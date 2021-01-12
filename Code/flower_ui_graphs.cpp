@@ -21,8 +21,7 @@ INTERNAL_FUNCTION v2 AddGraphPoint(ui_graph* Graph, v2 UnitP, float PixelRadius 
 {
     v2 TargetP = GetGraphPoint(Graph, UnitP);
     
-    PushOutlinedCircle2D(Global_UI->Params.Commands,
-                         TargetP,
+    PushOutlinedCircle2D(TargetP,
                          PixelRadius,
                          2.0f,
                          Color);
@@ -42,8 +41,7 @@ INTERNAL_FUNCTION v2 AddGraphPoint(ui_slider_graph* Graph,
     
     v2 CircleCenter = V2(TargetX, TargetY);
     
-    PushOutlinedCircle2D(Global_UI->Params.Commands,
-                         CircleCenter,
+    PushOutlinedCircle2D(CircleCenter,
                          PointRadius,
                          4,
                          Color);
@@ -94,7 +92,7 @@ INTERNAL_FUNCTION void AddHatchToAxis(ui_graph* Graph,
     v2 HatchBegin = HatchOrigin + HatchPerp * HatchWidth * 0.5f;
     v2 HatchEnd = HatchOrigin - HatchPerp * HatchWidth * 0.5f;
     
-    PushLine2D(Commands, HatchBegin, HatchEnd, Graph->AxisThickness, AxisColor);
+    PushLine2D(HatchBegin, HatchEnd, Graph->AxisThickness, AxisColor);
     
     if(Graph->ShowIntLabels)
     {
@@ -149,8 +147,7 @@ void AddAxis(ui_graph* Graph,
     int UnitMaxInt = std::floor(UnitMax);
     
     // NOTE(Dima): Pushing axis
-    PushArrow2D(Commands,
-                Graph->Origin - Axis * LowerUnits,
+    PushArrow2D(Graph->Origin - Axis * LowerUnits,
                 Graph->Origin + Axis * UpperUnits,
                 Graph->AxisThickness,
                 AxisColor);
@@ -214,8 +211,7 @@ INTERNAL_FUNCTION v2 AddGraphCircle(ui_graph* Graph, v2 UnitP, f32 UnitRadius, v
     
     f32 HalfThick = RENDER_DEFAULT_2D_LINE_THICKNESS * 0.5f;
     
-    PushCircleInternal2D(Global_UI->Params.Commands,
-                         TargetP,
+    PushCircleInternal2D(TargetP,
                          PixelRadius - HalfThick,
                          PixelRadius + HalfThick,
                          Color,
@@ -309,8 +305,7 @@ INTERNAL_FUNCTION ui_slider_graph SliderGraph(v2 CenterP,
     
     if(ShowRect)
     {
-        PushRect(Global_UI->Params.Commands,
-                 Result.Rect, 
+        PushRect(Result.Rect, 
                  ColorGray());
     }
     
@@ -490,13 +485,11 @@ INTERNAL_FUNCTION void LerpGraphColors(float t,
     v4 MinColor = Min;
     v4 MaxColor = Max;
     
-    PushOutlinedRect(Commands, 
-                     RectCenterDim(MinColorP, MinMaxDim),
+    PushOutlinedRect(RectCenterDim(MinColorP, MinMaxDim),
                      2,
                      MinColor);
     
-    PushOutlinedRect(Commands, 
-                     RectCenterDim(MaxColorP, MinMaxDim),
+    PushOutlinedRect(RectCenterDim(MaxColorP, MinMaxDim),
                      2,
                      MaxColor);
     
@@ -504,8 +497,7 @@ INTERNAL_FUNCTION void LerpGraphColors(float t,
     
     v2 LerpColorP = Lerp(MinColorP, MaxColorP, t);
     
-    PushOutlinedRect(Commands, 
-                     RectCenterDim(LerpColorP, MinMaxDim),
+    PushOutlinedRect(RectCenterDim(LerpColorP, MinMaxDim),
                      2,
                      LerpedColor);
     
@@ -588,8 +580,7 @@ INTERNAL_FUNCTION void LerpGraphPositions(float t, b32 ShowLabels = true)
     
     if(DrawLine)
     {
-        PushRoundLine2D(Global_UI->Params.Commands, 
-                        GraphMinP, GraphLerpP,
+        PushRoundLine2D(GraphMinP, GraphLerpP,
                         11.0f,
                         ColorBlue());
     }
@@ -784,8 +775,7 @@ INTERNAL_FUNCTION void MappingRangeGraph(v2 Range1,
     // NOTE(Dima): Misc
     if(Graph1.ValueScreenPCalculated && Graph2.ValueScreenPCalculated)
     {
-        PushDashedLine2D(Global_UI->Params.Commands,
-                         Graph1.ValueScreenP,
+        PushDashedLine2D(Graph1.ValueScreenP,
                          Graph2.ValueScreenP,
                          RENDER_DEFAULT_2D_LINE_DASH_LENGTH,
                          RENDER_DEFAULT_2D_LINE_DASH_SPACING,

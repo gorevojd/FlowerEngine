@@ -374,8 +374,7 @@ INTERNAL_FUNCTION void Text(char* Txt, b32 Highligth = false)
     
     if(Highligth)
     {
-        PushRectOutline(Params->Commands,
-                        Bounds, 2,
+        PushRectOutline(Bounds, 2,
                         Color);
     }
     

@@ -45,25 +45,28 @@ SCENE_UPDATE(TestGame)
     asset_id PlaneID = GetByName("Mesh_Plane");
     asset_id GroundMaterialID = GetByName("Material_Ground");
     
-    RenderModel(Global_RenderCommands,
-                Global_Assets->Bear,
-                V3(0.0f, 0.0f, 0.0f),
+    RenderModel(Global_Assets->Bear,
+                V3(1.0f, 0.0f, 0.0f),
                 Global_Time->Time,
                 Global_Assets->BearSuccess);
     
-    RenderModel(Global_RenderCommands,
-                Global_Assets->Fox,
+    RenderModel(Global_Assets->Bear,
+                V3(-1.0f, 0.0f, 0.0f),
+                Global_Time->Time,
+                Global_Assets->BearIdle);
+    
+    RenderModel(Global_Assets->Fox,
                 V3(-3.0f, 0.0f, 0.0f),
                 Global_Time->Time,
                 Global_Assets->FoxTalk);
     
-    RenderModel(Global_RenderCommands,
-                Global_Assets->Supra,
+#if 1    
+    RenderModel(Global_Assets->Supra,
                 V3(4.0f, 0.0f, 0.0f),
                 Global_Time->Time);
+#endif
     
-    PushMesh(Global_RenderCommands,
-             &Global_Assets->Plane,
+    PushMesh(&Global_Assets->Plane,
              &Global_Assets->GroundMaterial,
              ScalingMatrix(10.0f),
              V3(1.0f));

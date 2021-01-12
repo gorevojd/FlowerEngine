@@ -1,5 +1,7 @@
-inline void* PushRenderCommand_(render_commands* Commands, u32 CommandType, u32 SizeOfCommandStruct)
+inline void* PushRenderCommand_(u32 CommandType, u32 SizeOfCommandStruct)
 {
+    render_commands* Commands = Global_RenderCommands;
+    
     Assert(Commands->CommandCount < MAX_RENDER_COMMANDS_COUNT);
     render_command_header* Head = &Commands->CommandHeaders[Commands->CommandCount++];
     
@@ -11,35 +13,22 @@ inline void* PushRenderCommand_(render_commands* Commands, u32 CommandType, u32 
     return(CommandData);
 }
 
-#define PushRenderCommand(commands, type, struct_type) (struct_type*)PushRenderCommand_(commands, type, sizeof(struct_type))
+#define PushRenderCommand(type, struct_type) (struct_type*)PushRenderCommand_(type, sizeof(struct_type))
 
-inline void SetMeshInternals(render_command_mesh_internal* Internal,
-                             mesh* Mesh,
-                             material* Material,
-                             v3 C,
-                             m44* SkinningMatrices,
-                             int SkinningMatricesCount)
-{
-    Internal->Mesh = Mesh;
-    Internal->Material = Material;
-    Internal->C = C;
-    Internal->SkinningMatrices = SkinningMatrices;
-    Internal->SkinningMatricesCount = SkinningMatricesCount;
-}
-
-inline void PushMesh(render_commands* Commands, 
-                     mesh* Mesh, 
+inline void PushMesh(mesh* Mesh, 
                      material* Material, 
                      const m44& ModelToWorld,
                      v3 C = V3(1.0f, 1.0f, 1.0f),
                      m44* SkinningMatrices = 0,
                      int SkinningMatricesCount = 0)
 {
-    render_command_mesh* Entry = PushRenderCommand(Commands, RenderCommand_Mesh, render_command_mesh);
+    render_command_mesh* Entry = PushRenderCommand(RenderCommand_Mesh, render_command_mesh);
     
-    SetMeshInternals(&Entry->Mesh, Mesh, Material, C, 
-                     SkinningMatrices, 
-                     SkinningMatricesCount);
+    Entry->Mesh = Mesh;
+    Entry->Material = Material;
+    Entry->C = C;
+    Entry->SkinningMatrices = SkinningMatrices;
+    Entry->SkinningMatricesCount = SkinningMatricesCount;
     
     Entry->ModelToWorld = ModelToWorld;
 }
@@ -151,16 +140,26 @@ inline void PushInstanceMesh(int MaxInstanceCount,
     
     if(!Instance)
     {
-        render_command_instanced_mesh* Entry = PushRenderCommand(Global_RenderCommands, 
-                                                                 RenderCommand_InstancedMesh, 
+        render_command_instanced_mesh* Entry = PushRenderCommand(RenderCommand_InstancedMesh, 
                                                                  render_command_instanced_mesh);
         
-        SetMeshInternals(&Entry->Mesh, Mesh, Material, C,
-                         SkinningMatrices,
-                         SkinningMatricesCount);
+        
+        Entry->Mesh = Mesh;
+        Entry->Material = Material;
+        Entry->C = C;
         
         Entry->InstanceMatrices = PushArray(&Global_RenderCommands->CommandsBuffer, 
                                             m44, MaxInstanceCount);
+        Entry->NumSkinningMatricesPerInstance = SkinningMatricesCount;
+        
+        // NOTE(Dima): 256 is the maximum number of bones
+        Entry->InstanceSkinningMatrices = 0;
+        if(SkinningMatricesCount > 0)
+        {
+            Entry->InstanceSkinningMatrices = PushArray(&Global_RenderCommands->CommandsBuffer,
+                                                        m44, MaxInstanceCount * SkinningMatricesCount);
+        }
+        
         Entry->MaxInstanceCount = MaxInstanceCount;
         Entry->InstanceCount = 0;
         
@@ -169,14 +168,34 @@ inline void PushInstanceMesh(int MaxInstanceCount,
     
     Assert(Instance);
     
-    Assert(Instance->Command->InstanceCount < Instance->Command->MaxInstanceCount);
-    Instance->Command->InstanceMatrices[Instance->Command->InstanceCount] = ModelToWorld;
+    int InstanceIndex = Instance->Command->InstanceCount;
+    Assert(InstanceIndex < Instance->Command->MaxInstanceCount);
+    
+    // NOTE(Dima): Save instance transform
+    Instance->Command->InstanceMatrices[InstanceIndex] = ModelToWorld;
+    
+    // NOTE(Dima): Copy skinning matrices
+    if(SkinningMatrices)
+    {
+        Assert(SkinningMatricesCount == Instance->Command->NumSkinningMatricesPerInstance);
+        
+        for(int SkinningMatrixIndex = 0;
+            SkinningMatrixIndex < SkinningMatricesCount;
+            SkinningMatrixIndex++)
+        {
+            int CurIndex = SkinningMatricesCount * InstanceIndex + SkinningMatrixIndex;
+            
+            Instance->Command->InstanceSkinningMatrices[CurIndex] = SkinningMatrices[SkinningMatrixIndex];
+        }
+    }
+    
+    // NOTE(Dima): Increasing instance count
     Instance->Command->InstanceCount++;
 }
 
-inline void PushImage(render_commands* Commands, image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    render_command_image* Entry = PushRenderCommand(Commands, RenderCommand_Image, render_command_image);
+    render_command_image* Entry = PushRenderCommand(RenderCommand_Image, render_command_image);
     
     Entry->Image = Img;
     Entry->P = P;
@@ -237,8 +256,7 @@ INTERNAL_FUNCTION inline void PushRectInternal(rect_buffer* RectBuffer,
     RectBuffer->RectCount++;
 }
 
-INTERNAL_FUNCTION inline void PushTriangle2D(render_commands* Commands,
-                                             v2 Point0, 
+INTERNAL_FUNCTION inline void PushTriangle2D(v2 Point0, 
                                              v2 Point1, 
                                              v2 Point2,
                                              v4 C = ColorWhite())
@@ -249,14 +267,13 @@ INTERNAL_FUNCTION inline void PushTriangle2D(render_commands* Commands,
     Verts[2] = { Point2, V2(0.0f, 0.0f)};
     Verts[3] = { Point2, V2(0.0f, 0.0f)};
     
-    rect_buffer* RectBuffer = &Commands->Rects2D;
+    rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
     int ModelTransformMatrixIndex = RectBuffer->IdentityMatrixIndex;;
     
     PushRectInternal(RectBuffer, Verts, Rect_Solid, ModelTransformMatrixIndex, C);
 }
 
-INTERNAL_FUNCTION inline void PushQuadrilateral2D(render_commands* Commands,
-                                                  v2 Point0, 
+INTERNAL_FUNCTION inline void PushQuadrilateral2D(v2 Point0, 
                                                   v2 Point1, 
                                                   v2 Point2,
                                                   v2 Point3,
@@ -268,14 +285,13 @@ INTERNAL_FUNCTION inline void PushQuadrilateral2D(render_commands* Commands,
     Verts[2] = { Point2, V2(0.0f, 0.0f)};
     Verts[3] = { Point3, V2(0.0f, 0.0f)};
     
-    rect_buffer* RectBuffer = &Commands->Rects2D;
+    rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
     int ModelTransformMatrixIndex = RectBuffer->IdentityMatrixIndex;;
     
     PushRectInternal(RectBuffer, Verts, Rect_Solid, ModelTransformMatrixIndex, C);
 }
 
-INTERNAL_FUNCTION inline void PushCircleInternal2D(render_commands* Commands, 
-                                                   v2 P, 
+INTERNAL_FUNCTION inline void PushCircleInternal2D(v2 P, 
                                                    f32 InnerRadius,
                                                    f32 OuterRadius,
                                                    v4 C = ColorWhite(),
@@ -298,8 +314,7 @@ INTERNAL_FUNCTION inline void PushCircleInternal2D(render_commands* Commands,
         v2 NextInner = P + NormNext * InnerRadius;
         v2 CurInner = P + NormCurrent * InnerRadius;
         
-        PushQuadrilateral2D(Commands, 
-                            CurOuter,
+        PushQuadrilateral2D( CurOuter,
                             NextOuter, 
                             NextInner,
                             CurInner,
@@ -307,52 +322,44 @@ INTERNAL_FUNCTION inline void PushCircleInternal2D(render_commands* Commands,
     }
 }
 
-INTERNAL_FUNCTION inline void PushCircle2D(render_commands* Commands, 
-                                           v2 P, f32 Radius,
+INTERNAL_FUNCTION inline void PushCircle2D(v2 P, f32 Radius,
                                            v4 C = ColorWhite(),
                                            int Segments = 24)
 {
-    PushCircleInternal2D(Commands,
-                         P, 0.0f,
+    PushCircleInternal2D(P, 0.0f,
                          Radius,
                          C,
                          Segments);
 }
 
-INTERNAL_FUNCTION inline void PushCircleOutline2D(render_commands* Commands, 
-                                                  v2 P, 
+INTERNAL_FUNCTION inline void PushCircleOutline2D(v2 P, 
                                                   f32 CircleRadius,
                                                   f32 OutlineThickness,
                                                   v4 C = ColorWhite(),
                                                   int Segments = 24)
 {
-    PushCircleInternal2D(Commands,
-                         P,
+    PushCircleInternal2D(P,
                          CircleRadius,
                          CircleRadius + OutlineThickness,
                          C,
                          Segments);
 }
 
-INTERNAL_FUNCTION inline void PushOutlinedCircle2D(render_commands* Commands,
-                                                   v2 P, f32 Radius,
+INTERNAL_FUNCTION inline void PushOutlinedCircle2D(v2 P, f32 Radius,
                                                    f32 OutlineThickness,
                                                    v4 CircleC = ColorWhite(),
                                                    v4 OutlineC = ColorGray(0.05f))
 {
-    PushCircle2D(Commands,
-                 P, Radius,
+    PushCircle2D(P, Radius,
                  CircleC, 16);
     
-    PushCircleOutline2D(Commands,
-                        P, Radius,
+    PushCircleOutline2D(P, Radius,
                         OutlineThickness,
                         OutlineC,
                         16);
 }
 
-INTERNAL_FUNCTION inline void PushRect(render_commands* Commands,
-                                       rc2 Rect,
+INTERNAL_FUNCTION inline void PushRect(rc2 Rect,
                                        v4 C = ColorWhite())
 {
     v2 Point1 = Rect.Min;
@@ -360,16 +367,14 @@ INTERNAL_FUNCTION inline void PushRect(render_commands* Commands,
     v2 Point3 = Rect.Max;
     v2 Point4 = V2(Rect.Min.x, Rect.Max.y);
     
-    PushQuadrilateral2D(Commands,
-                        Point1,
+    PushQuadrilateral2D(Point1,
                         Point2,
                         Point3,
                         Point4,
                         C);
 }
 
-INTERNAL_FUNCTION inline void PushRectOutline(render_commands* Commands,
-                                              rc2 Rect,
+INTERNAL_FUNCTION inline void PushRectOutline(rc2 Rect,
                                               f32 Thickness,
                                               v4 C = ColorBlack())
 {
@@ -388,23 +393,21 @@ INTERNAL_FUNCTION inline void PushRectOutline(render_commands* Commands,
         RectIndex < 4;
         RectIndex++)
     {
-        PushRect(Commands, Lines[RectIndex], C);
+        PushRect(Lines[RectIndex], C);
     }
 }
 
-INTERNAL_FUNCTION inline void PushOutlinedRect(render_commands* Commands,
-                                               rc2 Rect,
+INTERNAL_FUNCTION inline void PushOutlinedRect(rc2 Rect,
                                                f32 OutlineThickness,
                                                v4 RectColor = ColorWhite(),
                                                v4 OutlineColor = ColorBlack())
 {
-    PushRect(Commands, Rect, RectColor);
+    PushRect(Rect, RectColor);
     
-    PushRectOutline(Commands, Rect, OutlineThickness, OutlineColor);
+    PushRectOutline(Rect, OutlineThickness, OutlineColor);
 }
 
-INTERNAL_FUNCTION inline void PushLineInternal2D(render_commands* Commands,
-                                                 v2 Begin,
+INTERNAL_FUNCTION inline void PushLineInternal2D(v2 Begin,
                                                  v2 End,
                                                  f32 Thickness = RENDER_DEFAULT_2D_LINE_THICKNESS,
                                                  v4 C = ColorWhite(),
@@ -446,7 +449,7 @@ INTERNAL_FUNCTION inline void PushLineInternal2D(render_commands* Commands,
         Verts[2] = { LineBegin + Offset, V2(0.0f, 0.0f)};
         Verts[3] = { LineBegin - Offset, V2(0.0f, 0.0f)};
         
-        rect_buffer* RectBuffer = &Commands->Rects2D;
+        rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
         int ModelTransformMatrixIndex = RectBuffer->IdentityMatrixIndex;
         
         PushRectInternal(RectBuffer, Verts, Rect_Solid, ModelTransformMatrixIndex, C);
@@ -461,8 +464,7 @@ INTERNAL_FUNCTION inline void PushLineInternal2D(render_commands* Commands,
         v2 Corner2 = LineEnd + ArrowOffset;
         v2 Corner3 = LineEnd - ArrowOffset;
         
-        PushTriangle2D(Commands,
-                       Corner1,
+        PushTriangle2D(Corner1,
                        Corner2,
                        Corner3,
                        C);
@@ -475,49 +477,43 @@ INTERNAL_FUNCTION inline void PushLineInternal2D(render_commands* Commands,
         v2 Corner2 = LineBegin + ArrowOffset;
         v2 Corner3 = LineBegin - ArrowOffset;
         
-        PushTriangle2D(Commands,
-                       Corner1,
+        PushTriangle2D(Corner1,
                        Corner2,
                        Corner3,
                        C);
     }
 }
 
-INTERNAL_FUNCTION inline void PushLine2D(render_commands* Commands,
-                                         v2 Begin,
+INTERNAL_FUNCTION inline void PushLine2D(v2 Begin,
                                          v2 End,
                                          f32 Thickness = RENDER_DEFAULT_2D_LINE_THICKNESS,
                                          v4 C = ColorWhite())
 {
-    PushLineInternal2D(Commands, 
-                       Begin,
+    PushLineInternal2D(Begin,
                        End,
                        Thickness, C);
 }
 
-INTERNAL_FUNCTION inline void PushRoundLine2D(render_commands* Commands,
-                                              v2 Begin,
+INTERNAL_FUNCTION inline void PushRoundLine2D(v2 Begin,
                                               v2 End,
                                               f32 Radius,
                                               v4 C = ColorWhite())
 {
-    PushLineInternal2D(Commands, 
-                       Begin,
+    PushLineInternal2D(Begin,
                        End,
                        Radius * 2.0f, 
                        C);
     
-    PushCircle2D(Commands, Begin, 
+    PushCircle2D(Begin, 
                  Radius, C,
                  12);
     
-    PushCircle2D(Commands, End, 
+    PushCircle2D(End, 
                  Radius, C,
                  12);
 }
 
-INTERNAL_FUNCTION inline void PushDashedLine2D(render_commands* Commands,
-                                               v2 Begin,
+INTERNAL_FUNCTION inline void PushDashedLine2D(v2 Begin,
                                                v2 End,
                                                f32 DashMaxLen = RENDER_DEFAULT_2D_LINE_DASH_LENGTH,
                                                f32 SpaceLen = RENDER_DEFAULT_2D_LINE_DASH_SPACING,
@@ -544,8 +540,7 @@ INTERNAL_FUNCTION inline void PushDashedLine2D(render_commands* Commands,
         v2 CurLineEnd = CurLineStart + OffsetNorm * CurDashLen;
         
         // NOTE(Dima): Pushing line
-        PushLineInternal2D(Commands, 
-                           CurLineStart, 
+        PushLineInternal2D(CurLineStart, 
                            CurLineEnd,
                            Thickness,
                            C);
@@ -555,14 +550,12 @@ INTERNAL_FUNCTION inline void PushDashedLine2D(render_commands* Commands,
     }
 }
 
-INTERNAL_FUNCTION inline void PushArrow2D(render_commands* Commands,
-                                          v2 Begin,
+INTERNAL_FUNCTION inline void PushArrow2D(v2 Begin,
                                           v2 End,
                                           f32 Thickness = RENDER_DEFAULT_2D_LINE_THICKNESS,
                                           v4 C = ColorWhite())
 {
-    PushLineInternal2D(Commands, 
-                       Begin,
+    PushLineInternal2D(Begin,
                        End,
                        Thickness, C, 
                        true, false);

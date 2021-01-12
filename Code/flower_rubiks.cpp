@@ -909,8 +909,7 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             
             mesh* InnerMesh = &Cube->InnerMeshes[Rot->AxisIndex];
             
-            PushMesh(Global_RenderCommands,
-                     InnerMesh,
+            PushMesh(InnerMesh,
                      0,
                      InnerTransform,
                      V3(1.0f));

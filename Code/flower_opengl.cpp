@@ -419,17 +419,17 @@ INTERNAL_FUNCTION mesh_handles OpenGLAllocateMesh(mesh* Mesh, opengl_shader* Sha
 }
 
 INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
-                                        render_command_mesh_internal* MeshCommand,
+                                        mesh* Mesh,
+                                        material* Material,
+                                        v3 Color,
+                                        m44* SkinningMatrices,
+                                        int NumInstanceSkMat,
                                         m44* View, 
                                         m44* Projection,
                                         m44* InstanceModelTransforms,
                                         int MeshInstanceCount,
                                         b32 UseInstancing)
 {
-    mesh* Mesh = MeshCommand->Mesh;
-    v3 Color = MeshCommand->C;
-    material* Material = MeshCommand->Material;
-    
     if(!Mesh->ApiHandles.Initialized)
     {
         Mesh->ApiHandles = OpenGLAllocateMesh(Mesh, &OpenGL.StdShader);
@@ -470,11 +470,11 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
     GLuint SkinningMatricesTBO;
     OpenGLCreateAndBindTextureBuffer(&SkinningMatricesBO,
                                      &SkinningMatricesTBO,
-                                     sizeof(m44) * MeshCommand->SkinningMatricesCount,
-                                     MeshCommand->SkinningMatrices,
+                                     sizeof(m44) * NumInstanceSkMat * MeshInstanceCount,
+                                     SkinningMatrices,
                                      GL_RGBA32F,
                                      0, Shader->SkinningMatricesLoc);
-    glUniform1i(Shader->SkinningMatricesCountLoc, MeshCommand->SkinningMatricesCount);
+    glUniform1i(Shader->SkinningMatricesCountLoc, NumInstanceSkMat);
     glUniform1i(Shader->MeshIsSkinnedLoc, Mesh->IsSkinned);
     
     if(Material != 0)
@@ -669,7 +669,11 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands)
                 render_command_mesh* MeshCommand = GetRenderCommand(Commands, CommandIndex, render_command_mesh);
                 
                 OpenGLRenderMesh(&OpenGL.StdShader,
-                                 &MeshCommand->Mesh,
+                                 MeshCommand->Mesh,
+                                 MeshCommand->Material,
+                                 MeshCommand->C,
+                                 MeshCommand->SkinningMatrices,
+                                 MeshCommand->SkinningMatricesCount,
                                  &Commands->View, 
                                  &Commands->Projection,
                                  &MeshCommand->ModelToWorld, 1,
@@ -682,7 +686,11 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands)
                                                                               render_command_instanced_mesh);
                 
                 OpenGLRenderMesh(&OpenGL.StdShader,
-                                 &MeshCommand->Mesh,
+                                 MeshCommand->Mesh,
+                                 MeshCommand->Material,
+                                 MeshCommand->C,
+                                 MeshCommand->InstanceSkinningMatrices,
+                                 MeshCommand->NumSkinningMatricesPerInstance,
                                  &Commands->View, 
                                  &Commands->Projection,
                                  MeshCommand->InstanceMatrices, 

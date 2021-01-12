@@ -156,6 +156,7 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Supra = LoadModel("E:/Development/Modeling/Modeling challenge/ToyotaSupra/Supra.FBX");
     
     A->BearSuccess = LoadSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
+    A->BearIdle = LoadSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
     A->FoxTalk = LoadSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
     
     // NOTE(Dima): Bear materials
@@ -232,6 +233,7 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     AddAsset("Supra", Asset_Model, &A->Supra);
     
     AddAsset("Bear_Success", Asset_Animation, &A->BearSuccess);
+    AddAsset("Bear_Idle", Asset_Animation, &A->BearIdle);
     AddAsset("Fox_Talk", Asset_Animation, &A->FoxTalk);
     
     AddAsset("Material_Bear", Asset_Material, &A->BearMaterial);

@@ -4,6 +4,7 @@
 #define RENDER_DEFAULT_2D_LINE_THICKNESS 4.0f
 #define RENDER_DEFAULT_2D_LINE_DASH_LENGTH 20.0f
 #define RENDER_DEFAULT_2D_LINE_DASH_SPACING 8.0f
+#define RENDER_MAX_BONES 256
 
 enum render_command_type
 {
@@ -24,27 +25,25 @@ struct render_command_image
     v4 C;
 };
 
-struct render_command_mesh_internal
+struct render_command_mesh
 {
     mesh* Mesh;
     material* Material;
-    
     m44* SkinningMatrices;
-    int SkinningMatricesCount;
-    
     v3 C;
-};
-
-struct render_command_mesh
-{
-    render_command_mesh_internal Mesh;
+    int SkinningMatricesCount;
     
     m44 ModelToWorld;
 };
 
 struct render_command_instanced_mesh
 {
-    render_command_mesh_internal Mesh;
+    mesh* Mesh;
+    material* Material;
+    v3 C;
+    
+    m44* InstanceSkinningMatrices;
+    int NumSkinningMatricesPerInstance;
     
     m44* InstanceMatrices;
     int InstanceCount;
@@ -107,7 +106,6 @@ struct window_dimensions
     int Height;
 };
 
-// TODO(Dima): Get rid of render_commands in Render Push functions
 struct render_commands
 {
     memory_arena CommandsBuffer;

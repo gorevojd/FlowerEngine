@@ -64,6 +64,7 @@ struct asset_system
     model* Supra;
     
     animation* BearSuccess;
+    animation* BearIdle;
     animation* FoxTalk;
     
     material BearMaterial;

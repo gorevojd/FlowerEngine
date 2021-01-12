@@ -151,8 +151,7 @@ INTERNAL_FUNCTION void SetMatrices(m44 ViewMatrix)
         Global_RenderCommands->Projection;
 }
 
-void RenderModel(render_commands* Commands,
-                 model* Model,
+void RenderModel(model* Model,
                  v3 P,
                  f32 Time,
                  animation* Animation = 0)
@@ -196,25 +195,15 @@ void RenderModel(render_commands* Commands,
                     MeshTran = ModelToWorld;
                 }
                 
-                PushMesh(Commands, 
-                         Mesh,
-                         Model->Materials[Mesh->MaterialIndexInModel],
-                         MeshTran,
-                         V3(1.0f),
-                         SkinningMatrices,
-                         SkinningMatricesCount);
+                PushInstanceMesh(1000, 
+                                 Mesh,
+                                 Model->Materials[Mesh->MaterialIndexInModel],
+                                 MeshTran,
+                                 V3(1.0f),
+                                 SkinningMatrices,
+                                 SkinningMatricesCount);
+                
             }
         }
-        
-#if 0        
-        if(BoneMesh != 0)
-        {
-            m44 BoneTran = ScalingMatrix(0.05f) * TranslationMatrix((V4(0, 0, 0, 1) * NodeTran).xyz);
-            
-            PushMesh(Commands, BoneMesh,
-                     0,
-                     BoneTran);
-        }
-#endif
     }
 }
