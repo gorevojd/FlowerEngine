@@ -9,5 +9,9 @@
 
 	"RubiksCube": {
 		"FileName": "mode_rubiks.cpp"
-	}
+	},
+
+	"MouseCheese": {
+		"FileName": "mode_mousecheese.cpp"
+	},
 }

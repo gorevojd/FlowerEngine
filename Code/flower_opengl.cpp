@@ -1,5 +1,7 @@
 GLOBAL_VARIABLE opengl_state OpenGL;
 
+#include "imgui_impl_opengl3.cpp"
+
 #if 0
 char* ReadFileAndNullTerminate(char* Path)
 {
@@ -286,6 +288,10 @@ INTERNAL_FUNCTION void OpenGLInit()
     
     SDL_GL_SetSwapInterval(0);
     
+    // Setup Platform/Renderer backends
+    const char* imgui_glsl_version = "#version 130";
+    ImGui_ImplOpenGL3_Init(imgui_glsl_version);
+    
     glEnable(GL_DEPTH_TEST);
     
     glEnable(GL_BLEND);
@@ -305,6 +311,8 @@ INTERNAL_FUNCTION void OpenGLInit()
 INTERNAL_FUNCTION void OpenGLFree()
 {
     OpenGLDeleteShader(&OpenGL.StdShader);
+    
+    ImGui_ImplOpenGL3_Shutdown();
 }
 
 INTERNAL_FUNCTION mesh_handles OpenGLAllocateMesh(mesh* Mesh, opengl_shader* Shader)
@@ -827,9 +835,16 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
     glEnable(GL_DEPTH_TEST);
 }
 
+INTERNAL_FUNCTION PLATFORM_RENDERER_BEGIN_FRAME(OpenGLBeginFrame)
+{
+    ImGui_ImplOpenGL3_NewFrame();
+}
+
 INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
 {
     render_commands* Commands = Global_RenderCommands;
+    
+    ImGui_ImplOpenGL3_NewFrame();
     
     //glClearColor(0.3f, 0.4f, 0.8f, 1.0f);
     glClearColor(0.6f, 0.6f, 0.9f, 1.0f);
@@ -843,6 +858,8 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     
     OpenGLRenderRectBuffer(Commands, &Commands->Rects3D, true, true);
     OpenGLRenderRectBuffer(Commands, &Commands->Rects2D, false, false);
+    
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 INTERNAL_FUNCTION PLATFORM_RENDERER_SWAPBUFFERS(OpenGLSwapBuffers)

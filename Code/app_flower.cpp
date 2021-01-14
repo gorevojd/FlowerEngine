@@ -15,6 +15,9 @@
 
 #include <iostream>
 
+#include "imgui_impl_sdl.h"
+#include "imgui_impl_sdl.cpp"
+
 #include <SDL.h>
 #include <vector>
 #include <algorithm>
@@ -508,19 +511,19 @@ INTERNAL_FUNCTION void ProcessKeyboardEvents(input_system* Input, SDL_KeyboardEv
             {
                 SetFullscreen(!App->IsFullscreen);
             }
-            
-            if(KeyCode == SDLK_BACKQUOTE && AltIsDown)
-            {
-                Input->CapturingMouse = !Input->CapturingMouse;
-                
-                SDL_SetRelativeMouseMode(Input->CapturingMouse ? SDL_TRUE : SDL_FALSE);
-            }
         }
         else
         {
             
         }
     }
+}
+
+INTERNAL_FUNCTION PLATFORM_SET_CAPTURING_MOUSE(SetCapturingMouse)
+{
+    Global_Input->CapturingMouse = IsCapture;
+    
+    SDL_SetRelativeMouseMode(IsCapture ? SDL_TRUE : SDL_FALSE);
 }
 
 INTERNAL_FUNCTION void ProcessEvents(input_system* Input)
@@ -530,6 +533,8 @@ INTERNAL_FUNCTION void ProcessEvents(input_system* Input)
     SDL_Event Event;
     while(SDL_PollEvent(&Event))
     {
+        ImGui_ImplSDL2_ProcessEvent(&Event);
+        
         switch(Event.type)
         {
             case SDL_KEYUP:
@@ -935,6 +940,7 @@ int main(int ArgsCount, char** Args)
     Platform.AllocateBlock = AppAllocBlock;
     Platform.DeallocateBlock = AppDeallocBlock;
     Platform.ProcessInput = ProcessInput;
+    Platform.SetCapturingMouse = SetCapturingMouse;
     Platform.Render = OpenGLRender;
     Platform.SwapBuffers = OpenGLSwapBuffers;
     Platform.ReadFileAndNullTerminate = StandardReadFileAndNullTerminate;
@@ -961,6 +967,7 @@ int main(int ArgsCount, char** Args)
     App->WndDims.Width = App->WndDims.InitWidth;
     App->WndDims.Height = App->WndDims.InitHeight;
     
+    
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
@@ -982,6 +989,19 @@ int main(int ArgsCount, char** Args)
     SDL_SetRelativeMouseMode(Global_Input->CapturingMouse ? SDL_TRUE : SDL_FALSE);
     
     App->OpenGLContext = SDL_GL_CreateContext(App->Window);
+    
+    // NOTE(Dima): Setup IMGUI
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
+    
+    ImGui_ImplSDL2_InitForOpenGL(App->Window, App->OpenGLContext);
     
     OpenGLInit();
     
@@ -1012,6 +1032,11 @@ int main(int ArgsCount, char** Args)
         Global_Time->SinTime = Sin(Global_Time->Time);
         Global_Time->CosTime = Cos(Global_Time->Time);
         
+        // NOTE(Dima): Starting IMGUI frame
+        // Start the Dear ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL2_NewFrame(App->Window);
+        
         // NOTE(Dima): Updating a game
         Global_RenderCommands->WindowDimensions = App->WndDims;
         
@@ -1021,6 +1046,9 @@ int main(int ArgsCount, char** Args)
     }
     
     OpenGLFree();
+    
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
     
     SDL_GL_DeleteContext(App->OpenGLContext);
     SDL_DestroyWindow(App->Window);

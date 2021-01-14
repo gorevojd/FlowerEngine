@@ -111,7 +111,7 @@ SCENE_INIT(RubiksCube)
     
     InitCamera(&State->Camera, Camera_RotateAround);
     
-    State->Cube3 = CreateCube(Scene->Arena, 30, 2.0f, V3(0.0f));
+    State->Cube3 = CreateCube(Scene->Arena, 2, 2.0f, V3(0.0f));
 }
 
 SCENE_UPDATE(RubiksCube)

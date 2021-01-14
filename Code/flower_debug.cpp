@@ -1,5 +1,7 @@
 #if defined(INTERNAL_BUILD)
 
+GLOBAL_VARIABLE debug_state* Global_Debug;
+
 void DEBUGParseNameFromUnique(char* To, int ToSize,
                               char* From)
 {
@@ -501,6 +503,16 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
 }
 #endif
 
+void DEBUGOverlays()
+{
+    if(ImGui::BeginMenu("Profile"))
+    {
+        
+        
+        ImGui::EndMenu();
+    }
+}
+
 void DEBUGInitGlobalTable(memory_arena* Arena)
 {
     Global_DebugTable = PushStruct(Arena, debug_global_table);
@@ -516,7 +528,7 @@ void DEBUGInitGlobalTable(memory_arena* Arena)
     Global_DebugTable->Arena = Arena;
 }
 
-GLOBAL_VARIABLE debug_state* Global_Debug;
+
 
 INTERNAL_FUNCTION void DEBUGInit(memory_arena* Arena)
 {

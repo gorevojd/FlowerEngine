@@ -203,6 +203,15 @@ inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 
     Entry->Dim = V2(Height * Img->WidthOverHeight, Height);
 }
 
+inline void PushCenteredImage(image* Img, v2 CenterP, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+{
+    f32 Width = Height * Img->WidthOverHeight;
+    
+    v2 PushP = CenterP - V2(Width, Height) * 0.5f;
+    
+    PushImage(Img, PushP, Height, C);
+}
+
 INTERNAL_FUNCTION inline int PushRectTransform(rect_buffer* RectBuffer, m44* Transform)
 {
     int Index = RectBuffer->TransformsCount++;

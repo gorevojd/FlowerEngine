@@ -2,6 +2,7 @@
 #define TUTY_OPENGL_H
 
 #include "GL/glew.h"
+#include "imgui_impl_opengl3.h"
 
 inline b32 OpenGLAttribIsValid(GLint Attrib)
 {

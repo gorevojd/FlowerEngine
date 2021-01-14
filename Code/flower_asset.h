@@ -41,6 +41,9 @@ struct asset_system
     mesh Cube;
     mesh Plane;
     
+    image Mouse;
+    image Cheese;
+    
     image BoxTexture;
     image PlaneTexture;
     image Palette; 

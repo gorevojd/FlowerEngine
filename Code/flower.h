@@ -25,6 +25,8 @@ struct game
     int CurrentSceneIndex;
     int NextSceneIndex;
     
+    bool ShowOverlays;
+    
     memory_arena* Arena;
 };
 

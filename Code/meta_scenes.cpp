@@ -12,6 +12,7 @@
 #define META_SCENES_H
 
 #include "graph_show.cpp"
+#include "mode_mousecheese.cpp"
 #include "mode_rubiks.cpp"
 #include "test_game.cpp"
 
@@ -20,6 +21,7 @@ GLOBAL_VARIABLE const char* MetaScene_Names[] =
 	"TestGame",
 	"GraphShow",
 	"RubiksCube",
+	"MouseCheese",
 };
 
 GLOBAL_VARIABLE scene_init* MetaScene_InitFunctions[] = 
@@ -27,6 +29,7 @@ GLOBAL_VARIABLE scene_init* MetaScene_InitFunctions[] =
 	TestGameInit,
 	GraphShowInit,
 	RubiksCubeInit,
+	MouseCheeseInit,
 };
 
 GLOBAL_VARIABLE scene_update* MetaScene_UpdateFunctions[] = 
@@ -34,6 +37,7 @@ GLOBAL_VARIABLE scene_update* MetaScene_UpdateFunctions[] =
 	TestGameUpdate,
 	GraphShowUpdate,
 	RubiksCubeUpdate,
+	MouseCheeseUpdate,
 };
 
 #endif //META_GAME_MODES_H

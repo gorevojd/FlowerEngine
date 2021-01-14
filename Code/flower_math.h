@@ -1723,4 +1723,20 @@ inline rc2 RectCenterDim(v2 Center, v2 Dim)
     return(Result);
 }
 
+inline b32 PointInRect(v2 Point, rc2 Rect)
+{
+    v2 Center = GetCenter(Rect);
+    v2 HalfDim = GetDim(Rect) * 0.5f;
+    v2 Diff = Point - Center;
+    
+    b32 Result = false;
+    if(std::abs(Diff.x) <= HalfDim.x && 
+       std::abs(Diff.y) <= HalfDim.y)
+    {
+        Result = true;
+    }
+    
+    return(Result);
+}
+
 #endif

@@ -1,3 +1,11 @@
+// NOTE(Dima): MOuse stuff
+inline b32 MouseInRect(rc2 Rect)
+{
+    b32 Result = PointInRect(Global_Input->MouseWindowP, Rect);
+    
+    return(Result);
+}
+
 // NOTE(Dima): Internal calls
 #define GET_BUTTON_COMMON(name) b32 name(key_state* Key)
 typedef GET_BUTTON_COMMON(get_button_common);
@@ -41,6 +49,13 @@ inline b32 GetKeyUp(u32 KeyCode)
 inline b32 GetKeyDown(u32 KeyCode)
 {
     b32 Result = GetKeyDownInternal(&Global_Input->Keyboard.KeyStates[KeyCode]);
+    
+    return(Result);
+}
+
+inline b32 GetMod(u32 Mod)
+{
+    b32 Result = (Global_Input->Keyboard.Mods & Mod) != 0;
     
     return(Result);
 }

@@ -181,7 +181,8 @@ INTERNAL_FUNCTION inline rubiks_is_outer_bool RubiksIsOuterCubie(rubiks_cube* Cu
     {
         Result.Result[RubiksDirection_Right] = true;
     }
-    else if(x == (Cube->Dim - 1))
+    
+    if(x == (Cube->Dim - 1))
     {
         Result.Result[RubiksDirection_Left] = true;
     }
@@ -190,7 +191,8 @@ INTERNAL_FUNCTION inline rubiks_is_outer_bool RubiksIsOuterCubie(rubiks_cube* Cu
     {
         Result.Result[RubiksDirection_Down] = true;
     }
-    else if(y == (Cube->Dim - 1))
+    
+    if(y == (Cube->Dim - 1))
     {
         Result.Result[RubiksDirection_Up] = true;
     }
@@ -199,7 +201,8 @@ INTERNAL_FUNCTION inline rubiks_is_outer_bool RubiksIsOuterCubie(rubiks_cube* Cu
     {
         Result.Result[RubiksDirection_Back] = true;
     }
-    else if(z == (Cube->Dim - 1))
+    
+    if(z == (Cube->Dim - 1))
     {
         Result.Result[RubiksDirection_Front] = true;
     }
@@ -450,8 +453,8 @@ INTERNAL_FUNCTION void RubiksPrecomputeMeshes(rubiks_cube* Cube)
         }
     }
     
-    Assert(UniqueMeshMap.size() == RUBIKS_MESHES_COUNT);
-    Assert(Cube->UniqueMeshesCount == RUBIKS_MESHES_COUNT);
+    //Assert(UniqueMeshMap.size() == RUBIKS_MESHES_COUNT);
+    //Assert(Cube->UniqueMeshesCount == RUBIKS_MESHES_COUNT);
 }
 
 inline v3 RubiksPlaneTo3DPoint(rubiks_cube* Cube, v2 PlaneP, u32 Direction, b32 IsUpper)

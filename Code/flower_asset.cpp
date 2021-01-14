@@ -131,6 +131,9 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Cube = MakeUnitCube();
     A->Plane = MakePlane();
     
+    A->Mouse = LoadImageFile("E:/Media/Photos/Internet/Images/Mouse.png");
+    A->Cheese = LoadImageFile("E:/Media/Photos/Internet/Images/Cheese.png");
+    
     A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");;
     A->PlaneTexture = LoadImageFile("E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png");
     A->Palette = LoadImageFile("E:/Development/Modeling/Pallette/MyPallette.png", true);
@@ -213,6 +216,9 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     AddAsset("Mesh_Cube", Asset_Mesh, &A->Cube);
     AddAsset("Mesh_Plane", Asset_Mesh, &A->Plane);
+    
+    AddAsset("Image_Mouse", Asset_Image, &A->Mouse);
+    AddAsset("Image_Cheese", Asset_Image, &A->Cheese);
     
     AddAsset("Texture_Box", Asset_Image, &A->BoxTexture);
     AddAsset("Texture_Plane", Asset_Image, &A->PlaneTexture);

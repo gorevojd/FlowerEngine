@@ -2,12 +2,6 @@
 #include <map>
 #include <algorithm>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
-
 #define DefineOffset(name, type, count) \
 {\
 mi Size##name = sizeof(type) * (count); \
@@ -42,7 +36,7 @@ INTERNAL_FUNCTION image LoadImageFile(char* FilePath, b32 FilteringIsClosest = f
     int Height;
     int Channels;
     
-    stbi_set_flip_vertically_on_load(true);
+    //stbi_set_flip_vertically_on_load(true);
     
     unsigned char* Image = stbi_load(FilePath,
                                      &Width,
@@ -1200,8 +1194,8 @@ INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
         Assert(Node->NumChildIndices <= ArrayCount(Node->ChildIndices));
         Assert(Node->NumMeshIndices <= ArrayCount(Node->MeshIndices));
         
-        Node->NumChildIndices = Min(Node->NumChildIndices, ArrayCount(Node->ChildIndices));
-        Node->NumMeshIndices = Min(Node->NumMeshIndices, ArrayCount(Node->MeshIndices));
+        Node->NumChildIndices = FlowerMin(Node->NumChildIndices, ArrayCount(Node->ChildIndices));
+        Node->NumMeshIndices = FlowerMin(Node->NumMeshIndices, ArrayCount(Node->MeshIndices));
         
         // NOTE(Dima): Copy child indices
         for(int ChildIndex = 0;

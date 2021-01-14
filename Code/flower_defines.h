@@ -23,8 +23,8 @@
 #define INTERNAL_FUNCTION static
 #define LOCAL_PERSIST static
 
-#define Min(a, b) ((a) < (b) ? (a) : (b))
-#define Max(a, b) ((a) > (b) ? (a) : (b))
+#define FlowerMin(a, b) ((a) < (b) ? (a) : (b))
+#define FlowerMax(a, b) ((a) > (b) ? (a) : (b))
 
 #define Kilobytes(count) ((count) * 1000)
 #define Megabytes(count) ((count) * 1000000)
