@@ -147,57 +147,60 @@ struct playing_animation
 
 void UpdateAnimation(animation* Animation, f32 Time, m44* NodeMatrices)
 {
-    f32 CurrentTick = fmod(Time * Animation->TicksPerSecond, Animation->DurationTicks);
+    asset_animation_shared* Shared = &Animation->Shared;
+    
+    f32 CurrentTick = fmod(Time * Shared->TicksPerSecond, 
+                           Shared->DurationTicks);
     u32 AnimBehaviour = AnimBehaviour_Repeat;
     
     for(int NodeAnimIndex = 0;
-        NodeAnimIndex < Animation->NumNodeAnimations;
+        NodeAnimIndex < Shared->NumNodeAnims;
         NodeAnimIndex++)
     {
-        node_animation* NodeAnim = Animation->NodeAnimations[NodeAnimIndex];
+        node_animation* NodeAnim = &Animation->NodeAnims[NodeAnimIndex];
         
         // NOTE(Dima): Finding frames that we will interpolate between
         nearest_frames NearestP = FindNearestFrames(NodeAnim->PositionTimes,
-                                                    NodeAnim->PositionCount,
+                                                    NodeAnim->NumPos,
                                                     CurrentTick,
-                                                    Animation->DurationTicks,
+                                                    Shared->DurationTicks,
                                                     AnimBehaviour);
         
         nearest_frames NearestR = FindNearestFrames(NodeAnim->RotationTimes,
-                                                    NodeAnim->RotationCount,
+                                                    NodeAnim->NumRot,
                                                     CurrentTick,
-                                                    Animation->DurationTicks,
+                                                    Shared->DurationTicks,
                                                     AnimBehaviour);
         
         nearest_frames NearestS = FindNearestFrames(NodeAnim->ScalingTimes,
-                                                    NodeAnim->ScalingCount,
+                                                    NodeAnim->NumScl,
                                                     CurrentTick,
-                                                    Animation->DurationTicks,
+                                                    Shared->DurationTicks,
                                                     AnimBehaviour);
         
         // NOTE(Dima): Checking and interpolating
         v3 NewP = V3(0.0f);
-        if(NeedInterpolateKeys(NodeAnim->PositionCount, &NearestP))
+        if(NeedInterpolateKeys(NodeAnim->NumPos, &NearestP))
         {
             NewP = InterpolateVectorKeys(&NearestP, 
                                          NodeAnim->PositionKeys,
-                                         NodeAnim->PositionCount);
+                                         NodeAnim->NumPos);
         }
         
         v3 NewS = V3(1.0f);
-        if(NeedInterpolateKeys(NodeAnim->ScalingCount, &NearestS))
+        if(NeedInterpolateKeys(NodeAnim->NumScl, &NearestS))
         {
             NewS = InterpolateVectorKeys(&NearestS,
                                          NodeAnim->ScalingKeys,
-                                         NodeAnim->ScalingCount);
+                                         NodeAnim->NumScl);
         }
         
         quat NewR = IdentityQuaternion();
-        if(NeedInterpolateKeys(NodeAnim->RotationCount, &NearestR))
+        if(NeedInterpolateKeys(NodeAnim->NumRot, &NearestR))
         {
             NewR = InterpolateQuaternionKeys(&NearestR,
                                              NodeAnim->RotationKeys,
-                                             NodeAnim->RotationCount);
+                                             NodeAnim->NumRot);
         }
         
         m44 AnimatedTransform = ScalingMatrix(NewS) * QuaternionToMatrix4(NewR) * TranslationMatrix(NewP);
@@ -209,14 +212,14 @@ void UpdateAnimation(animation* Animation, f32 Time, m44* NodeMatrices)
 
 INTERNAL_FUNCTION void CalculateToModelTransforms(model* Model)
 {
-    m44* ArrayToModel = Model->NodeToModel;
-    m44* ArrayToParent = Model->NodeToParent;
+    m44* ArrayToModel = Model->Node_ToModel;
+    m44* ArrayToParent = Model->Node_ToParent;
     
     for(int TranIndex = 0;
-        TranIndex < Model->NumNodes;
+        TranIndex < Model->Shared.NumNodes;
         TranIndex++)
     {
-        int ParentIndex = Model->ParentNodeIndex[TranIndex];
+        int ParentIndex = Model->Node_ParentIndex[TranIndex];
         
         if(ParentIndex == -1)
         {
@@ -232,11 +235,12 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model* Model)
 INTERNAL_FUNCTION void CalculateSkinningMatrices(model* Model)
 {
     for(int BoneIndex = 0;
-        BoneIndex < Model->NumBones;
+        BoneIndex < Model->Shared.NumBones;
         BoneIndex++)
     {
-        model_bone* Bone = &Model->Bones[BoneIndex];
+        int NodeIndex = Model->Bone_NodeIndex[BoneIndex];
+        const m44& InvBindPos = Model->Bone_InvBindPose[BoneIndex];
         
-        Model->SkinningMatrices[BoneIndex] = Bone->InvBindPose * Model->NodeToModel[Bone->NodeIndex];
+        Model->Bone_SkinningMatrices[BoneIndex] = InvBindPos * Model->Node_ToModel[NodeIndex];
     }
 }

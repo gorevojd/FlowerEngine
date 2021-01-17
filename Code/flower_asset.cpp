@@ -1,9 +1,11 @@
 #include "flower_asset_load.cpp"
 
-INTERNAL_FUNCTION void AddGlyphToAtlas(glyph* Glyph)
+INTERNAL_FUNCTION void AddGlyphToAtlas(font* Font, int GlyphIndex)
 {
-    image* Src = &Glyph->Image;
+    image* Src = &Font->GlyphImages[GlyphIndex];
     image* Dst = &Global_Assets->FontsAtlas;
+    
+    glyph* Glyph = &Font->Glyphs[GlyphIndex];
     
     int SrcW = Src->Width;
     int SrcH = Src->Height;
@@ -53,15 +55,15 @@ INTERNAL_FUNCTION void AddFontToAtlas(font* Font)
     {
         glyph* Glyph = &Font->Glyphs[GlyphIndex];
         
-        AddGlyphToAtlas(Glyph);
+        AddGlyphToAtlas(Font, GlyphIndex);
     }
 }
 
-INTERNAL_FUNCTION asset_id AddAsset(const char* Name, u32 Type, void* Ptr)
+INTERNAL_FUNCTION asset_id AddAsset(const char* GUID, u32 Type, void* Ptr)
 {
     asset NewAsset = {};
     
-    CopyStringsSafe(NewAsset.Name, ArrayCount(NewAsset.Name), (char*)Name);
+    CopyStringsSafe(NewAsset.GUID, ArrayCount(NewAsset.GUID), (char*)GUID);
     NewAsset.Type = Type;
     NewAsset.Ptr = Ptr;
     
@@ -70,7 +72,7 @@ INTERNAL_FUNCTION asset_id AddAsset(const char* Name, u32 Type, void* Ptr)
     Global_Assets->Assets.push_back(NewAsset);
     
     // NOTE(Dima): Insering to table
-    auto NewPair = std::pair<std::string, asset_id>(std::string(Name), 
+    auto NewPair = std::pair<std::string, asset_id>(std::string(GUID), 
                                                     NewAssetID);
     
     Global_Assets->NameToAssetID->insert(NewPair);
@@ -80,10 +82,12 @@ INTERNAL_FUNCTION asset_id AddAsset(const char* Name, u32 Type, void* Ptr)
 
 inline asset_id GetByName(char* AssetName)
 {
+    asset_id Result = 0;
     auto FindIt = Global_Assets->NameToAssetID->find(std::string(AssetName));
-    Assert(FindIt != Global_Assets->NameToAssetID->end());
-    
-    asset_id Result = FindIt->second;
+    if(FindIt != Global_Assets->NameToAssetID->end())
+    {
+        Result = FindIt->second;
+    }
     
     return(Result);
 }
@@ -99,6 +103,113 @@ inline void* GetAssetDataByIDInternal(asset_id ID, u32 AssetType)
 }
 
 #define GetAssetDataByID(id, data_type, asset_type) (data_type*)GetAssetByIDInternal(id, asset_type);
+#define GetAsset(guid, data_type, asset_type) GetAssetDataByID(GetByName(guid), asset_type) 
+
+#if 0
+struct asset_source
+{
+    std::string GUID;
+    std::string FilePath;
+    
+    u32 Type;
+    u32 TypeSize;
+    
+    b32 FromFile;
+    
+    loading_params LoadingParams;
+    
+    void* Data;
+};
+
+struct loaded_assets
+{
+    std::vector<asset_source> Sources;
+    
+    memory_arena Arena;
+    
+    loaded_assets()
+    {
+        Arena = {};
+    }
+    
+    ~loaded_assets()
+    {
+        FreeArena(&Arena);
+    }
+    
+    int AddSource(const char* GUID,
+                  const char* FilePath,
+                  u32 AssetType)
+    {
+        int Result = Sources.size();
+        
+        asset_source New = {};
+        
+        New.GUID = std::string(GUID);
+        New.FilePath = std::string(FilePath);
+        New.FromFile = true;
+        New.Type = AssetType;
+        New.LoadingParams = DefaultLoadingParams();
+        New.TypeSize = Global_AssetTypeSize[AssetType];
+        
+        Sources.push_back(New);
+        
+        return(Result);
+    }
+    
+    int AddSource(const char* GUID,
+                  void* Source,
+                  u32 AssetType)
+    {
+        int Result = Sources.size();
+        
+        asset_source New = {};
+        
+        New.GUID = std::string(GUID);
+        New.FromFile = false;
+        New.Type = AssetType;
+        New.LoadingParams = DefaultLoadingParams();
+        New.TypeSize = Global_AssetTypeSize[AssetType];
+        
+        Sources.push_back(New);
+        
+        return(Result);
+    }
+    
+    void Load()
+    {
+        for(auto& Source : Sources)
+        {
+            Source.Data = malloc(Source.TypeSize);
+            
+            switch(Source.Type)
+            {
+                case Asset_Model:
+                {
+                    model* Model = (model*)Source.Data;
+                    
+                    *Model = LoadModel();
+                }break;
+                
+                case Asset_Animation:
+                {
+                    
+                }break;
+                
+                case Asset_Image:
+                {
+                    
+                }break;
+                
+                case Asset_Mesh:
+                {
+                    
+                }break;
+            }
+        }
+    }
+};
+#endif
 
 INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
 {
@@ -107,10 +218,6 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     asset_system* A = Global_Assets;
     
-    // NOTE(Dima): Reserving memory for assets array
-    A->Assets.reserve(1024);
-    A->NameToAssetID = PushNew<std::unordered_map<std::string, asset_id>>(Arena);
-    
     // NOTE(Dima): Font atlas initializing
     int FontAtlasSize = 2048;
     void* FontsAtlasMem = calloc(FontAtlasSize * FontAtlasSize * sizeof(u32), 1);
@@ -118,10 +225,99 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
                                                       FontAtlasSize,
                                                       FontsAtlasMem);
     
+#if 0    
+    Assert(ArrayCount(Global_AssetTypeSize) == Asset_Count);
+    loaded_assets Loaded;
+    
+    // NOTE(Dima): Loading assets
+    mesh Cube = MakeUnitCube();
+    mesh Plane = MakePlane();
+    
+    Loaded.AddSource("Mesh_Cube", &Cube, Asset_Mesh);
+    Loaded.AddSource("Mesh_Plane", &Plane, Asset_Mesh);
+    
+    // NOTE(Dima): Adding fonts
+    Loaded.AddSource("Times_New_Roman",
+                     "C:/Windows/Fonts/times.ttf",
+                     Asset_Font);
+    Loaded.AddSource("Life_Is_Goofy",
+                     "../Data/Fonts/Life is goofy.ttf",
+                     Asset_Font);
+    Loaded.AddSource("Arial",
+                     "c:/windows/fonts/arial.ttf",
+                     Asset_Font);
+    
+    // NOTE(Dima): Adding images
+    Loaded.AddSource("Image_Cheese", "E:/Media/Photos/Internet/Images/Cheese.png", Asset_Image);
+    Loaded.AddSource("Image_Mouse", "E:/Media/Photos/Internet/Images/Mouse.png", Asset_Image);
+    
+    Loaded.AddSource("Texture_Box", "../Data/Textures/container_diffuse.png", Asset_Image);
+    Loaded.AddSource("Texture_Plane", "E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png", Asset_Image);
+    int PalleteSI = Loaded.AddSource("Texture_Palette", 
+                                     "E:/Development/Modeling/Pallette/MyPallette.png", 
+                                     Asset_Image);
+    
+    // NOTE(Dima): Adding Bear Textures
+    Loaded.AddSource("Bear_Diffuse", "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear.tga",
+                     Asset_Image);
+    Loaded.AddSource("Bear_Normal", "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear Normals.tga",
+                     Asset_Image);
+    Loaded.AddSource("Bear_Eyes_Diffuse", "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Eye Bear.tga",
+                     Asset_Image);
+    Loaded.AddSource("Bear_Eyes_Shine", 
+                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Eye Shine Bear.tga", 
+                     Asset_Image);
+    
+    // NOTE(Dima): Adding Fox Textures
+    Loaded.AddSource("Fox_Diffuse", 
+                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Fox.tga",
+                     Asset_Image);
+    Loaded.AddSource("Fox_Normal", 
+                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Fox Normals.tga",
+                     Asset_Image);
+    Loaded.AddSource("Fox_Eyes_Diffuse", 
+                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Eye Green.tga",
+                     Asset_Image);
+    Loaded.AddSource("Fox_Eyes_Shine", 
+                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Eye Shine.tga", 
+                     Asset_Image);
+    
+    // NOTE(Dima): Adding models
+    Loaded.AddSource("Bear", 
+                     "E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/bear.FBX",
+                     Asset_Model);
+    
+    Loaded.AddSource("Fox",
+                     "E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/Fox.FBX",
+                     Asset_Model);
+    
+    Loaded.AddSource("Supra",
+                     "E:/Development/Modeling/Modeling challenge/ToyotaSupra/Supra.FBX",
+                     Asset_Model);
+    
+    // NOTE(Dima): Adding animations
+    loaded_animations BearSuccess = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
+    Loaded.AddSource("Bear_Success",
+                     &BearSuccess.Animations[0],
+                     Asset_Animation);
+    
+    loaded_animations BearIdle = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
+    Loaded.AddSource("Bear_Idle",
+                     &BearIdle.Animations[0],
+                     Asset_Animation);
+    
+    loaded_animations FoxTalk = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
+    Loaded.AddSource("Fox_Talk",
+                     &FoxTalk.Animations[0],
+                     Asset_Animation);
+#endif
+    
+    
+#if 1
     // NOTE(Dima): Loading fonts
-    A->TimesNewRoman = LoadFontFile("C:/Windows/Fonts/times.ttf", 30);
-    A->LifeIsGoofy = LoadFontFile("../Data/Fonts/Life is goofy.ttf", 30);
-    A->Arial = LoadFontFile("c:/windows/fonts/arial.ttf", 30);
+    A->TimesNewRoman = LoadFontFile("C:/Windows/Fonts/times.ttf");
+    A->LifeIsGoofy = LoadFontFile("../Data/Fonts/Life is goofy.ttf");
+    A->Arial = LoadFontFile("c:/windows/fonts/arial.ttf");
     
     AddFontToAtlas(&A->TimesNewRoman);
     AddFontToAtlas(&A->LifeIsGoofy);
@@ -136,7 +332,9 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");;
     A->PlaneTexture = LoadImageFile("E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png");
-    A->Palette = LoadImageFile("E:/Development/Modeling/Pallette/MyPallette.png", true);
+    loading_params PaletteParams = DefaultLoadingParams();
+    PaletteParams.Image_FilteringIsClosest = true;
+    A->Palette = LoadImageFile("E:/Development/Modeling/Pallette/MyPallette.png", PaletteParams);
     
     A->BearDiffuse = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear.tga");
     A->BearNormal = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear Normals.tga");
@@ -158,9 +356,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Fox = LoadModel("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/Fox.FBX", FoxParams);
     A->Supra = LoadModel("E:/Development/Modeling/Modeling challenge/ToyotaSupra/Supra.FBX");
     
-    A->BearSuccess = LoadSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
-    A->BearIdle = LoadSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
-    A->FoxTalk = LoadSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
+    loaded_animations BearSuccess = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
+    loaded_animations BearIdle = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
+    loaded_animations FoxTalk = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
+    
+    A->BearSuccess = BearSuccess.Animations[0];
+    A->BearIdle = BearIdle.Animations[0];
+    A->FoxTalk = FoxTalk.Animations[0];
     
     // NOTE(Dima): Bear materials
     A->BearMaterial = {};
@@ -172,13 +374,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->BearEyesShineMaterial = {};
     A->BearEyesShineMaterial.Diffuse = &A->BearEyesShine;
     
-    A->Bear->Materials[0] = &A->BearMaterial;
-    A->Bear->Materials[1] = &A->BearEyesMaterial;
-    A->Bear->Materials[2] = &A->BearEyesShineMaterial;
-    A->Bear->Meshes[1]->MaterialIndexInModel = 1;
-    A->Bear->Meshes[2]->MaterialIndexInModel = 2;
-    A->Bear->Meshes[3]->MaterialIndexInModel = 1;
-    A->Bear->Meshes[4]->MaterialIndexInModel = 2;
+    A->Bear.Materials[0] = &A->BearMaterial;
+    A->Bear.Materials[1] = &A->BearEyesMaterial;
+    A->Bear.Materials[2] = &A->BearEyesShineMaterial;
+    A->Bear.Meshes[1]->MaterialIndexInModel = 1;
+    A->Bear.Meshes[2]->MaterialIndexInModel = 2;
+    A->Bear.Meshes[3]->MaterialIndexInModel = 1;
+    A->Bear.Meshes[4]->MaterialIndexInModel = 2;
     
     // NOTE(Dima): Fox materials
     A->FoxMaterial = {};
@@ -190,16 +392,15 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->FoxEyesShineMaterial = {};
     A->FoxEyesShineMaterial.Diffuse = &A->FoxEyesShine;
     
-    A->Fox->Materials[0] = &A->FoxMaterial;
-    A->Fox->Materials[1] = &A->FoxEyesMaterial;
-    A->Fox->Materials[2] = &A->FoxEyesShineMaterial;
-    A->Fox->Meshes[1]->MaterialIndexInModel = 1;
-    A->Fox->Meshes[2]->MaterialIndexInModel = 2;
-    A->Fox->Meshes[3]->MaterialIndexInModel = 1;
-    A->Fox->Meshes[4]->MaterialIndexInModel = 2;
+    A->Fox.Materials[0] = &A->FoxMaterial;
+    A->Fox.Materials[1] = &A->FoxEyesMaterial;
+    A->Fox.Materials[2] = &A->FoxEyesShineMaterial;
+    A->Fox.Meshes[1]->MaterialIndexInModel = 1;
+    A->Fox.Meshes[2]->MaterialIndexInModel = 2;
+    A->Fox.Meshes[3]->MaterialIndexInModel = 1;
+    A->Fox.Meshes[4]->MaterialIndexInModel = 2;
     
     // NOTE(Dima): Other materials
-    A->Palette = LoadImageFile("E:/Development/Modeling/Pallette/MyPallette.png", true);
     A->PaletteMaterial = {};
     A->PaletteMaterial.Diffuse = &A->Palette;
     
@@ -207,44 +408,11 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->GroundMaterial.Diffuse = &A->PlaneTexture;
     
     // NOTE(Dima): Supra material
-    A->Supra->Materials[0] = &A->PaletteMaterial;
+    A->Supra.Materials[0] = &A->PaletteMaterial;
+#endif
     
-    // NOTE(Dima): Describing assets
-    AddAsset("Times_New_Roman", Asset_Font, &A->TimesNewRoman);
-    AddAsset("Life_Is_Goofy", Asset_Font, &A->LifeIsGoofy);
-    AddAsset("Arial", Asset_Font, &A->Arial);
-    
-    AddAsset("Mesh_Cube", Asset_Mesh, &A->Cube);
-    AddAsset("Mesh_Plane", Asset_Mesh, &A->Plane);
-    
-    AddAsset("Image_Mouse", Asset_Image, &A->Mouse);
-    AddAsset("Image_Cheese", Asset_Image, &A->Cheese);
-    
-    AddAsset("Texture_Box", Asset_Image, &A->BoxTexture);
-    AddAsset("Texture_Plane", Asset_Image, &A->PlaneTexture);
-    AddAsset("Texture_Palette", Asset_Image, &A->Palette);
-    
-    AddAsset("Bear_Diffuse", Asset_Image, &A->BearDiffuse);
-    AddAsset("Bear_Normal", Asset_Image, &A->BearNormal);
-    AddAsset("Bear_Eyes_Diffuse", Asset_Image, &A->BearEyesDiffuse);
-    AddAsset("Bear_Eyes_Shine", Asset_Image, &A->BearEyesShine);
-    
-    AddAsset("Fox_Diffuse", Asset_Image, &A->FoxDiffuse);
-    AddAsset("Fox_Normal", Asset_Image, &A->FoxNormal);
-    AddAsset("Fox_Eyes_Diffuse", Asset_Image, &A->FoxEyesDiffuse);
-    AddAsset("Fox_Eyes_Shine", Asset_Image, &A->FoxEyesShine);
-    
-    AddAsset("Fox", Asset_Model, &A->Fox);
-    AddAsset("Bear", Asset_Model, &A->Bear);
-    AddAsset("Supra", Asset_Model, &A->Supra);
-    
-    AddAsset("Bear_Success", Asset_Animation, &A->BearSuccess);
-    AddAsset("Bear_Idle", Asset_Animation, &A->BearIdle);
-    AddAsset("Fox_Talk", Asset_Animation, &A->FoxTalk);
-    
-    AddAsset("Material_Bear", Asset_Material, &A->BearMaterial);
-    AddAsset("Material_Fox", Asset_Material, &A->FoxMaterial);
-    AddAsset("Material_Palette", Asset_Material, &A->PaletteMaterial);
-    AddAsset("Material_Ground", Asset_Material, &A->GroundMaterial);
+    AddFontToAtlas(&A->TimesNewRoman);
+    AddFontToAtlas(&A->LifeIsGoofy);
+    AddFontToAtlas(&A->Arial);
     
 }

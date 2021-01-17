@@ -161,23 +161,24 @@ void RenderModel(model* Model,
     
     if(Animation != 0)
     {
-        UpdateAnimation(Animation, Time, Model->NodeToParent);
-        CalculateToModelTransforms(Model);
-        CalculateSkinningMatrices(Model);
+        UpdateAnimation(Animation, Time, Model->Node_ToParent);
         
-        SkinningMatrices = Model->SkinningMatrices;
-        SkinningMatricesCount = Model->NumBones;
+        SkinningMatrices = Model->Bone_SkinningMatrices;
+        SkinningMatricesCount = Model->Shared.NumBones;
     }
+    
+    CalculateToModelTransforms(Model);
+    CalculateSkinningMatrices(Model);
     
     m44 ModelToWorld = TranslationMatrix(P);
     
     for(int NodeIndex = 0;
-        NodeIndex < Model->NumNodes;
+        NodeIndex < Model->Shared.NumNodes;
         NodeIndex++)
     {
         model_node* Node = &Model->Nodes[NodeIndex];
         
-        m44 NodeTran = Model->NodeToModel[NodeIndex] * ModelToWorld;
+        m44 NodeTran = Model->Node_ToModel[NodeIndex] * ModelToWorld;
         
         for(int MeshIndex = 0;
             MeshIndex < Node->NumMeshIndices;

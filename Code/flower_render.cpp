@@ -578,7 +578,7 @@ inline void PushGlyph(rect_buffer* RectBuffer,
                       int ModelTransformMatrixIndex,
                       v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    v2 Dim = V2(Height * Glyph->Image.WidthOverHeight, Height);
+    v2 Dim = V2(Height * Glyph->WidthOverHeight, Height);
     
     v2 MinUV = Glyph->MinUV;
     v2 MaxUV = Glyph->MaxUV;

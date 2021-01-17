@@ -30,6 +30,69 @@ char* ReadFileAndNullTerminate(char* Path)
 }
 #endif
 
+INTERNAL_FUNCTION void OpenGLCheckError(char* File, int Line)
+{
+    char* Text = "";
+    
+    GLenum Error = glGetError();
+    
+    b32 Print = true;
+    switch(Error)
+    {
+        case GL_NO_ERROR:
+        {
+            Text = "GL_NO_ERROR\nNo error has been recorded.\n";
+            
+            Print = false;
+        }break;
+        
+        case GL_INVALID_ENUM:
+        {
+            Text = "GL_INVALID_ENUM\nAn unacceptable value is specified for an enumerated argument. The offending command is ignored and has no other side effect than to set the error flag.\n";
+        }break;
+        
+        case GL_INVALID_VALUE:
+        {
+            Text = "GL_INVALID_VALUE\nA numeric argument is out of range. The offending command is ignored and has no other side effect than to set the error flag.\n";
+        }break;
+        
+        case GL_INVALID_OPERATION:
+        {
+            Text = "GL_INVALID_OPERATION\nThe specified operation is not allowed in the current state. The offending command is ignored and has no other side effect than to set the error flag.\n";
+        }break;
+        
+        case GL_INVALID_FRAMEBUFFER_OPERATION:
+        {
+            Text = "GL_INVALID_FRAMEBUFFER_OPERATION\nThe framebuffer object is not complete. The offending command is ignored and has no other side effect than to set the error flag.\n";
+        }break;
+        
+        case GL_OUT_OF_MEMORY:
+        {
+            Text = "GL_OUT_OF_MEMORY\nThere is not enough memory left to execute the command. The state of the GL is undefined, except for the state of the error flags, after this error is recorded.\n";
+        }break;
+        
+        case GL_STACK_UNDERFLOW:
+        {
+            Text = "GL_STACK_UNDERFLOW\nAn attempt has been made to perform an operation that would cause an internal stack to underflow.\n";
+        }break;
+        
+        case GL_STACK_OVERFLOW:
+        {
+            Text = "GL_STACK_OVERFLOW\nAn attempt has been made to perform an operation that would cause an internal stack to underflow.\n";
+        }break;
+    }
+    
+    if(Print)
+    {
+        char Buf[512];
+        
+        stbsp_sprintf(Buf, "%s\n(File: %s, Line: %d)", Text, File, Line);
+        
+        printf(Buf);
+    }
+}
+
+
 INTERNAL_FUNCTION GLuint OpenGLLoadProgram(char* VertexFilePath, 
                                            char* FragmentFilePath, 
                                            char* GeometryFilePath = 0) 
@@ -284,6 +347,7 @@ INTERNAL_FUNCTION void OpenGLFreeTextureBuffer(GLuint* Buffer,
 
 INTERNAL_FUNCTION void OpenGLInit()
 {
+    glewExperimental = GL_TRUE;
     glewInit();
     
     SDL_GL_SetSwapInterval(0);
@@ -317,9 +381,9 @@ INTERNAL_FUNCTION void OpenGLFree()
 
 INTERNAL_FUNCTION mesh_handles OpenGLAllocateMesh(mesh* Mesh, opengl_shader* Shader)
 {
-    GLuint VAO;
-    GLuint VBO;
-    GLuint EBO;
+    GLuint VAO = 0;
+    GLuint VBO = 0;
+    GLuint EBO = 0;
     
     // NOTE(Dima): Init VAO and VBO
     glGenVertexArrays(1, &VAO);
@@ -330,15 +394,15 @@ INTERNAL_FUNCTION mesh_handles OpenGLAllocateMesh(mesh* Mesh, opengl_shader* Sha
     
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, 
-                 Mesh->VerticesDataBufferSize, 
-                 Mesh->VerticesDataBuffer, 
-                 GL_STREAM_DRAW);
+                 Mesh->FreeSize, 
+                 Mesh->Free, 
+                 GL_STATIC_DRAW);
     
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
                  sizeof(u32) * Mesh->IndexCount, 
                  Mesh->Indices, 
-                 GL_STREAM_DRAW);
+                 GL_STATIC_DRAW);
     
     // NOTE(Dima): Position
     if(OpenGLAttribIsValid(Shader->PositionAttr))
@@ -520,6 +584,7 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
     
     OpenGLFreeTextureBuffer(&SkinningMatricesBO,
                             &SkinningMatricesTBO);
+    
     if(UseInstancing)
     {
         OpenGLFreeTextureBuffer(&InstanceModelBO,

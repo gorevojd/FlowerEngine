@@ -150,7 +150,13 @@ inline void FreeArena(memory_arena* Arena, b32 JustResetData = false)
     {
         Arena->Block = 0;
     }
+}
+
+inline void ResetArena(memory_arena* Arena)
+{
+    b32 JustResetData = true;
     
+    FreeArena(Arena, JustResetData);
 }
 
 inline memory_arena CreateArenaInsideMemory(void* Memory, mi Size)

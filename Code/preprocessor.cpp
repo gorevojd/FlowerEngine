@@ -15,6 +15,7 @@ struct parsed_scene
     std::string File;
     std::string InitMethod;
     std::string UpdateMethod;
+    std::string OnGUIMethod;
 };
 
 struct parse_scene_context
@@ -67,8 +68,9 @@ void ParseScene(parse_scene_context* Context)
     
     // NOTE(Dima): Read scene name
     Scene.Name = JsonReadString(Tokenz);
-    Scene.InitMethod = Scene.Name + "Init";
-    Scene.UpdateMethod = Scene.Name + "Update";
+    Scene.InitMethod = Scene.Name + "_Init";
+    Scene.UpdateMethod = Scene.Name + "_Update";
+    Scene.OnGUIMethod = Scene.Name + "_OnGUI";
     
     RequireToken(Tokenz, JsonToken_Colon);
     RequireToken(Tokenz, JsonToken_OpenBlock);
@@ -170,6 +172,21 @@ void OutputScenesMeta(parse_scene_context* Context, const char* FileName)
         OutFile << "\t" << Scene->UpdateMethod << "," << std::endl;
     }
     OutFile << "};" << std::endl << std::endl;
+    
+    
+    // NOTE(Dima): Printing OnGUI functions
+    OutFile << "GLOBAL_VARIABLE scene_ongui* MetaScene_OnGUIFunctions[] = " << std::endl;
+    OutFile << "{" << std::endl;
+    for(int SceneIndex = 0;
+        SceneIndex < Context->ParsedScenes.size();
+        SceneIndex++)
+    {
+        parsed_scene* Scene = &Context->ParsedScenes[SceneIndex];
+        
+        OutFile << "\t" << Scene->OnGUIMethod << "," << std::endl;
+    }
+    OutFile << "};" << std::endl << std::endl;
+    
     
     // NOTE(Dima): Printing end of file
     OutFile << "#endif //META_GAME_MODES_H" << std::endl;

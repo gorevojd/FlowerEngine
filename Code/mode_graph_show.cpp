@@ -41,3 +41,8 @@ SCENE_UPDATE(GraphShow)
     
     UniBiMappingRangeGraph(PongTime);
 }
+
+SCENE_ONGUI(GraphShow)
+{
+    
+}

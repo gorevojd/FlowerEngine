@@ -1,6 +1,8 @@
 #ifndef FLOWER_RENDER_PRIMITIVES_H
 #define FLOWER_RENDER_PRIMITIVES_H
 
+#include "flower_asset_types_shared.h"
+
 struct mesh_handles
 {
     u64 ArrayObject;
@@ -24,8 +26,9 @@ struct mesh
 {
     char Name[64];
     
-    void* VerticesDataBuffer;
-    u32 VerticesDataBufferSize;
+    // NOTE(Dima): This pointer holds data for all the mesh (this includes vertices and index data)
+    void* Free;
+    u32 FreeSize;
     
     v3* P;
     v2* UV;
@@ -64,20 +67,8 @@ struct material
     image* Diffuse;
 };
 
-struct node_animation_offsets
-{
-    u32 OffsetPositionKeys;
-    u32 OffsetRotationKeys;
-    u32 OffsetScalingKeys;
-    u32 OffsetPositionTimes;
-    u32 OffsetRotationTimes;
-    u32 OffsetScalingTimes;
-};
-
 struct node_animation
 {
-    node_animation_offsets Offsets;
-    
     v3* PositionKeys;
     quat* RotationKeys;
     v3* ScalingKeys;
@@ -86,68 +77,11 @@ struct node_animation
     f32* RotationTimes;
     f32* ScalingTimes;
     
-    int PositionCount;
-    int RotationCount;
-    int ScalingCount;
+    int NumPos;
+    int NumRot;
+    int NumScl;
     
     int NodeIndex;
-};
-
-struct model_bone
-{
-    m44 InvBindPose;
-    
-    // NOTE(Dima): Index to node which represents this bone transformation in Model
-    int NodeIndex;
-};
-
-struct model_node
-{
-    char Name[64];
-    
-    int ChildIndices[32];
-    int MeshIndices[8];
-    
-    int NumChildIndices;
-    int NumMeshIndices;
-};
-
-struct model_offsets
-{
-    u32 OffsetMeshes;
-    u32 OffsetMaterials;
-    u32 OffsetNodes;
-    u32 OffsetNodeToModel;
-    u32 OffsetNodeToParent;
-    u32 OffsetParentNodeIndex;
-    u32 OffsetBones;
-    u32 OffsetSkinningMatrices;
-};
-
-struct model
-{
-    // NOTE(Dima): Meshes
-    mesh** Meshes;
-    int NumMeshes;
-    
-    // NOTE(Dima): Materials
-    material** Materials;
-    int NumMaterials;
-    
-    // NOTE(Dima): Nodes
-    model_node* Nodes;
-    m44* NodeToModel;
-    m44* NodeToParent;
-    int* ParentNodeIndex;
-    int NumNodes;
-    
-    // NOTE(Dima): Bones
-    model_bone* Bones;
-    m44* SkinningMatrices;
-    int NumBones;
-    
-    // NOTE(Dima): Offsets
-    model_offsets Offsets;
 };
 
 enum animation_behaviour
@@ -159,18 +93,17 @@ enum animation_behaviour
 struct animation
 {
     char Name[64];
+    asset_animation_shared Shared;
     
-    node_animation** NodeAnimations;
-    int NumNodeAnimations;
+    node_animation* NodeAnims;
     
-    f32 DurationTicks;
-    f32 TicksPerSecond;
-    u32 Behaviour;
+    void* Free;
 };
 
 struct glyph
 {
-    image Image;
+    int ImageIndex;
+    f32 WidthOverHeight;
     
     u32 Codepoint;
     
@@ -186,6 +119,7 @@ struct glyph
 
 struct font
 {
+    image* GlyphImages;
     glyph* Glyphs;
     int GlyphCount;
     
@@ -198,6 +132,38 @@ struct font
     f32 LineAdvance;
     
     int Size;
+};
+
+struct model_node
+{
+    char Name[64];
+    
+    int ChildIndices[32];
+    int MeshIndices[8];
+    
+    int NumChildIndices;
+    int NumMeshIndices;
+};
+
+struct model
+{
+    mesh** Meshes;
+    material** Materials;
+    
+    // NOTE(Dima): Nodes
+    model_node* Nodes;
+    m44* Node_ToModel;
+    m44* Node_ToParent;
+    int* Node_ParentIndex;
+    
+    // NOTE(Dima): Bones
+    m44* Bone_InvBindPose;
+    int* Bone_NodeIndex;
+    m44* Bone_SkinningMatrices;
+    
+    asset_model_shared Shared;
+    
+    void* Free;
 };
 
 #endif //FLOWER_RENDER_PRIMITIVES_H

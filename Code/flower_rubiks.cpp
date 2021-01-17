@@ -88,6 +88,7 @@ INTERNAL_FUNCTION inline void RubiksPushRoundTrapezoid(helper_rubiks_mesh* Resul
 
 INTERNAL_FUNCTION helper_rubiks_mesh GetStickerMeshInternal(f32 CubieLen, 
                                                             f32 StickerPercentage,
+                                                            b32 Rounded,
                                                             f32 Roundness)
 {
     helper_rubiks_mesh Result = {};
@@ -96,71 +97,89 @@ INTERNAL_FUNCTION helper_rubiks_mesh GetStickerMeshInternal(f32 CubieLen,
     f32 r = Roundness * S;
     
     f32 HalfS = S * 0.5f;
-    f32 HalfSR = HalfS - r;
-    
-    // NOTE(Dima): Generating circle points
-    int OneCornerSegments = 3;
-    int SegmentsCount = OneCornerSegments * 4;
-    
-    std::vector<v2> CirclePoints;
-    for(int SegmentIndex = 0; 
-        SegmentIndex < SegmentsCount;
-        SegmentIndex++)
+    if(Rounded)
     {
-        f32 CurrentAngle = (f32)SegmentIndex * F_TWO_PI / (f32)SegmentsCount;
         
-        v2 Direction = V2(Cos(CurrentAngle), Sin(CurrentAngle));
+        f32 HalfSR = HalfS - r;
         
-        CirclePoints.push_back(Direction * r);
-    }
-    
-    // NOTE(Dima): Corner 1 perimeter
-    RubiksPushCircleSegmentToPerimeter(Result.PerimeterPoints,
-                                       V2(HalfSR, HalfSR), 
-                                       0 * OneCornerSegments, 
-                                       CirclePoints,
-                                       OneCornerSegments);
-    
-    // NOTE(Dima): Corner 2 perimeter
-    RubiksPushCircleSegmentToPerimeter(Result.PerimeterPoints,
-                                       V2(-HalfSR, HalfSR), 
-                                       1 * OneCornerSegments, 
-                                       CirclePoints,
-                                       OneCornerSegments);
-    
-    // NOTE(Dima): Corner 3 perimeter
-    RubiksPushCircleSegmentToPerimeter(Result.PerimeterPoints,
-                                       V2(-HalfSR, -HalfSR), 
-                                       2 * OneCornerSegments, 
-                                       CirclePoints,
-                                       OneCornerSegments);
-    
-    // NOTE(Dima): Corner 4 perimeter
-    RubiksPushCircleSegmentToPerimeter(Result.PerimeterPoints,
-                                       V2(HalfSR, -HalfSR), 
-                                       3 * OneCornerSegments, 
-                                       CirclePoints,
-                                       OneCornerSegments);
-    
-    // NOTE(Dima): Pushing main quad
+        // NOTE(Dima): Generating circle points
+        int OneCornerSegments = 3;
+        int SegmentsCount = OneCornerSegments * 4;
+        
+        std::vector<v2> CirclePoints;
+        for(int SegmentIndex = 0; 
+            SegmentIndex < SegmentsCount;
+            SegmentIndex++)
+        {
+            f32 CurrentAngle = (f32)SegmentIndex * F_TWO_PI / (f32)SegmentsCount;
+            
+            v2 Direction = V2(Cos(CurrentAngle), Sin(CurrentAngle));
+            
+            CirclePoints.push_back(Direction * r);
+        }
+        
+        // NOTE(Dima): Corner 1 perimeter
+        RubiksPushCircleSegmentToPerimeter(Result.PerimeterPoints,
+                                           V2(HalfSR, HalfSR), 
+                                           0 * OneCornerSegments, 
+                                           CirclePoints,
+                                           OneCornerSegments);
+        
+        // NOTE(Dima): Corner 2 perimeter
+        RubiksPushCircleSegmentToPerimeter(Result.PerimeterPoints,
+                                           V2(-HalfSR, HalfSR), 
+                                           1 * OneCornerSegments, 
+                                           CirclePoints,
+                                           OneCornerSegments);
+        
+        // NOTE(Dima): Corner 3 perimeter
+        RubiksPushCircleSegmentToPerimeter(Result.PerimeterPoints,
+                                           V2(-HalfSR, -HalfSR), 
+                                           2 * OneCornerSegments, 
+                                           CirclePoints,
+                                           OneCornerSegments);
+        
+        // NOTE(Dima): Corner 4 perimeter
+        RubiksPushCircleSegmentToPerimeter(Result.PerimeterPoints,
+                                           V2(HalfSR, -HalfSR), 
+                                           3 * OneCornerSegments, 
+                                           CirclePoints,
+                                           OneCornerSegments);
+        
+        // NOTE(Dima): Pushing main quad
 #if 1    
-    v2 Poi1 = V2(-HalfS, HalfSR);
-    v2 Poi2 = V2(HalfS, HalfSR);
-    v2 Poi3 = V2(HalfS, -HalfSR);
-    v2 Poi4 = V2(-HalfS, -HalfSR);
-    
-    PushStickerPolygon(&Result, Poi1, Poi2, Poi3, Poi4);
+        v2 Poi1 = V2(-HalfS, HalfSR);
+        v2 Poi2 = V2(HalfS, HalfSR);
+        v2 Poi3 = V2(HalfS, -HalfSR);
+        v2 Poi4 = V2(-HalfS, -HalfSR);
+        
+        PushStickerPolygon(&Result, Poi1, Poi2, Poi3, Poi4);
 #endif
-    
-    // NOTE(Dima): Pushing upper rounded trapezoid
-    RubiksPushRoundTrapezoid(&Result, 
-                             OneCornerSegments,
-                             0);
-    
-    // NOTE(Dima): Pushing upper rounded trapezoid
-    RubiksPushRoundTrapezoid(&Result, 
-                             OneCornerSegments,
-                             2 * (OneCornerSegments + 1));
+        
+        // NOTE(Dima): Pushing upper rounded trapezoid
+        RubiksPushRoundTrapezoid(&Result, 
+                                 OneCornerSegments,
+                                 0);
+        
+        // NOTE(Dima): Pushing upper rounded trapezoid
+        RubiksPushRoundTrapezoid(&Result, 
+                                 OneCornerSegments,
+                                 2 * (OneCornerSegments + 1));
+    }
+    else
+    {
+        v2 Poi1 = V2(-HalfS, HalfS);
+        v2 Poi2 = V2(HalfS, HalfS);
+        v2 Poi3 = V2(HalfS, -HalfS);
+        v2 Poi4 = V2(-HalfS, -HalfS);
+        
+        PushStickerPolygon(&Result, Poi1, Poi2, Poi3, Poi4);
+        
+        Result.PerimeterPoints.push_back(Poi1);
+        Result.PerimeterPoints.push_back(Poi2);
+        Result.PerimeterPoints.push_back(Poi3);
+        Result.PerimeterPoints.push_back(Poi4);
+    }
     
     // NOTE(Dima): PUshing lower rounded trapezoid
     
@@ -389,6 +408,128 @@ INTERNAL_FUNCTION mesh GenerateCubieMesh(rubiks_cube* Cube,
     return(Result);
 }
 
+inline v3 RubiksPlaneTo3DPoint(rubiks_cube* Cube, v2 PlaneP, u32 Direction, b32 IsUpper)
+{
+    
+    v3 Normal = RubiksDirection[Direction];
+    f32 Offset = Cube->OneCubieLen * 0.5f;
+    
+    if(IsUpper)
+    {
+        Offset += Cube->StickerHeight;
+    }
+    
+    v3 Result = Normal * Offset;
+    
+    switch(Direction)
+    {
+        case RubiksDirection_Down:
+        case RubiksDirection_Up:
+        {
+            Result.x = PlaneP.x;
+            Result.z = PlaneP.y;
+        }break;
+        
+        case RubiksDirection_Left:
+        case RubiksDirection_Right:
+        {
+            Result.y = PlaneP.x;
+            Result.z = PlaneP.y;
+        }break;
+        
+        case RubiksDirection_Back:
+        case RubiksDirection_Front:
+        {
+            Result.x = PlaneP.x;
+            Result.y = PlaneP.y;
+        }break;
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void GenerateStickerMeshes(rubiks_cube* Cube, b32 RoundStickers)
+{
+    // NOTE(Dima): Generating sticker helper meshes
+    Cube->HelperStickerUp = GetStickerMeshInternal(Cube->OneCubieLen,
+                                                   0.88f, 
+                                                   RoundStickers, 0.1f);
+    Cube->HelperStickerDown = GetStickerMeshInternal(Cube->OneCubieLen,
+                                                     0.91f, 
+                                                     RoundStickers, 0.1f);
+    
+    // NOTE(Dima): Generating sticker meshes
+    for(int DirectionIndex = 0;
+        DirectionIndex < RubiksDirection_Count;
+        DirectionIndex++)
+    {
+        helper_mesh& HelperMesh = Cube->StickersMeshes[DirectionIndex];
+        
+        HelperMesh.Name = std::string("StickerMesh");
+        
+        v3 StickerColor = RubiksColors[DirectionIndex].rgb;
+        
+        helper_rubiks_mesh* StickerUp = &Cube->HelperStickerUp;
+        helper_rubiks_mesh* StickerDown = &Cube->HelperStickerDown;
+        
+        // NOTE(Dima): Generating sticker sides
+        
+        Assert(StickerUp->PerimeterPoints.size() == StickerDown->PerimeterPoints.size());
+        
+        int NumPerimP = StickerUp->PerimeterPoints.size();
+        for(int PIndex = 0; 
+            PIndex < NumPerimP; 
+            PIndex++)
+        {
+            v3 CurTop = RubiksPlaneTo3DPoint(Cube, 
+                                             StickerUp->PerimeterPoints[PIndex], 
+                                             DirectionIndex, true);
+            v3 NextTop = RubiksPlaneTo3DPoint(Cube, 
+                                              StickerUp->PerimeterPoints[(PIndex + 1) % NumPerimP], 
+                                              DirectionIndex, true);
+            v3 CurBot = RubiksPlaneTo3DPoint(Cube, 
+                                             StickerDown->PerimeterPoints[PIndex], 
+                                             DirectionIndex, false);
+            v3 NextBot = RubiksPlaneTo3DPoint(Cube, 
+                                              StickerDown->PerimeterPoints[(PIndex + 1) % NumPerimP], 
+                                              DirectionIndex, false);
+            
+            v3 Normal = NOZ(Cross(NextBot - CurTop, NextTop - CurTop));
+            
+            PushFlatPolygon(HelperMesh, 
+                            CurTop, NextTop,
+                            NextBot, CurBot,
+                            Normal, StickerColor);
+        }
+        
+        // NOTE(Dima): Generating sticker top
+        std::vector<v3> Points;
+        
+        helper_mesh StickerUpperMesh = {};
+        
+        // NOTE(Dima): Converting plane to 3d points
+        int NumP = StickerUp->P.size();
+        for(int PIndex = 0;
+            PIndex < NumP;
+            PIndex++)
+        {
+            v3 CurP = RubiksPlaneTo3DPoint(Cube, 
+                                           StickerUp->P[PIndex], 
+                                           DirectionIndex, true);
+            
+            StickerUpperMesh.Vertices.push_back(CurP);
+            StickerUpperMesh.Normals.push_back(RubiksDirection[DirectionIndex]);
+            StickerUpperMesh.TexCoords.push_back(V2(0.0f, 0.0f));
+            StickerUpperMesh.Colors.push_back(StickerColor);
+        }
+        
+        // NOTE(Dima): Copying indices
+        StickerUpperMesh.Indices = StickerUp->Ids;
+        
+        HelperMesh = CombineHelperMeshes(&HelperMesh, &StickerUpperMesh);
+    }
+}
+
 INTERNAL_FUNCTION std::string OuterCombinationUniqueName(rubiks_is_outer_bool* Bool)
 {
     char Buf[128];
@@ -457,46 +598,6 @@ INTERNAL_FUNCTION void RubiksPrecomputeMeshes(rubiks_cube* Cube)
     //Assert(Cube->UniqueMeshesCount == RUBIKS_MESHES_COUNT);
 }
 
-inline v3 RubiksPlaneTo3DPoint(rubiks_cube* Cube, v2 PlaneP, u32 Direction, b32 IsUpper)
-{
-    
-    v3 Normal = RubiksDirection[Direction];
-    f32 Offset = Cube->OneCubieLen * 0.5f;
-    
-    if(IsUpper)
-    {
-        Offset += Cube->StickerHeight;
-    }
-    
-    v3 Result = Normal * Offset;
-    
-    switch(Direction)
-    {
-        case RubiksDirection_Down:
-        case RubiksDirection_Up:
-        {
-            Result.x = PlaneP.x;
-            Result.z = PlaneP.y;
-        }break;
-        
-        case RubiksDirection_Left:
-        case RubiksDirection_Right:
-        {
-            Result.y = PlaneP.x;
-            Result.z = PlaneP.y;
-        }break;
-        
-        case RubiksDirection_Back:
-        case RubiksDirection_Front:
-        {
-            Result.x = PlaneP.x;
-            Result.y = PlaneP.y;
-        }break;
-    }
-    
-    return(Result);
-}
-
 INTERNAL_FUNCTION inline v3 GetCubieP(rubiks_cube* Cube, int x, int y, int z)
 {
     v3 CubieP = V3((f32)x * Cube->OneCubieLen + Cube->CubieOffset,
@@ -504,142 +605,6 @@ INTERNAL_FUNCTION inline v3 GetCubieP(rubiks_cube* Cube, int x, int y, int z)
                    (f32)z * Cube->OneCubieLen + Cube->CubieOffset);
     
     return(CubieP);
-}
-
-INTERNAL_FUNCTION inline void ResetCubies(rubiks_cube* Cube)
-{
-    // NOTE(Dima): Initializing cubies
-    for(int x = 0; x < Cube->Dim; x++)
-    {
-        for(int y = 0; y < Cube->Dim; y++)
-        {
-            for(int z = 0; z < Cube->Dim; z++)
-            {
-                v3 CubieP = GetCubieP(Cube, x, y, z);
-                
-                int CubieIndex = GetCubieIndex(Cube, x, y, z);
-                Cube->Current[CubieIndex] = CubieIndex;
-                
-                rubiks_cubie* Cubie = GetCubie(Cube, x, y, z);
-                
-                Cubie->Transform = TranslationMatrix(CubieP);
-                Cubie->AppliedRotation = IdentityMatrix4();
-                Cubie->InitP = CubieP;
-            }
-        }
-    }
-}
-
-inline rubiks_cube CreateCube(memory_arena* Arena, int CubeDim, f32 SideLen, v3 P = V3(0.0f))
-{
-    rubiks_cube Result = {};
-    
-    int OneFaceCount = CubeDim * CubeDim;
-    Result.CubiesCount = OneFaceCount * CubeDim;
-    Result.Dim = CubeDim;
-    Result.Cubies = PushArray(Arena, rubiks_cubie, Result.CubiesCount);
-    Result.Current = PushArray(Arena, int, Result.CubiesCount);
-    
-    Result.SideLen = SideLen;
-    Result.BeginnedRotation.InRotationTime = 0.0f;
-    Result.BeginnedRotation.TimeForRotation = 0.0f;
-    
-    Result.RotateFace.Face = PushArray(Arena, int, OneFaceCount);
-    Result.RotateFace.TempFace = PushArray(Arena, int, OneFaceCount);
-    Result.RotateFace.IndicesInCurrent = PushArray(Arena, int, OneFaceCount);
-    Result.RotateFace.Count = 0;
-    
-    Result.ToRotateIndices = PushArray(Arena, int, 4 * (CubeDim - 1));
-    Result.RotatedIndices = PushArray(Arena, int, 4 * (CubeDim - 1));
-    
-    Result.OneCubieLen = Result.SideLen / (f32)Result.Dim;
-    Result.HalfSideLen = Result.SideLen * 0.5f;
-    Result.CubieOffset = Result.OneCubieLen * 0.5f - Result.HalfSideLen;
-    Result.StickerHeight = Result.OneCubieLen * 0.018f;
-    Result.IsRotatingNow = false;
-    
-    // NOTE(Dima): Generating sticker helper meshes
-    Result.HelperStickerUp = GetStickerMeshInternal(Result.OneCubieLen,
-                                                    0.88f, 0.1f);
-    Result.HelperStickerDown = GetStickerMeshInternal(Result.OneCubieLen,
-                                                      0.91f, 0.1f);
-    
-    // NOTE(Dima): Generating sticker meshes
-    for(int DirectionIndex = 0;
-        DirectionIndex < RubiksDirection_Count;
-        DirectionIndex++)
-    {
-        helper_mesh& HelperMesh = Result.StickersMeshes[DirectionIndex];
-        
-        HelperMesh.Name = std::string("StickerMesh");
-        
-        v3 StickerColor = RubiksColors[DirectionIndex].rgb;
-        
-        helper_rubiks_mesh* StickerUp = &Result.HelperStickerUp;
-        helper_rubiks_mesh* StickerDown = &Result.HelperStickerDown;
-        
-        // NOTE(Dima): Generating sticker sides
-        int NumPerimP = StickerUp->PerimeterPoints.size();
-        for(int PIndex = 0; 
-            PIndex < NumPerimP; 
-            PIndex++)
-        {
-            v3 CurTop = RubiksPlaneTo3DPoint(&Result, 
-                                             StickerUp->PerimeterPoints[PIndex], 
-                                             DirectionIndex, true);
-            v3 NextTop = RubiksPlaneTo3DPoint(&Result, 
-                                              StickerUp->PerimeterPoints[(PIndex + 1) % NumPerimP], 
-                                              DirectionIndex, true);
-            v3 CurBot = RubiksPlaneTo3DPoint(&Result, 
-                                             StickerDown->PerimeterPoints[PIndex], 
-                                             DirectionIndex, false);
-            v3 NextBot = RubiksPlaneTo3DPoint(&Result, 
-                                              StickerDown->PerimeterPoints[(PIndex + 1) % NumPerimP], 
-                                              DirectionIndex, false);
-            
-            v3 Normal = NOZ(Cross(NextBot - CurTop, NextTop - CurTop));
-            
-            PushFlatPolygon(HelperMesh, 
-                            CurTop, NextTop,
-                            NextBot, CurBot,
-                            Normal, StickerColor);
-        }
-        
-        // NOTE(Dima): Generating sticker top
-        std::vector<v3> Points;
-        
-        helper_mesh StickerUpperMesh = {};
-        
-        
-        // NOTE(Dima): Converting plane to 3d points
-        int NumP = StickerUp->P.size();
-        for(int PIndex = 0;
-            PIndex < NumP;
-            PIndex++)
-        {
-            v3 CurP = RubiksPlaneTo3DPoint(&Result, 
-                                           StickerUp->P[PIndex], 
-                                           DirectionIndex, true);
-            
-            StickerUpperMesh.Vertices.push_back(CurP);
-            StickerUpperMesh.Normals.push_back(RubiksDirection[DirectionIndex]);
-            StickerUpperMesh.TexCoords.push_back(V2(0.0f, 0.0f));
-            StickerUpperMesh.Colors.push_back(StickerColor);
-        }
-        
-        // NOTE(Dima): Copying indices
-        StickerUpperMesh.Indices = StickerUp->Ids;
-        
-        HelperMesh = CombineHelperMeshes(&HelperMesh, &StickerUpperMesh);
-    }
-    
-    
-    // NOTE(Dima): Initializing cubies
-    ResetCubies(&Result);
-    RubiksPrecomputeMeshes(&Result);
-    RubiksGenerateInnerMeshes(&Result);
-    
-    return(Result);
 }
 
 INTERNAL_FUNCTION inline void AddCubieToRotatedFace(rubiks_cube* Cube, 
@@ -656,13 +621,13 @@ INTERNAL_FUNCTION inline void AddCubieToRotatedFace(rubiks_cube* Cube,
     RotFace->Count++;
 }
 
-// TODO(Dima): Rewrite these functions to store those indices in a loop by loop form
 INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceX(rubiks_cube* Cube, int x)
 {
     rubiks_rotate_face* Result = &Cube->RotateFace;
     
     Result->Count = 0;
     Result->AxisIndex = RubiksAxis_X;
+    Result->FaceIndex = x;
     
     for(int z = Cube->Dim - 1; z >= 0; z--)
     {
@@ -681,6 +646,7 @@ INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceY(rubiks_cube* Cube, int y)
     
     Result->Count = 0;
     Result->AxisIndex = RubiksAxis_Y;
+    Result->FaceIndex = y;
     
     for(int z = 0; z < Cube->Dim; z++)
     {
@@ -699,6 +665,7 @@ INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceZ(rubiks_cube* Cube, int z)
     
     Result->Count = 0;
     Result->AxisIndex = RubiksAxis_Z;
+    Result->FaceIndex = z;
     
     for(int y = 0; y < Cube->Dim; y++)
     {
@@ -711,23 +678,59 @@ INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceZ(rubiks_cube* Cube, int z)
     return(Result);
 }
 
-INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
+INTERNAL_FUNCTION inline int RubiksGetRotatedIndex(int Current, int Shift, 
+                                                   int Count)
 {
-    rubiks_beginned_rotation* BeginnedRotation = &Cube->BeginnedRotation;
+    int Result = Current + Shift;
     
-    rubiks_rotate_face* Face = &Cube->RotateFace;
+    if(Result < 0)
+    {
+        Result += Count;
+    }
+    else if(Result >= Count)
+    {
+        Result -= Count;
+    }
     
-    // NOTE(Dima): Updating internal rotation
-    int* ToRotateIndices = Cube->ToRotateIndices;
-    int* RotatedIndices = Cube->RotatedIndices;
+    return(Result);
+}
+
+INTERNAL_FUNCTION void RubiksCalcPrecomputedFace(rubiks_cube* Cube,
+                                                 rubiks_precomp_face* Face, 
+                                                 memory_arena* Arena)
+{
     
+    Face->LoopCount = Cube->Dim / 2;
+    
+    Face->InitLoops = PushArray(Arena, int*, Face->LoopCount);
+    Face->RotatedClockwise = PushArray(Arena, int*, Face->LoopCount);
+    Face->RotatedCounterClockwise = PushArray(Arena, int*, Face->LoopCount);
+    Face->LoopCubiesCount = PushArray(Arena, int, Face->LoopCount);
+    
+    for(int i = 0; i < Face->LoopCount; i++)
+    {
+        int CurrentDim = Cube->Dim - 2 * i;
+        
+        int CurLoopCubiesCount = (CurrentDim - 1) * 4;
+        
+        Face->LoopCubiesCount[i] = CurLoopCubiesCount;
+        Face->InitLoops[i] = PushArray(Arena, int, CurLoopCubiesCount);
+        Face->RotatedClockwise[i] = PushArray(Arena, int, CurLoopCubiesCount);
+        Face->RotatedCounterClockwise[i] = PushArray(Arena, int, CurLoopCubiesCount);
+    }
+    
+    // NOTE(Dima): This loop will walk LoopCount times
+    int LoopIndex = 0;
     int CurrentStart = 0;
     int CurrentEnd = Cube->Dim - 1;
     while(CurrentStart < CurrentEnd)
     {
+        int* ToRotateIndices = Face->InitLoops[LoopIndex];
+        int* RotatedClockwise = Face->RotatedClockwise[LoopIndex];
+        int* RotatedCounterClockwise = Face->RotatedCounterClockwise[LoopIndex];
+        
         int ToRotateCount = 0;
         
-        // TODO(Dima): These can be precomputed for different sizes of cube
         for(int x = CurrentStart;
             x < CurrentEnd;
             x++)
@@ -756,27 +759,56 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
             ToRotateIndices[ToRotateCount++] = y * Cube->Dim + CurrentStart;
         }
         
-        // NOTE(Dima): Rotating indices
+        Assert(ToRotateCount == Face->LoopCubiesCount[LoopIndex]);
+        
+        // NOTE(Dima): Getting shift value
         int RotateShift = CurrentEnd - CurrentStart;
-        if(!BeginnedRotation->IsClockwise)
-        {
-            RotateShift = -RotateShift;
-        }
+        
+        int ShiftClockwise = RotateShift;
+        int ShiftCounterClockwise = -RotateShift;
+        
+        // NOTE(Dima): Rotating indices
         for(int i = 0;
             i < ToRotateCount;
             i++)
         {
-            int ToGetIndex = i + RotateShift;
-            if(ToGetIndex < 0)
-            {
-                ToGetIndex += ToRotateCount;
-            }
-            else if(ToGetIndex >= ToRotateCount)
-            {
-                ToGetIndex -= ToRotateCount;
-            }
+            int CWIndex = RubiksGetRotatedIndex(i, ShiftClockwise, ToRotateCount);
+            int CCWIndex = RubiksGetRotatedIndex(i, ShiftCounterClockwise, ToRotateCount);
             
-            RotatedIndices[i] = ToRotateIndices[ToGetIndex];
+            RotatedClockwise[i] = ToRotateIndices[CWIndex];
+            RotatedCounterClockwise[i] = ToRotateIndices[CCWIndex];
+        }
+        
+        CurrentStart++;
+        CurrentEnd--;
+        
+        LoopIndex++;
+    }
+}
+
+INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
+{
+    rubiks_beginned_rotation* BeginnedRotation = &Cube->BeginnedRotation;
+    
+    rubiks_rotate_face* Face = &Cube->RotateFace;
+    
+    // NOTE(Dima): Updating internal rotation
+    b32 IsOuter = (Face->FaceIndex == 0) || (Face->FaceIndex == Cube->Dim - 1);
+    
+    int LoopIndex = 0;
+    int CurrentStart = 0;
+    int CurrentEnd = Cube->Dim - 1;
+    while(CurrentStart < CurrentEnd)
+    {
+        // NOTE(Dima): Preparing
+        rubiks_precomp_face* PrecompFace = &Cube->PrecompFace;
+        int* ToRotateIndices = PrecompFace->InitLoops[LoopIndex];
+        int ToRotateCount = PrecompFace->LoopCubiesCount[LoopIndex];
+        
+        int* RotatedIndices = PrecompFace->RotatedCounterClockwise[LoopIndex];
+        if(BeginnedRotation->IsClockwise)
+        {
+            RotatedIndices = PrecompFace->RotatedClockwise[LoopIndex];
         }
         
         // NOTE(Dima): Using rotated indices
@@ -789,6 +821,12 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
         
         CurrentStart++;
         CurrentEnd--;
+        LoopIndex++;
+        
+        if(!IsOuter)
+        {
+            break;
+        }
     }
     
     // NOTE(Dima): Copying rotated indices to Current
@@ -864,6 +902,75 @@ INTERNAL_FUNCTION void UpdateBeginnedRotation(rubiks_cube* Cube)
     }
 }
 
+
+INTERNAL_FUNCTION inline void ResetCubies(rubiks_cube* Cube)
+{
+    // NOTE(Dima): Initializing cubies
+    for(int x = 0; x < Cube->Dim; x++)
+    {
+        for(int y = 0; y < Cube->Dim; y++)
+        {
+            for(int z = 0; z < Cube->Dim; z++)
+            {
+                v3 CubieP = GetCubieP(Cube, x, y, z);
+                
+                int CubieIndex = GetCubieIndex(Cube, x, y, z);
+                Cube->Current[CubieIndex] = CubieIndex;
+                
+                rubiks_cubie* Cubie = GetCubie(Cube, x, y, z);
+                
+                Cubie->Transform = TranslationMatrix(CubieP);
+                Cubie->AppliedRotation = IdentityMatrix4();
+                Cubie->InitP = CubieP;
+            }
+        }
+    }
+}
+
+inline rubiks_cube CreateCube(memory_arena* Arena, 
+                              int CubeDim, 
+                              f32 SideLen, 
+                              b32 RoundStickers = true)
+{
+    rubiks_cube Result = {};
+    
+    int OneFaceCount = CubeDim * CubeDim;
+    Result.CubiesCount = OneFaceCount * CubeDim;
+    Result.Dim = CubeDim;
+    Result.Cubies = PushArray(Arena, rubiks_cubie, Result.CubiesCount);
+    Result.Current = PushArray(Arena, int, Result.CubiesCount);
+    
+    Result.SideLen = SideLen;
+    Result.BeginnedRotation.InRotationTime = 0.0f;
+    Result.BeginnedRotation.TimeForRotation = 0.0f;
+    
+    Result.RotateFace.Face = PushArray(Arena, int, OneFaceCount);
+    Result.RotateFace.TempFace = PushArray(Arena, int, OneFaceCount);
+    Result.RotateFace.IndicesInCurrent = PushArray(Arena, int, OneFaceCount);
+    Result.RotateFace.Count = 0;
+    
+    Result.ToRotateIndices = PushArray(Arena, int, 4 * (CubeDim - 1));
+    Result.RotatedIndices = PushArray(Arena, int, 4 * (CubeDim - 1));
+    
+    Result.OneCubieLen = Result.SideLen / (f32)Result.Dim;
+    Result.HalfSideLen = Result.SideLen * 0.5f;
+    Result.CubieOffset = Result.OneCubieLen * 0.5f - Result.HalfSideLen;
+    Result.StickerHeight = Result.OneCubieLen * 0.018f;
+    Result.IsRotatingNow = false;
+    
+    // NOTE(Dima): Precomputing face indices
+    RubiksCalcPrecomputedFace(&Result, &Result.PrecompFace, Arena);
+    
+    // NOTE(Dima): Generating sticker meshes
+    GenerateStickerMeshes(&Result, RoundStickers);
+    
+    // NOTE(Dima): Initializing cubies
+    ResetCubies(&Result);
+    RubiksPrecomputeMeshes(&Result);
+    RubiksGenerateInnerMeshes(&Result);
+    
+    return(Result);
+}
 
 // NOTE(Dima): Function returns true if rotation was beginned
 INTERNAL_FUNCTION b32 BeginRotateFace(rubiks_cube* Cube, 

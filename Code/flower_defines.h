@@ -4,9 +4,9 @@
 #include <stdint.h>
 
 #define INTERNAL_BUILD
-
+#include <assert.h>
 #if defined(INTERNAL_BUILD)
-#define Assert(cond) if(!(cond)){ *((int*)0) = 0;}
+#define Assert(cond) assert(cond)
 #else
 #define Assert(cond)
 #endif

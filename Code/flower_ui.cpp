@@ -46,7 +46,7 @@ enum print_text_flags
     PrintText_3D = (1 << 0),
 };
 
-INTERNAL_FUNCTION rc2 PrintText_( font* Font, 
+INTERNAL_FUNCTION rc2 PrintText_(font* Font, 
                                  char* Text, 
                                  v3 Left, v3 Up,
                                  v3 P, 
@@ -87,6 +87,8 @@ INTERNAL_FUNCTION rc2 PrintText_( font* Font,
     Bounds.Min.y = AtP.y - Font->Ascent * Scale;
     Bounds.Max.y = AtP.y - Font->Descent * Scale;
     
+    image* GlyphImages = Font->GlyphImages;
+    
     while(*At)
     {
         int GlyphIndex = *At - ' ';
@@ -95,7 +97,9 @@ INTERNAL_FUNCTION rc2 PrintText_( font* Font,
         
         if(!IsGetSizePass)
         {
-            f32 TargetHeight = (f32)Glyph->Image.Height * Scale;
+            image* Image = &GlyphImages[Glyph->ImageIndex];
+            
+            f32 TargetHeight = (f32)Image->Height * Scale;
             
             v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;
             PushGlyph(Buffer, Glyph, ImageP, 

@@ -89,6 +89,37 @@ struct helper_rubiks_mesh
     std::vector<v2> PerimeterPoints;
 };
 
+struct rubiks_precomp_loop
+{
+    int LoopCubiesCount;
+};
+
+/*
+
+0000000
+0111110
+0122210
+0123210
+0122210
+0111110
+0000000
+
+rubiks_precomp_face will hold 3 loops of cubies indices on face for 0, 1, 2.
+It will not hold the center loop for 3.
+
+*/
+
+struct rubiks_precomp_face
+{
+    int LoopCount;
+    
+    int** InitLoops;
+    int** RotatedClockwise;
+    int** RotatedCounterClockwise;
+    
+    int* LoopCubiesCount;
+};
+
 struct rubiks_rotate_face
 {
     // NOTE(Dima): These arrays hold current indices, which are rotated
@@ -101,6 +132,8 @@ struct rubiks_rotate_face
     int Count;
     int AxisIndex;
     v3 RotateOrigin;
+    
+    int FaceIndex;
 };
 
 typedef m44 rubiks_rotation_function(float Angle);
@@ -157,6 +190,7 @@ struct rubiks_cube
     rubiks_beginned_rotation BeginnedRotation;
     // NOTE(Dima): This for updating transforms of face cubies
     rubiks_rotate_face RotateFace;
+    rubiks_precomp_face PrecompFace;
     
     // NOTE(Dima): These for rotating internal structure of cube
     int* ToRotateIndices;

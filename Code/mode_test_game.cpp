@@ -35,6 +35,7 @@ SCENE_UPDATE(TestGame)
     UpdateCamera(&State->Camera, SpeedMultiplier);
     
 #if 1
+#if 0
     asset_id BearID = GetByName("Bear");
     asset_id BearSuccessID = GetByName("Bear_Success");
     
@@ -44,24 +45,25 @@ SCENE_UPDATE(TestGame)
     asset_id SupraID = GetByName("Supra");
     asset_id PlaneID = GetByName("Mesh_Plane");
     asset_id GroundMaterialID = GetByName("Material_Ground");
+#endif
     
-    RenderModel(Global_Assets->Bear,
+    RenderModel(&Global_Assets->Bear,
                 V3(1.0f, 0.0f, 0.0f),
                 Global_Time->Time,
-                Global_Assets->BearSuccess);
+                &Global_Assets->BearSuccess);
     
-    RenderModel(Global_Assets->Bear,
+    RenderModel(&Global_Assets->Bear,
                 V3(-1.0f, 0.0f, 0.0f),
                 Global_Time->Time,
-                Global_Assets->BearIdle);
+                &Global_Assets->BearIdle);
     
-    RenderModel(Global_Assets->Fox,
+    RenderModel(&Global_Assets->Fox,
                 V3(-3.0f, 0.0f, 0.0f),
                 Global_Time->Time,
-                Global_Assets->FoxTalk);
+                &Global_Assets->FoxTalk);
     
 #if 1    
-    RenderModel(Global_Assets->Supra,
+    RenderModel(&Global_Assets->Supra,
                 V3(4.0f, 0.0f, 0.0f),
                 Global_Time->Time);
 #endif
@@ -107,4 +109,10 @@ SCENE_UPDATE(TestGame)
 #endif
     
     SetMatrices(GetViewMatrix(&State->Camera));
+}
+
+
+SCENE_ONGUI(TestGame)
+{
+    
 }

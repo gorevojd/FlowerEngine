@@ -1,22 +1,38 @@
 #ifndef FLOWER_ASSET_H
 #define FLOWER_ASSET_H
 
+// TODO(Dima): Text segment in asset file to hold all names of various assets
+
 #include <unordered_map>
 
 enum asset_type
 {
+    Asset_None,
+    
     Asset_Font,
     Asset_Image,
     Asset_Mesh,
     Asset_Animation,
-    Asset_NodeAnimation,
-    Asset_Model,
     Asset_Material,
+    Asset_Model,
+    
+    Asset_Count,
+};
+
+GLOBAL_VARIABLE mi Global_AssetTypeSize[Asset_Count] = 
+{
+    0,
+    sizeof(font),
+    sizeof(image),
+    sizeof(mesh),
+    sizeof(animation),
+    sizeof(material),
+    sizeof(model),
 };
 
 struct asset
 {
-    char Name[64];
+    char GUID[64];
     
     u32 Type;
     
@@ -24,7 +40,6 @@ struct asset
 };
 
 typedef u32 asset_id;
-
 
 struct asset_system
 {
@@ -62,13 +77,13 @@ struct asset_system
     image FoxEyesDiffuse;
     image FoxEyesShine;
     
-    model* Bear;
-    model* Fox;
-    model* Supra;
+    model Bear;
+    model Fox;
+    model Supra;
     
-    animation* BearSuccess;
-    animation* BearIdle;
-    animation* FoxTalk;
+    animation BearSuccess;
+    animation BearIdle;
+    animation FoxTalk;
     
     material BearMaterial;
     material BearEyesMaterial;
