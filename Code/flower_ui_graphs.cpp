@@ -886,5 +886,684 @@ INTERNAL_FUNCTION void UniBiMappingRangeGraph(f32 t)
                          ColorBlack());
     }
 #endif
+}
+
+INTERNAL_FUNCTION void RandomNumberGraph()
+{
+    PushClear(V3(0.1f));
     
+    ui_params InitParams = Global_UI->Params;
+    Global_UI->Params.Font = &Global_Assets->BerlinSans;
+    
+    char* HeaderText = "Random bilateral [-1, 1] float";
+    
+    v2 HeaderTextP = UVToScreenPoint(0.5f, 0.1f);
+    
+    random_generation Random = SeedRandom(1232);
+    
+    // NOTE(Dima): Printing header text
+    PrintTextAligned(HeaderText, 
+                     HeaderTextP,
+                     TextAlign_Center,
+                     TextAlign_Center,
+                     1.0f,
+                     V4(1.0f, 1.0f, 1.0f, 1.0f),
+                     false);
+    
+    int ColumnsCount = 5;
+    int RowsCount = 4;
+    
+    f32 StartUVx = 0.1f;
+    f32 EndUVx = 0.9f;
+    f32 StartUVy = 0.25f;
+    f32 EndUVy = 0.9f;
+    
+    f32 StepUVx = (EndUVx - StartUVx) / (f32)(ColumnsCount - 1);
+    f32 StepUVy = (EndUVy - StartUVy) / (f32)(RowsCount - 1);
+    
+    // NOTE(Dima): Printing random numbers
+    for(int y = 0; y < RowsCount; y++)
+    {
+        for(int x = 0; x < ColumnsCount; x++)
+        {
+            v2 NumP = UVToScreenPoint(StartUVx + (f32)x * StepUVx,
+                                      StartUVy + (f32)y * StepUVy);
+            
+            char NumText[64];
+            
+            f32 RandomNum = RandomBilateral(&Random);
+            
+            stbsp_sprintf(NumText, "%.4f", RandomNum);
+            
+            // NOTE(Dima): Printing header text
+            PrintTextAligned(NumText, 
+                             NumP,
+                             TextAlign_Center,
+                             TextAlign_Center,
+                             0.8f,
+                             V4(1.0f, 1.0f, 1.0f, 1.0f),
+                             false);
+        }
+    }
+    
+    Global_UI->Params = InitParams;
+}
+
+INTERNAL_FUNCTION void GraphDisplaySamples(v2* Samples, 
+                                           int SampleCount,
+                                           f32 Radius = 4.0f)
+{
+    // NOTE(Dima): Displaying samples
+    for(int SampleIndex = 0;
+        SampleIndex < SampleCount;
+        SampleIndex++)
+    {
+        v2 SampleP = Samples[SampleIndex];
+        
+        int SegmentsCount = 8;
+        
+        PushCircle2D(SampleP, 
+                     Radius, ColorGreen(),
+                     SegmentsCount);
+    }
+}
+
+INTERNAL_FUNCTION rc2 GraphShowQuad(f32* OutPixelHeight)
+{
+    // NOTE(Dima): Drawing quad on screen
+    window_dimensions Dims = Global_RenderCommands->WindowDimensions;
+    f32 AspectRatio = Dims.Width / Dims.Height;
+    
+    f32 UVHeight = 0.8f;
+    f32 PixelHeight = UVToScreenPoint(0.0f, UVHeight).y;
+    f32 HalfDim = PixelHeight * 2.0f;
+    
+    v2 GraphCenter = UVToScreenPoint(0.52f, 0.5f);
+    v2 GraphDim = V2(PixelHeight, PixelHeight);
+    
+    // NOTE(Dima): Pushing rect
+    rc2 GraphRect = RectCenterDim(GraphCenter, GraphDim);
+    PushRectOutline(GraphRect, 5, ColorWhite());
+    
+    if(OutPixelHeight)
+    {
+        *OutPixelHeight = PixelHeight;
+    }
+    
+    return(GraphRect);
+}
+
+INTERNAL_FUNCTION void GraphNoiseSamples(memory_arena* Arena,
+                                         v2* Samples, int Count)
+{
+    PushClear(V3(0.1f));
+    
+    f32 PixelHeight = 0;
+    rc2 GraphRect = GraphShowQuad(&PixelHeight);
+    
+    static v2* DisplaySamples = 0;
+    static int CurCount = Count;
+    static b32 ShowGrid = true;
+    
+    static f32 ShowStart = 999999.0f;
+    
+    int GridDim = 10;
+    if(ShowGrid)
+    {
+        f32 LineThick = 3.0f;
+        v4 LineColor = ColorGray(0.5f);
+        
+        for(int x = 1; x < GridDim; x++)
+        {
+            f32 tx = (f32)x / (f32)(GridDim);
+            
+            f32 CoordX = Lerp(GraphRect.Min.x, GraphRect.Max.x, tx);
+            f32 CoordY = Lerp(GraphRect.Min.y, GraphRect.Max.y, tx);
+            
+            PushLine2D(V2(CoordX, GraphRect.Min.y), 
+                       V2(CoordX, GraphRect.Max.y),
+                       LineThick, LineColor);
+            
+            PushLine2D(V2(GraphRect.Min.x, CoordY),
+                       V2(GraphRect.Max.x, CoordY),
+                       LineThick, LineColor);
+        }
+    }
+    
+    if(GetKeyDown(Key_Space))
+    {
+        ShowStart = Global_Time->Time;
+    }
+    
+    f32 Delay = 0.16f;
+    int CountToShow = Clamp((Global_Time->Time - ShowStart) / Delay, 0, Count);
+    
+    if(!DisplaySamples)
+    {
+        DisplaySamples = PushArray(Arena, v2, Count);
+        
+        for(int i = 0; i < Count; i++)
+        {
+            DisplaySamples[i] = V2(Lerp(GraphRect.Min.x, GraphRect.Max.x, Samples[i].x),
+                                   Lerp(GraphRect.Min.y, GraphRect.Max.y, Samples[i].y));
+        }
+    }
+    
+    int Mode = 1;
+    if(Mode == 0)
+    {
+        GraphDisplaySamples(DisplaySamples, CountToShow, 6);
+    }
+    else if(Mode == 1)
+    {
+        int CheckSampleCount = 5;
+        GraphDisplaySamples(DisplaySamples, CheckSampleCount, 6);
+        
+        int InspectX = 5;
+        int InspectY = 3;
+        
+        f32 OneQuadieLen = PixelHeight / (f32)GridDim;
+        rc2 QuadieRect = RectMinDim(GraphRect.Min + V2(InspectX, InspectY) * OneQuadieLen, V2(OneQuadieLen));
+        rc2 GrewRect = GrowRect(QuadieRect, 4.0f);
+        
+        PushRect(GrewRect, V4(1.0f, 0.5f, 0.0f, 0.2f));
+        PushRectOutline(QuadieRect, 4.0f, ColorYellow());
+        
+        v2 SampleP = ClampInRect(Global_Input->MouseWindowP, QuadieRect);
+        
+        v4 ColorCheckCircle = V4(0.0f, 1.0f, 0.0f, 0.3f);
+        
+        f32 PixelR = OneQuadieLen * F_SQRT_TWO;
+        for(int i = 0; i < CheckSampleCount; i++)
+        {
+            v2 Diff = SampleP - DisplaySamples[i];
+            
+            if(SqMagnitude(Diff) < PixelR * PixelR)
+            {
+                ColorCheckCircle = V4(1.0f, 0.0f, 0.0f, 0.3f);
+                
+                break;
+            }
+        }
+        
+        PushCircle2D(SampleP, PixelR, 
+                     ColorCheckCircle,
+                     32);
+        
+        // NOTE(Dima): Pushing sample
+        PushCircle2D(SampleP, 6, ColorGreen(), 10);
+    }
+}
+
+enum graph_quad_type
+{
+    GraphQuad_Simple,
+    GraphQuad_Grid,
+    GraphQuad_NaivePoiss,
+};
+
+INTERNAL_FUNCTION void GraphSamplesInQuad(memory_arena* Arena)
+{
+    PushClear(V3(0.1f));
+    
+    u32 Type = GraphQuad_Simple;
+    
+    f32 PixelHeight = 0;
+    rc2 GraphRect = GraphShowQuad(&PixelHeight);
+    
+    // NOTE(Dima): Samples
+    int SampleCount = 200;
+    f32 SpawnDelay = 0.05f;
+    int GridDim = std::roundf(std::sqrt(SampleCount));
+    
+    static random_generation Random = SeedRandom(123);
+    static b32 ShowGrid = true;
+    static rc2 LastQuadieRect = RectMinDim(V2(-100), V2(0.0f));
+    static f32 NextSpawnTime = 99999.0f;
+    
+    static b32 Initialized = false;
+    static v2* Samples = 0;
+    static int CurSampleCount = 0;
+    
+    if(!Initialized)
+    {
+        Samples = PushArray(Arena, v2, SampleCount);
+        
+        Initialized = true;
+    }
+    
+    if(GetKeyDown(Key_G))
+    {
+        ShowGrid = !ShowGrid;
+    }
+    
+    if(ShowGrid)
+    {
+        f32 LineThick = 3.0f;
+        v4 LineColor = ColorGray(0.5f);
+        
+        for(int x = 1; x < GridDim; x++)
+        {
+            f32 tx = (f32)x / (f32)(GridDim);
+            
+            f32 CoordX = Lerp(GraphRect.Min.x, GraphRect.Max.x, tx);
+            f32 CoordY = Lerp(GraphRect.Min.y, GraphRect.Max.y, tx);
+            
+            PushLine2D(V2(CoordX, GraphRect.Min.y), 
+                       V2(CoordX, GraphRect.Max.y),
+                       LineThick, LineColor);
+            
+            PushLine2D(V2(GraphRect.Min.x, CoordY),
+                       V2(GraphRect.Max.x, CoordY),
+                       LineThick, LineColor);
+        }
+        
+        PushRectOutline(LastQuadieRect, 4.0f, ColorYellow());
+    }
+    
+    if(GetKeyDown(Key_Space))
+    {
+        NextSpawnTime = Global_Time->Time + SpawnDelay;
+    }
+    
+    struct graph_quad_arrow
+    {
+        v2 Begin;
+        v2 End;
+        b32 Failed;
+    };
+    
+    static std::vector<graph_quad_arrow> Arrows;
+    static v2 LastSample = V2(-10);;
+    
+    if(Initialized)
+    {
+        if((Global_Time->Time > NextSpawnTime) && (CurSampleCount < SampleCount))
+        {
+            f32 AdditionalTimeInc = 0.0f;
+            
+            // NOTE(Dima): Generating sample if needed
+            switch(Type)
+            {
+                case GraphQuad_NaivePoiss:
+                {
+                    Arrows.clear();
+                    
+                    v2 InUV = RandomInUV(&Random);
+                    v2 Sample = V2(Lerp(GraphRect.Min.x, GraphRect.Max.x, InUV.x),
+                                   Lerp(GraphRect.Min.y, GraphRect.Max.y, InUV.y));
+                    LastSample = Sample;
+                    
+                    
+                    f32 MinDist = 40.0f;
+                    b32 ShouldInsert = true;
+                    for(int i = 0; i < CurSampleCount; i++)
+                    {
+                        v2 End = Samples[i];
+                        
+                        graph_quad_arrow Arrow = {};
+                        Arrow.Begin = Sample;
+                        Arrow.End = End;
+                        Arrow.Failed = false;
+                        
+                        v2 Offset = End - Sample;
+                        
+                        if(SqMagnitude(Offset) < MinDist * MinDist)
+                        {
+                            ShouldInsert = false;
+                            
+                            Arrow.Failed = true;
+                            AdditionalTimeInc = 1.0f;
+                        }
+                        
+                        Arrows.push_back(Arrow);
+                    }
+                    
+                    if(ShouldInsert)
+                    {
+                        Samples[CurSampleCount++] = Sample;
+                    }
+                }break;
+                
+                case GraphQuad_Simple:
+                {
+                    v2 InUV = RandomInUV(&Random);
+                    
+                    v2 Sample = V2(Lerp(GraphRect.Min.x, GraphRect.Max.x, InUV.x),
+                                   Lerp(GraphRect.Min.y, GraphRect.Max.y, InUV.y));
+                    
+                    Samples[CurSampleCount++] = Sample;
+                }break;
+                
+                case GraphQuad_Grid:
+                {
+                    int x = CurSampleCount % GridDim;
+                    int y = CurSampleCount / GridDim;
+                    
+                    f32 OneQuadieLen = PixelHeight / (f32)GridDim;
+                    rc2 QuadieRect = RectMinDim(GraphRect.Min + V2(x, y) * OneQuadieLen, V2(OneQuadieLen));
+                    
+                    LastQuadieRect = QuadieRect;
+                    
+                    v2 InUV = RandomInUV(&Random);
+                    
+                    Samples[CurSampleCount++] = V2(Lerp(QuadieRect.Min.x, QuadieRect.Max.x, InUV.x),
+                                                   Lerp(QuadieRect.Min.y, QuadieRect.Max.y, InUV.y));
+                }break;
+            }
+            
+            NextSpawnTime = Global_Time->Time + SpawnDelay + AdditionalTimeInc;
+        }
+        
+        // NOTE(Dima): Success arrows
+        for(auto& Arrow : Arrows)
+        {
+            v4 SuccessColor = V4(0.1f, 0.7f, 0.1f, 1.0f);
+            v4 FailColor = V4(0.9f, 0.1f, 0.1f, 1.0f);
+            
+            if(!Arrow.Failed)
+            {
+                PushArrow2D(Arrow.Begin, Arrow.End, 2.0f, SuccessColor);
+            }
+        }
+        
+        // NOTE(Dima): Fail arrows
+        for(auto& Arrow : Arrows)
+        {
+            v4 SuccessColor = V4(0.1f, 0.7f, 0.1f, 1.0f);
+            v4 FailColor = V4(0.9f, 0.1f, 0.1f, 1.0f);
+            
+            if(Arrow.Failed)
+            {
+                PushArrow2D(Arrow.Begin, Arrow.End, 4.0f, FailColor);
+            }
+        }
+        
+        GraphDisplaySamples(Samples, CurSampleCount);
+        
+        PushCircle2D(LastSample, 7, ColorYellow(), 16);
+    }
+}
+
+INTERNAL_FUNCTION void GraphSamplesInCircle(memory_arena* Arena, f32 SpawnDelay = 0.1f)
+{
+    PushClear(V3(0.1f));
+    
+    f32 PixelRadius = UVToScreenPoint(0.0f, 0.45f).y;
+    v2 CenterP = UVToScreenPoint(0.5f, 0.5f);
+    
+    PushCircleOutline2D(CenterP,
+                        PixelRadius,
+                        5.0f,
+                        ColorWhite(),
+                        64);
+    
+    static b32 Initialized = false;
+    static v2* Samples = 0;
+    static int CurSampleCount = 0;
+    static f32 NextSpawnTime = 99999.0f;
+    static random_generation Random = SeedRandom(123);
+    
+    int SampleCount = 400;
+    
+    if(!Initialized)
+    {
+        Samples = PushArray(Arena, v2, SampleCount);
+        
+        Initialized = true;
+    }
+    
+    if(GetKeyDown(Key_Space))
+    {
+        NextSpawnTime = Global_Time->Time + SpawnDelay;
+    }
+    
+    if(Initialized)
+    {
+        if((Global_Time->Time > NextSpawnTime) && (CurSampleCount < SampleCount))
+        {
+            Samples[CurSampleCount++] = CenterP + RandomInUnitCircle(&Random) * PixelRadius;
+            
+            NextSpawnTime = Global_Time->Time + SpawnDelay;
+        }
+        
+        GraphDisplaySamples(Samples, CurSampleCount);
+    }
+}
+
+INTERNAL_FUNCTION void GraphRadioactiveSource()
+{
+    struct radioactive_particle
+    {
+        v2 Direction;
+        v2 P;
+        f32 Radius;
+        b32 IsAlive;
+    };
+    
+    static radioactive_particle Particles[64];
+    static int CurParticle;
+    static f32 NextSpawnTime = 0.0f;
+    static random_generation Random = SeedRandom(123);
+    
+    f32 SpawnDelayMin = 0.05f;
+    f32 SpawnDelayMax = 0.5f;
+    
+    PushClear(V3(0.1f));
+    
+    f32 PixelRadius = UVToScreenPoint(0.0f, 0.25f).y;
+    v2 CenterP = UVToScreenPoint(0.5f, 0.5f);
+    
+    v4 ParticleInC = V4(0.8f, 0.2f, 0.1f, 1.0f);
+    v4 ParticleOutC = V4(0.2f, 0.1f, 0.75f, 1.0f);
+    
+    if(Global_Time->Time > NextSpawnTime)
+    {
+        radioactive_particle* Particle = &Particles[CurParticle];
+        
+        Particle->IsAlive = true;
+        Particle->Radius = RandomBetweenFloats(&Random, 
+                                               PixelRadius * 0.1f, 
+                                               PixelRadius * 0.25f);
+        Particle->Direction = RandomOnUnitCircle(&Random);
+        Particle->P = CenterP;
+        
+        CurParticle++;
+        if(CurParticle >= ArrayCount(Particles))
+        {
+            CurParticle = 0;
+        }
+        NextSpawnTime = Global_Time->Time + RandomBetweenFloats(&Random, 
+                                                                SpawnDelayMin, 
+                                                                SpawnDelayMax);
+    }
+    
+    // NOTE(Dima): Drawing particles;
+    for(int ParticleIndex = 0;
+        ParticleIndex < ArrayCount(Particles);
+        ParticleIndex++)
+    {
+        radioactive_particle* Particle = &Particles[ParticleIndex];
+        
+        if(Particle->IsAlive)
+        {
+            Particle->P += Particle->Direction * Global_Time->DeltaTime * 200.0f;
+            
+            // NOTE(Dima): Drawing nucleous
+            PushOutlinedCircle2D(Particle->P, 
+                                 Particle->Radius,
+                                 4.0f,
+                                 ParticleInC,
+                                 ParticleOutC,
+                                 32);
+        }
+    }
+    
+    // NOTE(Dima): Drawing nucleous
+    PushOutlinedCircle2D(CenterP, 
+                         PixelRadius,
+                         6.0f,
+                         ParticleInC,
+                         ParticleOutC,
+                         36);
+    
+}
+
+INTERNAL_FUNCTION void GraphCoinsThrow(memory_arena* Arena, 
+                                       image* CoinHead,
+                                       image* CoinTail)
+{
+    PushClear(V3(0.1f));
+    
+    ui_params InitParams = Global_UI->Params;
+    Global_UI->Params.Font = &Global_Assets->BerlinSans;
+    
+    static int HeadsCount;
+    static int TailsCount;
+    static random_generation Random = SeedRandom(1231);
+    static v2* CoinsP = 0;
+    static b32* IsHead = 0;
+    static f32* LifeTime = 0;
+    static int CoinsCount = 0;
+    static f32 NextSpawnTime = 999999.0f;
+    f32 ThrowDelay = 0.07f;
+    
+    char HeadsText[128];
+    stbsp_sprintf(HeadsText, "Heads: %d", HeadsCount);
+    
+    char TailsText[128];
+    stbsp_sprintf(TailsText, "Tails: %d", TailsCount);
+    
+    int HeadsPerc = 0;
+    int TailsPerc = 0;
+    
+    if(HeadsCount + TailsCount)
+    {
+        f32 Sum = HeadsCount + TailsCount;
+        HeadsPerc = std::roundf((f32)HeadsCount / Sum * 100.0f);
+        TailsPerc = std::roundf((f32)TailsCount / Sum * 100.0f);
+    }
+    
+    char RatioText[128];
+    stbsp_sprintf(RatioText, "Ratio %%: %d/%d",
+                  HeadsPerc, TailsPerc);
+    
+    f32 HeaderTextUVy = 0.1f;
+    f32 TextScale = 1.0f;
+    v4 TextColor = V4(1.0f, 1.0f, 1.0f, 1.0f);
+    v2 HeadsTextP = UVToScreenPoint(0.2f, HeaderTextUVy);
+    v2 TailsTextP = UVToScreenPoint(0.4f, HeaderTextUVy);
+    v2 PercTextP = UVToScreenPoint(0.6f, HeaderTextUVy);
+    
+    // NOTE(Dima): Printing headers text
+    PrintTextAligned(HeadsText, 
+                     HeadsTextP,
+                     TextAlign_Left,
+                     TextAlign_Center,
+                     TextScale,
+                     TextColor,
+                     false);
+    
+    PrintTextAligned(TailsText, 
+                     TailsTextP,
+                     TextAlign_Left,
+                     TextAlign_Center,
+                     TextScale,
+                     TextColor,
+                     false);
+    
+    PrintTextAligned(RatioText, 
+                     PercTextP,
+                     TextAlign_Left,
+                     TextAlign_Center,
+                     TextScale,
+                     TextColor,
+                     false);
+    
+    // NOTE(Dima): 
+    
+    int ColumnsCount = 20;
+    int RowsCount = 12;
+    
+    int MaxCoinCount = ColumnsCount * RowsCount;
+    
+    f32 StartUVx = 0.1f;
+    f32 EndUVx = 0.9f;
+    f32 StartUVy = 0.25f;
+    f32 EndUVy = 0.9f;
+    
+    f32 StepUVx = (EndUVx - StartUVx) / (f32)(ColumnsCount - 1);
+    f32 StepUVy = (EndUVy - StartUVy) / (f32)(RowsCount - 1);
+    f32 ScaleImage = 1.0f;
+    
+    if(!CoinsP)
+    {
+        CoinsP = PushArray(Arena, v2, MaxCoinCount);
+    }
+    
+    if(!IsHead)
+    {
+        IsHead = PushArray(Arena, b32, MaxCoinCount);
+    }
+    
+    if(!LifeTime)
+    {
+        LifeTime = PushArray(Arena, f32, MaxCoinCount);
+    }
+    
+    if(GetKeyDown(Key_Space))
+    {
+        NextSpawnTime = Global_Time->Time + ThrowDelay;
+    }
+    
+    if((Global_Time->Time > NextSpawnTime) && (CoinsCount < MaxCoinCount))
+    {
+        int x = CoinsCount % ColumnsCount;
+        int y = CoinsCount / ColumnsCount;
+        
+        CoinsP[CoinsCount] = UVToScreenPoint(StartUVx + (f32)x * StepUVx,
+                                             StartUVy + (f32)y * StepUVy);
+        
+        b32 ThisIsHead = RandomBool(&Random);
+        IsHead[CoinsCount] = ThisIsHead;
+        
+        if(ThisIsHead)
+        {
+            HeadsCount++;
+        }
+        else
+        {
+            TailsCount++;
+        }
+        
+        LifeTime[CoinsCount] = 0.0f;
+        
+        CoinsCount++;
+        NextSpawnTime = Global_Time->Time + ThrowDelay;
+    }
+    
+    // NOTE(Dima): Drawing coins
+    for(int CoinIndex = 0;
+        CoinIndex < CoinsCount;
+        CoinIndex++)
+    {
+        v2 CoinP = CoinsP[CoinIndex];
+        
+        image* ToPush = CoinTail;
+        if(IsHead[CoinIndex])
+        {
+            ToPush = CoinHead;
+        }
+        
+        f32 Alpha = Clamp01(LifeTime[CoinIndex] / 0.5f);
+        
+        f32 ImagePixelHeight = UVToScreenPoint(0.0f, StepUVy).y * 0.9f;
+        PushCenteredImage(ToPush, CoinP, 
+                          ImagePixelHeight,
+                          V4(1.0f, 1.0f, 1.0f, Alpha));
+        
+        LifeTime[CoinIndex] += Global_Time->DeltaTime;
+    }
+    
+    Global_UI->Params = InitParams;
 }

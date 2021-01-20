@@ -318,6 +318,9 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->TimesNewRoman = LoadFontFile("C:/Windows/Fonts/times.ttf");
     A->LifeIsGoofy = LoadFontFile("../Data/Fonts/Life is goofy.ttf");
     A->Arial = LoadFontFile("c:/windows/fonts/arial.ttf");
+    loading_params BerlinSansParams = DefaultLoadingParams();
+    BerlinSansParams.Font_PixelHeight = 60;
+    A->BerlinSans = LoadFontFile("../Data/Fonts/BerlinSans.ttf", BerlinSansParams);
     
     AddFontToAtlas(&A->TimesNewRoman);
     AddFontToAtlas(&A->LifeIsGoofy);
@@ -326,6 +329,11 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     // NOTE(Dima): Loading assets
     A->Cube = MakeUnitCube();
     A->Plane = MakePlane();
+    
+    loading_params CoinParams = DefaultLoadingParams();
+    CoinParams.Image_FlipVertically = false;
+    A->CoinTail = LoadImageFile("E:/Media/Photos/Internet/Images/CoinTail.png", CoinParams);
+    A->CoinHead = LoadImageFile("E:/Media/Photos/Internet/Images/CoinHead.png", CoinParams);
     
     A->Mouse = LoadImageFile("E:/Media/Photos/Internet/Images/Mouse.png");
     A->Cheese = LoadImageFile("E:/Media/Photos/Internet/Images/Cheese.png");
@@ -414,5 +422,5 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     AddFontToAtlas(&A->TimesNewRoman);
     AddFontToAtlas(&A->LifeIsGoofy);
     AddFontToAtlas(&A->Arial);
-    
+    AddFontToAtlas(&A->BerlinSans);
 }

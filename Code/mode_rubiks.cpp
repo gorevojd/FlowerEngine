@@ -99,7 +99,6 @@ INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube, v3 P, f32 Speed = 1.0f, b32
                         !ShiftIsPressed);
     }
     
-    
     UpdateBeginnedRotation(Cube);
     
     ShowCube(Cube, P, DebugMode);
@@ -134,7 +133,7 @@ SCENE_UPDATE(RubiksCube)
     UpdateCamera(&State->Camera);
     
     UpdateCube(&State->Cube3, V3(0.0f));
-    UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
+    //UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
     
     SetMatrices(GetViewMatrix(&State->Camera));
 }

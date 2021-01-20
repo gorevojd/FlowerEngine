@@ -986,6 +986,14 @@ int main(int ArgsCount, char** Args)
                                    App->WndDims.InitHeight,
                                    SDL_WINDOW_OPENGL);
     
+#if 0    
+    random_generation Random = SeedRandom(1234);
+    for(int i = 0; i < 100; i++)
+    {
+        SDL_Log("%u\n", RandomBetweenUint(&Random, 0, 10));
+    }
+#endif
+    
     // NOTE(Dima): Do not track mouse outside window
     SDL_CaptureMouse(SDL_FALSE);
     SDL_SetRelativeMouseMode(Global_Input->CapturingMouse ? SDL_TRUE : SDL_FALSE);

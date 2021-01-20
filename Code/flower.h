@@ -3,6 +3,7 @@
 
 #include "flower_defines.h"
 #include "flower_math.h"
+#include "flower_random.h"
 #include "flower_strings.h"
 #include "flower_platform.h"
 #include "flower_mem.h"

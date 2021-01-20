@@ -1,10 +1,19 @@
+struct ui_graphs_state
+{
+    std::vector<v2> BlueNoise;
+};
+
 SCENE_INIT(GraphShow)
 {
+    ui_graphs_state* State = GetSceneState(ui_graphs_state);
     
+    State->BlueNoise = GenerateBlueNoise(V2(1.0f), 0.1f, 126);
 }
 
 SCENE_UPDATE(GraphShow)
 {
+    ui_graphs_state* State = GetSceneState(ui_graphs_state);
+    
     static f32 TimeStart = 5.0f;
     f32 FadeDuration = 7.0f;
     
@@ -37,9 +46,20 @@ SCENE_UPDATE(GraphShow)
     f32 GraphValueMagnitude = 3.8f;
     f32 PassValue = -GraphValueMagnitude + Global_Input->MouseUV.x * 2.0f * GraphValueMagnitude;
     RoundingGraph(std::round, "std::round", PassValue);
-#endif
     
     UniBiMappingRangeGraph(PongTime);
+    
+    RandomNumberGraph();
+    
+    GraphSamplesInQuad(Scene->Arena);
+    GraphSamplesInCircle(Scene->Arena);
+    GraphNoiseSamples(Scene->Arena, &State->BlueNoise[0], State->BlueNoise.size());
+    GraphRadioactiveSource();
+#endif
+    
+    GraphCoinsThrow(Scene->Arena,
+                    &Global_Assets->CoinHead, 
+                    &Global_Assets->CoinTail);
 }
 
 SCENE_ONGUI(GraphShow)

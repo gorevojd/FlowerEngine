@@ -15,6 +15,14 @@ inline void* PushRenderCommand_(u32 CommandType, u32 SizeOfCommandStruct)
 
 #define PushRenderCommand(type, struct_type) (struct_type*)PushRenderCommand_(type, sizeof(struct_type))
 
+inline void PushClear(v3 Color, u32 Flags = RenderClear_Color)
+{
+    render_command_clear* Entry = PushRenderCommand(RenderCommand_Clear, render_command_clear);
+    
+    Entry->C = Color;
+    Entry->Flags = Flags;
+}
+
 inline void PushMesh(mesh* Mesh, 
                      material* Material, 
                      const m44& ModelToWorld,
@@ -199,7 +207,7 @@ inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 
     
     Entry->Image = Img;
     Entry->P = P;
-    Entry->C = C;
+    Entry->C = PremultiplyAlpha(C);
     Entry->Dim = V2(Height * Img->WidthOverHeight, Height);
 }
 
@@ -258,7 +266,7 @@ INTERNAL_FUNCTION inline void PushRectInternal(rect_buffer* RectBuffer,
     Indices[4] = VertexAt + 2;
     Indices[5] = VertexAt + 3;
     
-    RectBuffer->Colors[RectBuffer->RectCount] = PackRGBA(C);
+    RectBuffer->Colors[RectBuffer->RectCount] = PackRGBA(PremultiplyAlpha(C));
     RectBuffer->Types[RectBuffer->RectCount] = RectType;
     RectBuffer->IndicesToTransforms[RectBuffer->RectCount] = IndexToTransformMatrix;
     
@@ -357,15 +365,16 @@ INTERNAL_FUNCTION inline void PushCircleOutline2D(v2 P,
 INTERNAL_FUNCTION inline void PushOutlinedCircle2D(v2 P, f32 Radius,
                                                    f32 OutlineThickness,
                                                    v4 CircleC = ColorWhite(),
-                                                   v4 OutlineC = ColorGray(0.05f))
+                                                   v4 OutlineC = ColorGray(0.05f),
+                                                   int SegmentsCount = 16)
 {
     PushCircle2D(P, Radius,
-                 CircleC, 16);
+                 CircleC, SegmentsCount);
     
     PushCircleOutline2D(P, Radius,
                         OutlineThickness,
                         OutlineC,
-                        16);
+                        SegmentsCount);
 }
 
 INTERNAL_FUNCTION inline void PushRect(rc2 Rect,

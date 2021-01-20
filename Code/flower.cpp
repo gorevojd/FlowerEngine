@@ -20,6 +20,7 @@ debug_global_table* Global_DebugTable;
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+#include "flower_random.cpp"
 #include "flower_input.cpp"
 #include "flower_asset.cpp"
 #include "flower_render.cpp"

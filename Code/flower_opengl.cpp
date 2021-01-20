@@ -715,7 +715,6 @@ INTERNAL_FUNCTION void OpenGLRenderImage(opengl_shader* Shader,
 
 INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands)
 {
-    
     for(int CommandIndex = 0;
         CommandIndex < Commands->CommandCount;
         CommandIndex++)
@@ -724,6 +723,36 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands)
         
         switch(Header->CommandType)
         {
+            case RenderCommand_Clear:
+            {
+                render_command_clear* ClearCommand = GetRenderCommand(Commands, CommandIndex, render_command_clear);
+                
+                u32 OpenGLFlags = 0;
+                u32 OurFlags = ClearCommand->Flags;
+                
+                if(OurFlags & RenderClear_Color)
+                {
+                    OpenGLFlags |= GL_COLOR_BUFFER_BIT;
+                }
+                
+                if(OurFlags & RenderClear_Depth)
+                {
+                    OpenGLFlags |= GL_DEPTH_BUFFER_BIT;
+                }
+                
+                if(OurFlags & RenderClear_Stencil)
+                {
+                    OpenGLFlags |= GL_STENCIL_BUFFER_BIT;
+                }
+                
+                glClearColor(ClearCommand->C.r,
+                             ClearCommand->C.g,
+                             ClearCommand->C.b,
+                             1.0f);
+                
+                glClear(OpenGLFlags);
+            }break;
+            
             case RenderCommand_Image:
             {
                 render_command_image* ImageCommand = GetRenderCommand(Commands, CommandIndex, render_command_image);
@@ -772,7 +801,6 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands)
             }break;
         }
     }
-    
 }
 
 INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands, 

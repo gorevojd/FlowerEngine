@@ -56,6 +56,9 @@ struct asset_system
     mesh Cube;
     mesh Plane;
     
+    image CoinTail;
+    image CoinHead;
+    
     image Mouse;
     image Cheese;
     
@@ -66,6 +69,7 @@ struct asset_system
     font TimesNewRoman;
     font LifeIsGoofy;
     font Arial;
+    font BerlinSans;
     
     image BearDiffuse;
     image BearNormal;

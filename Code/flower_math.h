@@ -10,6 +10,7 @@
 #define F_PI_OVER_TWO 1.57079632679f
 
 #define F_ONE_OVER_255 0.00392156862f
+#define F_SQRT_TWO 1.41421356237f
 
 #define F_ENABLE_SIMD_MATH 1
 
@@ -1619,6 +1620,13 @@ inline v4 ColorFromHex(char* str) {
 	return(Res);
 }
 
+inline v4 PremultiplyAlpha(v4 Color)
+{
+    Color.rgb *= Color.a;
+    
+    return(Color);
+}
+
 inline uint32_t PackRGBA(v4 Color)
 {
     uint32_t Res = 
@@ -1723,6 +1731,16 @@ inline rc2 RectCenterDim(v2 Center, v2 Dim)
     return(Result);
 }
 
+inline rc2 GrowRect(rc2 Rect, f32 Scale)
+{
+    v2 HalfDim = GetDim(Rect) * 0.5f;
+    
+    Rect.Min -= HalfDim * Scale;
+    Rect.Max += HalfDim * Scale;
+    
+    return(Rect);
+}
+
 inline b32 PointInRect(v2 Point, rc2 Rect)
 {
     v2 Center = GetCenter(Rect);
@@ -1735,6 +1753,14 @@ inline b32 PointInRect(v2 Point, rc2 Rect)
     {
         Result = true;
     }
+    
+    return(Result);
+}
+
+inline v2 ClampInRect(v2 Point, rc2 Rect)
+{
+    v2 Result = V2(Clamp(Point.x, Rect.Min.x, Rect.Max.x),
+                   Clamp(Point.y, Rect.Min.y, Rect.Max.y));
     
     return(Result);
 }

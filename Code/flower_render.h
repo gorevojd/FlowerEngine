@@ -8,6 +8,7 @@
 
 enum render_command_type
 {
+    RenderCommand_Clear,
     RenderCommand_Image,
     RenderCommand_Mesh,
     RenderCommand_InstancedMesh,
@@ -16,6 +17,19 @@ enum render_command_type
 #define RENDER_COMMAND_STRUCT(type) render_command_##type
 
 #pragma pack(push, 8)
+enum render_command_clear_flags
+{
+    RenderClear_Color = (1 << 0),
+    RenderClear_Depth = (1 << 1),
+    RenderClear_Stencil = (1 << 2),
+};
+
+struct render_command_clear
+{
+    v3 C;
+    u32 Flags;
+};
+
 struct render_command_image
 {
     image* Image;
