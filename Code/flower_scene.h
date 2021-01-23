@@ -34,6 +34,8 @@ struct scene
     
     void Update()
     {
+        FUNCTION_TIMING();
+        
         if(!Initialized)
         {
             Init();

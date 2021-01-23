@@ -81,16 +81,26 @@ struct debug_thread{
     u16 ThreadID;
 };
 
-enum debug_profile_menu_type{
-    DebugProfileMenu_TopClock,
-    DebugProfileMenu_TopClockEx,
-    DebugProfileMenu_RootNode,
+struct debug_menus
+{
+    float GraphsSizeY;
+    
+    char* SelectedStatGUID;
+    
+    float* SelectedFunFloatsIncl;
+    float* SelectedFunFloatsExcl;
+    
+    float* FPSGraph_FrameTimes;
+    float* FPSGraph_FPSValues;
+    
+    bool Visible;
+    bool IncludingChildren;
 };
 
 struct debug_state{
     memory_arena* Arena;
     
-    u32 ToShowProfileMenuType;
+    debug_menus Menus;
     
     // NOTE(Dima): Profiler stuff
     int CollationFrameIndex;
@@ -140,6 +150,20 @@ inline u64 GetClocksFromStat(debug_timing_stat* Stat,
     if(!IncludingChildren){
         Result -= Stat->Stat.ClocksElapsedInChildren;
     }
+    
+    return(Result);
+}
+
+inline int GetValuesOffsetForGraph(debug_state* State)
+{
+    int Result = State->NewestFrameIndex + 1;
+    
+    return(Result);
+}
+
+inline int GetCountFramesForGraph()
+{
+    int Result = DEBUG_PROFILED_FRAMES_COUNT - 1;
     
     return(Result);
 }

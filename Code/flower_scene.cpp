@@ -10,4 +10,4 @@ INTERNAL_FUNCTION inline void* InitSceneState(scene* Scene, mi StateSize)
     return(Result);
 }
 
-#define GetSceneState(state_name) (state_name*)InitSceneState(Scene, sizeof(state_name)) 
+#define GetSceneState(state_name) (state_name*)InitSceneState(Scene, sizeof(state_name))

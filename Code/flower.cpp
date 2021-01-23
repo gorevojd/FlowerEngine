@@ -32,15 +32,6 @@ debug_global_table* Global_DebugTable;
 #include "flower_scene.cpp"
 #include "meta_scenes.cpp"
 
-#define IMGUI_DISABLE_STB_RECT_PACK_IMPLEMENTATION
-#define IMGUI_DISABLE_STB_TRUETYPE_IMPLEMENTATION
-#include "imgui.h"
-#include "imgui.cpp"
-#include "imgui_draw.cpp"
-#include "imgui_widgets.cpp"
-#include "imgui_tables.cpp"
-#include "imgui_demo.cpp"
-
 INTERNAL_FUNCTION inline void InitScene(game* Game, int SceneIndex)
 {
     scene* Scene = &Game->Scenes[SceneIndex];
@@ -113,119 +104,33 @@ INTERNAL_FUNCTION void InitGame(game* Game, memory_arena* Arena)
 #endif
 }
 
-INTERNAL_FUNCTION void ShowOverlays(game* Game)
+INTERNAL_FUNCTION void ShowUI(game* Game)
 {
-    ImGui::NewFrame();
+    // TODO(Dima): Start new frame here
     
-    // NOTE(Dima): Push UI
-    if(Game->ShowOverlays)
-    {
-        LOCAL_PERSIST bool ShowDemo = false;
-        if(ShowDemo)
+    if(Game->ShowOverlays){
+        if(BeginLayout("MainLayout"))
         {
-            ImGui::ShowDemoWindow(&ShowDemo);
+            ShowText("Test format string %d, %f", 100, 123.0f);
+            ShowText("Hello Twitch and YouTube!");
+            ShowText("Time: %.2f", Global_Time->Time);
+            ShowText("FPS: %.0f", 1.0f / Global_Time->DeltaTime);
+            ShowText("FrameTime ms: %.2f", Global_Time->DeltaTime * 1000.0f);
+            
+            EndLayout();
         }
-        
-        ImGui::SetNextWindowSize(ImVec2(500, 440), ImGuiCond_FirstUseEver);
-        if(ImGui::Begin("First Window"))
-        {
-#if 1
-            ImGui::BeginChild("left pane", ImVec2(150, 0), true);
-            
-            ImGui::EndChild();
-            
-            
-            ImGui::SameLine();
-            
-            ImGui::BeginChild("right pane");
-            ImGui::Text("This is my first text with ImGUI");
-            ImGui::BulletText("This is the bullet text");
-            ImGui::BulletText("This is another one followed by separator");
-            
-            ImGui::Checkbox("Show Demo Window", &ShowDemo);
-            
-            ImGui::Separator();
-            
-            if(ImGui::CollapsingHeader("Collapsing Header"))
-            {
-                static v4 Color1;
-                static v3 Color2;
-                
-                ImGui::ColorEdit4("Color 1", Color1.e);
-                ImGui::SameLine(); HelpMarker("Click on the color square to open a color picker.\n"
-                                              "Click and hold to use drag and drop.\n"
-                                              "Right-click on the color square to show options.\n"
-                                              "CTRL+click on individual component to input value.\n");
-                
-                ImGui::ColorEdit3("Color 2", Color2.e);
-                
-                if(ImGui::TreeNode("Tree1"))
-                {
-                    if(ImGui::TreeNode("Tree1"))
-                    {
-                        
-                        
-                        ImGui::TreePop();
-                    }
-                    
-                    if(ImGui::TreeNode("Tree2"))
-                    {
-                        
-                        
-                        ImGui::TreePop();
-                    }
-                    
-                    ImGui::TreePop();
-                }
-                
-                if(ImGui::TreeNode("Tree2"))
-                {
-                    
-                    
-                    ImGui::TreePop();
-                }
-            }
-            
-            ImGui::EndChild();
-#endif
-        }
-        ImGui::End();
-        
-        char CharBuffer[64];
-        stbsp_sprintf(CharBuffer, "Time: %.2f", Global_Time->Time);
-        
-        char FPSBuffer[64];
-        stbsp_sprintf(FPSBuffer, "FPS: %.0f", 1.0f / Global_Time->DeltaTime);
-        
-        char FrameTimeBuffer[64];
-        stbsp_sprintf(FrameTimeBuffer, "FrameTime ms: %.2f", Global_Time->DeltaTime * 1000.0f);
-        
-        window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
-        ui_params ParamsUI = {};
-        ParamsUI.Commands = Global_RenderCommands;
-        ParamsUI.Font = &Global_Assets->TimesNewRoman;
-        ParamsUI.Scale = 1.0f;
-        ParamsUI.WindowDims = WndDims;
-        SetParamsUI(ParamsUI);
-        
-#if 1        
-        BeginLayout();
-        Text("Hello Twitch and YouTube!");
-        Text(CharBuffer);
-        Text(FPSBuffer);
-        Text(FrameTimeBuffer);
-        EndLayout();
-#endif
-        
     }
 }
 
 INTERNAL_FUNCTION void UpdateGame(game* Game)
 {
+    FUNCTION_TIMING();
+    
     // NOTE(Dima): Processing Input
     Platform.ProcessInput();
     
-    ShowOverlays(Game);
+    UIBeginFrame();
+    
     
     // NOTE(Dima): Updating game
     scene* Scene = Game->Scenes + Game->CurrentSceneIndex;
@@ -259,6 +164,10 @@ INTERNAL_FUNCTION void UpdateGame(game* Game)
             {
                 Platform.SetCapturingMouse(!Global_Input->CapturingMouse);
             }
+            if(GetKeyDown(Key_D))
+            {
+                DEBUGToggleShowMenus();
+            }
         }
     }
     
@@ -275,7 +184,6 @@ INTERNAL_FUNCTION void UpdateGame(game* Game)
     Global_RenderCommands->FontAtlas = &Global_Assets->FontsAtlas;
     Global_RenderCommands->ScreenOrthoProjection = OrthographicProjection(WndDims->Width, 
                                                                           WndDims->Height);
-    ImGui::Render();
     
     BeginRender();
     Platform.Render();

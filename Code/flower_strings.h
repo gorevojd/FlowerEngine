@@ -336,6 +336,14 @@ inline b32 IsUpper(char C){
     return(Result);
 }
 
+inline b32 IsAlpha(char C)
+{
+    b32 Result = ((C >= 'a' && C <= 'z') ||
+                  (C >= 'A' && C <= 'Z'));
+    
+    return(Result);
+}
+
 inline b32 IsWhitespace(char C){
     b32 Result = 0;
     

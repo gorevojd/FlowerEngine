@@ -23,7 +23,7 @@ ECHO *************
 ECHO *   FLOWER  *
 ECHO *************
 
-set COMPILATION_FILES=..\Code\app_flower.cpp
+set COMPILATION_FILES=..\Code\sdl_flower.cpp
 
 SET THIS_PROJECT_NAME=Flower
 ECHO Compiling %THIS_PROJECT_NAME%

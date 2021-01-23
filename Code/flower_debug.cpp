@@ -82,7 +82,6 @@ INTERNAL_FUNCTION inline void InitThreadFrame(debug_state* State,
     Frame->RootTreeNodeUse.UniqueName = State->RootNodesName;
     Frame->RootTreeNodeUse.NameID = State->RootNodesNameHash;
     
-    
     DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, Next, Prev);
     DLIST_REFLECT_PTRS(Frame->StatUse, Next, Prev);
@@ -247,7 +246,8 @@ INTERNAL_FUNCTION debug_timing_stat* AllocateTimingStat(debug_state* State,
 INTERNAL_FUNCTION debug_timing_stat* 
 CreateOrFindStatForUniqueName(debug_state* State, 
                               debug_thread_frame* Frame,
-                              char* UniqueName)
+                              char* UniqueName,
+                              b32 AllocateIfNotFound = true)
 {
     u32 NameID = StringHashFNV(UniqueName);
     
@@ -268,7 +268,8 @@ CreateOrFindStatForUniqueName(debug_state* State,
         }
     }
     
-    if(!Found){
+    if(!Found && AllocateIfNotFound)
+    {
         debug_timing_stat* New = AllocateTimingStat(State, Frame);
         
         New->UniqueName = UniqueName;
@@ -282,52 +283,6 @@ CreateOrFindStatForUniqueName(debug_state* State,
     }
     
     return(Found);
-}
-
-INTERNAL_FUNCTION void 
-FillAndSortStats(debug_state* State, 
-                 debug_thread_frame* Frame, 
-                 b32 IncludingChildren)
-{
-    // NOTE(Dima): Filling to sort table
-    debug_timing_stat* Stat = Frame->StatUse.Next;
-    
-    Frame->ToSortStatsCount = 0;
-    
-    for(int StatIndex = 0;
-        StatIndex < DEBUG_STATS_TO_SORT_SIZE;
-        StatIndex++)
-    {
-        if(Stat == &Frame->StatUse){
-            break;
-        }
-        
-        ++Frame->ToSortStatsCount;
-        
-        Frame->ToSortStats[StatIndex] = Stat;
-        
-        Stat = Stat->Next;
-    }
-    
-    // NOTE(Dima): Sorting ToSort table by selection sort
-    for(int i = 0; i < Frame->ToSortStatsCount - 1; i++){
-        u64 MaxValue = GetClocksFromStat(Frame->ToSortStats[i], IncludingChildren);
-        int MaxIndex = i;
-        
-        for(int j = i + 1; j < Frame->ToSortStatsCount; j++){
-            u64 CurClocks = GetClocksFromStat(Frame->ToSortStats[j], IncludingChildren);
-            if(CurClocks > MaxValue){
-                MaxValue = CurClocks;
-                MaxIndex = j;
-            }
-        }
-        
-        if(MaxIndex != i){
-            debug_timing_stat* Temp = Frame->ToSortStats[i];
-            Frame->ToSortStats[i] = Frame->ToSortStats[MaxIndex];
-            Frame->ToSortStats[MaxIndex] = Temp;
-        }
-    }
 }
 
 INTERNAL_FUNCTION inline int IncrementFrameIndex(int Value){
@@ -355,32 +310,40 @@ IncrementFrameIndices(debug_state* State){
 }
 
 INTERNAL_FUNCTION inline void
-ProcessRecordsIndicesInc(debug_state* State){
+ProcessRecordsIndicesInc(debug_state* State)
+{
     b32 ShouldIncrement = true;
-    if(State->RecordingChangeRequested){
+    
+    if(State->RecordingChangeRequested)
+    {
         State->RecordingChangeRequested = false;
         
-        if(State->IsRecording){
+        if(State->IsRecording)
+        {
             State->Filter = DEBUG_DEFAULT_FILTER_VALUE;
             ShouldIncrement = false;
         }
-        else{
+        else
+        {
             State->Filter = DebugRecord_FrameBarrier;
         }
     }
     
-    if(State->IsRecording && ShouldIncrement){
+    if(State->IsRecording && ShouldIncrement)
+    {
         IncrementFrameIndices(State);
     }
 }
 
 INTERNAL_FUNCTION void
-FindFrameUpdateNode(debug_thread_frame* Frame){
+FindFrameUpdateNode(debug_thread_frame* Frame)
+{
     debug_profiled_tree_node* FrameUpdateNode = 0;
     
     debug_profiled_tree_node* At = Frame->RootTreeNodeUse.NextAlloc;
     
-    while(At != &Frame->RootTreeNodeUse){
+    while(At != &Frame->RootTreeNodeUse)
+    {
         char NameBuf[256];
         DEBUGParseNameFromUnique(NameBuf, 256, At->UniqueName);
         
@@ -396,7 +359,8 @@ FindFrameUpdateNode(debug_thread_frame* Frame){
     Frame->FrameUpdateNode = FrameUpdateNode;
 }
 
-INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
+INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State)
+{
     FUNCTION_TIMING();
     
     int RecordCount = Global_DebugTable->RecordAndTableIndex & DEBUG_RECORD_INDEX_MASK;
@@ -501,20 +465,28 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
         }
     }
 }
-#endif
 
-void DEBUGOverlays()
+INTERNAL_FUNCTION void DEBUGInitMenus(debug_state* State)
 {
-    if(ImGui::BeginMenu("Profile"))
-    {
-        
-        
-        ImGui::EndMenu();
-    }
+    debug_menus* Menus = &State->Menus;
+    
+    Menus->Visible = true;
+    Menus->IncludingChildren = false;
+    Menus->SelectedStatGUID = 0;
+    
+    Menus->GraphsSizeY = 80.0f;
+    
+    Menus->FPSGraph_FrameTimes = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
+    Menus->FPSGraph_FPSValues = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
+    
+    Menus->SelectedFunFloatsIncl = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
+    Menus->SelectedFunFloatsExcl = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
 }
+#endif
 
 void DEBUGInitGlobalTable(memory_arena* Arena)
 {
+#if defined(INTERNAL_BUILD)
     Global_DebugTable = PushStruct(Arena, debug_global_table);
     
     // NOTE(Dima): Initialize record arrays
@@ -526,13 +498,17 @@ void DEBUGInitGlobalTable(memory_arena* Arena)
     
     // NOTE(Dima): Init memory region
     Global_DebugTable->Arena = Arena;
+#endif
 }
 
-
+void DEBUGToggleShowMenus()
+{
+    Global_Debug->Menus.Visible = !Global_Debug->Menus.Visible;
+}
 
 INTERNAL_FUNCTION void DEBUGInit(memory_arena* Arena)
 {
-#if defined(INTERNAL_FUNCTION)
+#if defined(INTERNAL_BUILD)
     Global_Debug = PushStruct(Arena, debug_state);
     
     debug_state* State = Global_Debug;
@@ -547,7 +523,8 @@ INTERNAL_FUNCTION void DEBUGInit(memory_arena* Arena)
     State->IsRecording = DEBUG_DEFAULT_RECORDING;
     State->RecordingChangeRequested = false;
     State->Filter = DEBUG_DEFAULT_FILTER_VALUE;
-    State->ToShowProfileMenuType = DebugProfileMenu_TopClockEx;
+    
+    DEBUGInitMenus(State);
     
     CopyStrings(State->RootNodesName, "RootNode");
     CopyStrings(State->SentinelElementsName, "Sentinel");
@@ -566,6 +543,7 @@ INTERNAL_FUNCTION void DEBUGInit(memory_arena* Arena)
 #endif
 }
 
+#include "flower_debug_overlays.cpp"
 
 INTERNAL_FUNCTION void DEBUGUpdate()
 {
@@ -573,5 +551,10 @@ INTERNAL_FUNCTION void DEBUGUpdate()
     FUNCTION_TIMING();
     
     DEBUGProcessRecords(Global_Debug);
+    
+    if(Global_Debug->Menus.Visible)
+    {
+        DEBUGShowOverlays();
+    }
 #endif
 }

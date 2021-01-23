@@ -12,9 +12,27 @@ enum text_align_type
     TextAlign_Center,
 };
 
+
+// NOTE(Dima): Bounding boxes
+struct ui_element_bb
+{
+    // NOTE(Dima): This is for example for button Area
+    rc2 Active;
+    
+    // NOTE(Dima): This is for total element rect (like button and it's text, line,  etc)
+    rc2 Total;
+};
+
+// NOTE(Dima): Layouts
 struct ui_layout
 {
+    const char* Name;
     v2 At;
+    b32 JustStarted;
+    b32 StayOnSameLine;
+    ui_element_bb LastBB;
+    
+    ui_layout* Next;
 };
 
 struct ui_params
@@ -23,6 +41,9 @@ struct ui_params
     render_commands* Commands;
     font* Font;
     f32 Scale;
+    
+    f32 ScaleStack[64];
+    int ScaleStackIndex;
     
     window_dimensions* WindowDims;
 };
@@ -55,15 +76,37 @@ struct ui_slider_graph
     v2 ValueScreenP;
 };
 
+// NOTE(Dima): Colors
+enum ui_color_type
+{
+    UIColor_Text,
+    UIColor_TextActive,
+    
+    UIColor_Count,
+};
+
+struct ui_colors
+{
+    v4 Colors[UIColor_Count];
+};
+
 struct ui_state
 {
-    ui_layout Layout;
+    memory_arena* Arena;
+    
     ui_layout* CurrentLayout;
     
     ui_graph Graph;
     ui_graph* CurrentGraph;
     
     ui_params Params;
+    
+    // NOTE(Dima): Immediate mode stuff
+    ui_colors Colors;
+    
+    char StringFormatBuffer[2048];
+    
+    ui_layout* FirstLayout;
 };
 
 #endif //FLOWER_UI_H

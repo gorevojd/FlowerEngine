@@ -1,6 +1,9 @@
 #ifndef FLOWER_RUBIKS_H
 #define FLOWER_RUBIKS_H
 
+#include <unordered_map>
+#include <unordered_set>
+
 enum rubiks_axis
 {
     RubiksAxis_X,
@@ -71,6 +74,7 @@ GLOBAL_VARIABLE v4 RubiksColors[] =
 };
 #endif
 
+#if 0
 struct rubiks_cubie
 {
     // TODO(Dima): Maybe store those as pointers because a lot of cubes will not be visible
@@ -79,6 +83,18 @@ struct rubiks_cubie
     v3 InitP;
     
     int MeshIndex;
+};
+#endif
+
+struct rubiks_visible_cubies
+{
+    m44* FinalTransform;
+    m44* Transform;
+    m44* AppliedRotation;
+    v3* InitP;
+    int* MeshIndex;
+    
+    int Count;
 };
 
 struct helper_rubiks_mesh
@@ -154,12 +170,22 @@ struct rubiks_beginned_rotation
     int AxisIndex;
 };
 
+struct rubiks_command
+{
+    int Axis;
+    int FaceIndex;
+    b32 IsClockwise;
+};
+
 #define RUBIKS_TIME_FOR_ROTATION 0.2f
 struct rubiks_cube
 {
     int CubiesCount;
-    // NOTE(Dima): This array stores information about each cubie. Size is Dim * Dim * Dim
-    rubiks_cubie* Cubies;
+    // NOTE(Dima): This Cubies point to cubies in rubiks_visible_cubies 
+    // NOTE(Dima): (-1 means invisible cubie and we should not update it
+    int* CubiesToVisible;
+    // NOTE(Dima): This arrays stores information about each cubie. Size is Dim * Dim * Dim
+    rubiks_visible_cubies Visible;
     // NOTE(Dima): This array stores indices to cubies, which represent current state of cube.
     // NOTE(Dima): Size of this array is Dim * Dim * Dim
     int* Current;
@@ -195,6 +221,12 @@ struct rubiks_cube
     // NOTE(Dima): These for rotating internal structure of cube
     int* ToRotateIndices;
     int* RotatedIndices;
+    
+    // NOTE(Dima): Commands
+    int CommandsCount;
+    rubiks_command* Commands;
+    int DoIndex;
+    int AddIndex;
     
     b32 IsRotatingNow;
 };

@@ -3,6 +3,7 @@
 
 enum json_token_type
 {
+    JsonToken_ID,
     JsonToken_DoubleQuote,
     JsonToken_String,
     
@@ -80,7 +81,16 @@ void FreeTokenizer(json_tokenizer* Tokenz)
     }
 }
 
-b32 IsWhitespace(char C)
+inline b32 IsAlpha(char C)
+{
+    b32 Result = ((C >= 'a' && C <= 'z') ||
+                  (C >= 'A' && C <= 'Z'));
+    
+    return(Result);
+}
+
+
+inline b32 IsWhitespace(char C)
 {
     b32 Result = (C == ' ' ||
                   C == '\t' ||
@@ -180,6 +190,23 @@ void GetTokenInternal(json_tokenizer* Tokenz, json_token* Token)
             Token->Str = std::string(",");
             CountCharsInToken = 1;
         }
+        else if(IsAlpha(At[0]))
+        {
+            int CharCountInString = 0;
+            
+            while(!IsWhitespace(At[CharCountInString]) &&
+                  At[CharCountInString] != ',' &&
+                  At[CharCountInString] != '\"' &&
+                  At[CharCountInString] != 0)
+            {
+                CharCountInString++;
+            }
+            
+            Token->Type = JsonToken_ID;
+            Token->Str = std::string(At, CharCountInString);
+            
+            CountCharsInToken = CharCountInString;
+        }
         else
         {
             Assert(!"Invalid symbol");
@@ -225,6 +252,31 @@ std::string RequireToken(json_tokenizer* Tokenz, u32 TokenType)
     Assert(Tok.Type == TokenType);
     
     std::string Result = Tok.Str;
+    
+    return(Result);
+}
+
+b32 JsonReadBool(json_tokenizer* Tokenz)
+{
+    std::string ValueStr = RequireToken(Tokenz, JsonToken_ID);
+    
+    b32 IsTrue = ValueStr == "true";
+    b32 IsFalse = ValueStr == "false";
+    
+    Assert(IsTrue || IsFalse);
+    
+    b32 Result = false;
+    if(IsTrue || IsFalse)
+    {
+        if(IsTrue)
+        {
+            Result = true;
+        }
+        else
+        {
+            Result = false;
+        }
+    }
     
     return(Result);
 }

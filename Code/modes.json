@@ -1,6 +1,7 @@
 {
 	"TestGame": {
-		"FileName": "mode_test_game.cpp"
+		"FileName": "mode_test_game.cpp",
+		"Method_OnGUI": true,
 	},
 
 	"GraphShow": {

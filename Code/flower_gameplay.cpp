@@ -18,6 +18,7 @@ struct game_camera
     f32 ViewRadiusMin;
     f32 ViewRadiusMax;
     v3 ViewCenterP;
+    f32 ShowcaseRotateTime;
     
     u32 State;
 };
@@ -26,10 +27,12 @@ inline void InitCamera(game_camera* Cam, u32 State)
 {
     Cam->State = State;
     
+    
     Cam->ViewRadiusMax = 20.0f;
     Cam->ViewRadiusMin = 1.0f;
     Cam->ViewRadius = 15.0f;
     Cam->ViewTargetRadius = 7.0f;
+    Cam->ShowcaseRotateTime = 12.0f;
 }
 
 // NOTE(Dima): Updating camera rotation 
@@ -89,7 +92,7 @@ void UpdateCamera(game_camera* Camera, f32 CamSpeed = 1.0f)
         
         if(Camera->State == Camera_ShowcaseRotateZ)
         {
-            MouseDeltaX = Global_Time->DeltaTime * F_RAD2DEG * F_TWO_PI / 8.0f;
+            MouseDeltaX = Global_Time->DeltaTime * F_RAD2DEG * F_TWO_PI / Camera->ShowcaseRotateTime;
             MouseDeltaY = 0.0f;
         }
         UpdateCameraRotation(Camera, MouseDeltaY, MouseDeltaX, 0.0f);

@@ -60,12 +60,13 @@ INTERNAL_FUNCTION rc2 AddPointLabel(char* Text,
     v2 Offset = V2(Cos(AngleDegrees * F_DEG2RAD), 
                    Sin(AngleDegrees * F_DEG2RAD)) * Radius;
     
+    UIPushScale(TextScale);
     rc2 Result = PrintTextAligned(Text, 
                                   PointCenter + Offset,
                                   AlignX,
                                   AlignY, 
-                                  TextScale,
                                   ColorBlack(), false);
+    UIPopScale();
     
 #if 0    
     PushRectOutline(Global_UI->Params.Commands,
@@ -252,19 +253,19 @@ INTERNAL_FUNCTION void RoundingGraph(function_prototype_rounding* RoundFunc,
     v2 APos = UVToScreenPoint(0.5f, 0.65f);
     v2 BPos = UVToScreenPoint(0.5f, 0.73f);
     
-    f32 TextScale = 1.1f;
+    UIPushScale(1.1f);
     
     PrintTextAligned(ABuf, APos, 
                      TextAlign_Center,
                      TextAlign_Center,
-                     TextScale,
                      ColorGreen());
     
     PrintTextAligned(BBuf, BPos, 
                      TextAlign_Center,
                      TextAlign_Center,
-                     TextScale,
                      ColorBlue());
+    
+    UIPopScale();
 }
 
 INTERNAL_FUNCTION void MoveVectorGraph(v2 MoveVector)
@@ -279,14 +280,19 @@ INTERNAL_FUNCTION void MoveVectorGraph(v2 MoveVector)
     char VerticalBuffer[64];
     stbsp_sprintf(VerticalBuffer, "Vertical = %.2f", MoveVector.y);
     
-    BeginLayout(V2(800, 100));
-    Text(HorizontalBuffer);
-    Text(VerticalBuffer);
-    Text("Left", GetButton(Button_Left));
-    Text("Right", GetButton(Button_Right));
-    Text("Up", GetButton(Button_Up));
-    Text("Down", GetButton(Button_Down));
-    EndLayout();
+#if 0    
+    if(BeginLayout())
+    {
+        ShowTextUnformatted(HorizontalBuffer);
+        ShowTextUnformatted(VerticalBuffer);
+        ShowTextUnformatted("Left");
+        ShowTextUnformatted("Right");
+        ShowTextUnformatted("Up");
+        ShowTextUnformatted("Down");
+        
+        EndLayout();
+    }
+#endif
 }
 
 // NOTE(Dima): Params are in pixels
@@ -906,7 +912,6 @@ INTERNAL_FUNCTION void RandomNumberGraph()
                      HeaderTextP,
                      TextAlign_Center,
                      TextAlign_Center,
-                     1.0f,
                      V4(1.0f, 1.0f, 1.0f, 1.0f),
                      false);
     
@@ -936,11 +941,11 @@ INTERNAL_FUNCTION void RandomNumberGraph()
             stbsp_sprintf(NumText, "%.4f", RandomNum);
             
             // NOTE(Dima): Printing header text
+            Global_UI->Params.Scale = 0.8f;
             PrintTextAligned(NumText, 
                              NumP,
                              TextAlign_Center,
                              TextAlign_Center,
-                             0.8f,
                              V4(1.0f, 1.0f, 1.0f, 1.0f),
                              false);
         }
@@ -1460,7 +1465,6 @@ INTERNAL_FUNCTION void GraphCoinsThrow(memory_arena* Arena,
                      HeadsTextP,
                      TextAlign_Left,
                      TextAlign_Center,
-                     TextScale,
                      TextColor,
                      false);
     
@@ -1468,7 +1472,6 @@ INTERNAL_FUNCTION void GraphCoinsThrow(memory_arena* Arena,
                      TailsTextP,
                      TextAlign_Left,
                      TextAlign_Center,
-                     TextScale,
                      TextColor,
                      false);
     
@@ -1476,7 +1479,6 @@ INTERNAL_FUNCTION void GraphCoinsThrow(memory_arena* Arena,
                      PercTextP,
                      TextAlign_Left,
                      TextAlign_Center,
-                     TextScale,
                      TextColor,
                      false);
     

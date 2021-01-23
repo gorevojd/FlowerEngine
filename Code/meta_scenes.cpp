@@ -39,8 +39,8 @@ GLOBAL_VARIABLE scene_update* MetaScene_UpdateFunctions[] =
 GLOBAL_VARIABLE scene_ongui* MetaScene_OnGUIFunctions[] = 
 {
 	TestGame_OnGUI,
-	GraphShow_OnGUI,
-	RubiksCube_OnGUI,
+	0,
+	0,
 };
 
 #endif //META_GAME_MODES_H

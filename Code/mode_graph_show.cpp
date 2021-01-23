@@ -1,3 +1,5 @@
+#include "flower_ui_graphs.cpp"
+
 struct ui_graphs_state
 {
     std::vector<v2> BlueNoise;
@@ -60,9 +62,4 @@ SCENE_UPDATE(GraphShow)
     GraphCoinsThrow(Scene->Arena,
                     &Global_Assets->CoinHead, 
                     &Global_Assets->CoinTail);
-}
-
-SCENE_ONGUI(GraphShow)
-{
-    
 }

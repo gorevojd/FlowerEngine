@@ -412,7 +412,7 @@ INTERNAL_FUNCTION inline void PushUnitCubeSide(helper_mesh& HelperMesh,
                     Normal, Color);
 }
 
-INTERNAL_FUNCTION mesh MakeUnitCube(f32 SideLen = 2.0f)
+INTERNAL_FUNCTION mesh MakeUnitCube(f32 SideLen = 1.0f)
 {
     helper_mesh HelperMesh = {};
     

@@ -321,10 +321,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     loading_params BerlinSansParams = DefaultLoadingParams();
     BerlinSansParams.Font_PixelHeight = 60;
     A->BerlinSans = LoadFontFile("../Data/Fonts/BerlinSans.ttf", BerlinSansParams);
+    A->LiberationMono = LoadFontFile("../Data/Fonts/liberation-mono.ttf");
     
     AddFontToAtlas(&A->TimesNewRoman);
     AddFontToAtlas(&A->LifeIsGoofy);
     AddFontToAtlas(&A->Arial);
+    AddFontToAtlas(&A->BerlinSans);
+    AddFontToAtlas(&A->LiberationMono);
     
     // NOTE(Dima): Loading assets
     A->Cube = MakeUnitCube();

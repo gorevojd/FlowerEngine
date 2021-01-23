@@ -7,110 +7,13 @@ struct rubiks_state
     rubiks_cube Cube3;
 };
 
-INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube, v3 P, f32 Speed = 1.0f, b32 DebugMode = false)
-{
-    b32 ShiftIsPressed = GetKey(Key_LeftShift);
-    
-    if(GetKeyDown(Key_Q))
-    {
-        ResetCubies(Cube);
-    }
-    
-    if(GetKeyDown(Key_R))
-    {
-        BeginRotateFace(Cube, 
-                        RotationMatrixX,
-                        GetFaceX, 0,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    if(GetKeyDown(Key_L))
-    {
-        BeginRotateFace(Cube,
-                        RotationMatrixX,
-                        GetFaceX, Cube->Dim - 1,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    if(GetKeyDown(Key_D))
-    {
-        BeginRotateFace(Cube,
-                        RotationMatrixY,
-                        GetFaceY, 0,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    if(GetKeyDown(Key_U))
-    {
-        BeginRotateFace(Cube,
-                        RotationMatrixY,
-                        GetFaceY, Cube->Dim - 1,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    if(GetKeyDown(Key_F))
-    {
-        BeginRotateFace(Cube,
-                        RotationMatrixZ,
-                        GetFaceZ, 0,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    if(GetKeyDown(Key_B))
-    {
-        BeginRotateFace(Cube,
-                        RotationMatrixZ,
-                        GetFaceZ, Cube->Dim - 1,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    // NOTE(Dima): CenterTests
-    if(GetKeyDown(Key_I))
-    {
-        BeginRotateFace(Cube, 
-                        RotationMatrixX,
-                        GetFaceX, Cube->Dim / 2,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    if(GetKeyDown(Key_O))
-    {
-        BeginRotateFace(Cube, 
-                        RotationMatrixY,
-                        GetFaceY, Cube->Dim / 2,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    
-    if(GetKeyDown(Key_P))
-    {
-        BeginRotateFace(Cube, 
-                        RotationMatrixZ,
-                        GetFaceZ, Cube->Dim / 2,
-                        Speed,
-                        !ShiftIsPressed);
-    }
-    
-    UpdateBeginnedRotation(Cube);
-    
-    ShowCube(Cube, P, DebugMode);
-}
-
 SCENE_INIT(RubiksCube)
 {
     rubiks_state* State = GetSceneState(rubiks_state);
     
     InitCamera(&State->Camera, Camera_RotateAround);
     
-    State->Cube3 = CreateCube(Scene->Arena, 4, 2.0f, false);
+    State->Cube3 = CreateCube(Scene->Arena, 50, 2.0f, false);
 }
 
 SCENE_UPDATE(RubiksCube)
@@ -132,13 +35,70 @@ SCENE_UPDATE(RubiksCube)
     
     UpdateCamera(&State->Camera);
     
-    UpdateCube(&State->Cube3, V3(0.0f));
+    rubiks_cube* Cube = &State->Cube3;
+    
+    b32 ShiftIsPressed = GetKey(Key_LeftShift);
+    
+    if(GetKeyDown(Key_G))
+    {
+        GenerateScrubmle(Cube, Global_Time->Time * 1000.0f);
+    }
+    
+    if(GetKeyDown(Key_Q))
+    {
+        ResetCubies(Cube);
+    }
+    
+    if(GetKeyDown(Key_R))
+    {
+        AddCommandToCube(Cube, RubiksAxis_X, 0, !ShiftIsPressed);
+    }
+    
+    if(GetKeyDown(Key_L))
+    {
+        AddCommandToCube(Cube, RubiksAxis_X, Cube->Dim - 1, !ShiftIsPressed);
+    }
+    
+    if(GetKeyDown(Key_D))
+    {
+        AddCommandToCube(Cube, RubiksAxis_Y, 0, !ShiftIsPressed);
+    }
+    
+    if(GetKeyDown(Key_U))
+    {
+        AddCommandToCube(Cube, RubiksAxis_Y, Cube->Dim - 1, !ShiftIsPressed);
+    }
+    
+    if(GetKeyDown(Key_F))
+    {
+        AddCommandToCube(Cube, RubiksAxis_Z, 0, !ShiftIsPressed);
+    }
+    
+    if(GetKeyDown(Key_B))
+    {
+        AddCommandToCube(Cube, RubiksAxis_Z, Cube->Dim - 1, !ShiftIsPressed);
+    }
+    
+    // NOTE(Dima): CenterTests
+    if(GetKeyDown(Key_I))
+    {
+        AddCommandToCube(Cube, RubiksAxis_X, Cube->Dim / 2, !ShiftIsPressed);
+    }
+    
+    if(GetKeyDown(Key_O))
+    {
+        AddCommandToCube(Cube, RubiksAxis_Y, Cube->Dim / 2, !ShiftIsPressed);
+    }
+    
+    
+    if(GetKeyDown(Key_P))
+    {
+        AddCommandToCube(Cube, RubiksAxis_Z, Cube->Dim / 2, !ShiftIsPressed);
+    }
+    
+    UpdateCube(&State->Cube3, V3(0.0f), 3.0f);
+    
     //UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
     
     SetMatrices(GetViewMatrix(&State->Camera));
-}
-
-SCENE_ONGUI(RubiksCube)
-{
-    
 }

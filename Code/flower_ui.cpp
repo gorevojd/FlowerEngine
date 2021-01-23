@@ -1,6 +1,13 @@
-INTERNAL_FUNCTION inline f32 GetLineBase()
+INTERNAL_FUNCTION inline ui_params* UIGetParams()
 {
     ui_params* Params = &Global_UI->Params;
+    
+    return(Params);
+}
+
+INTERNAL_FUNCTION inline f32 GetLineBase()
+{
+    ui_params* Params = UIGetParams();
     
     f32 Result = Params->Font->Ascent * Params->Scale;
     
@@ -9,7 +16,7 @@ INTERNAL_FUNCTION inline f32 GetLineBase()
 
 INTERNAL_FUNCTION inline f32 GetLineAdvance()
 {
-    ui_params* Params = &Global_UI->Params;
+    ui_params* Params = UIGetParams();
     
     f32 Result = Params->Font->LineAdvance * Params->Scale;
     
@@ -172,15 +179,25 @@ INTERNAL_FUNCTION void PrintText3D(font* Font,
                false, C);
 }
 
-INTERNAL_FUNCTION inline v2 GetTextSize(char* Text, f32 TextScale)
+INTERNAL_FUNCTION inline rc2 GetTextRect(char* Text, v2 P)
 {
-    render_commands* Commands = Global_UI->Params.Commands;
-    font* Font = Global_UI->Params.Font;
+    ui_params* Params = UIGetParams();
     
-    rc2 TextRect = PrintText_(Font, 
-                              Text, 
-                              V3_Left(), V3_Up(), 
-                              V3(0.0f, 0.0f, 0.0f), V2(0.0f, 0.0f), 0, TextScale, true);
+    font* Font = Params->Font;
+    
+    rc2 Result = PrintText_(Font, 
+                            Text, 
+                            V3_Left(), V3_Up(), 
+                            V3(P.x, P.y, 0.0f), 
+                            V2(0.0f, 0.0f), 
+                            0, Params->Scale, true);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline v2 GetTextSize(char* Text)
+{
+    rc2 TextRect = GetTextRect(Text, V2(0.0f, 0.0f));
     
     v2 Result = GetDim(TextRect);
     
@@ -260,32 +277,33 @@ INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(f32 Min, f32 Max,
 INTERNAL_FUNCTION inline v2 GetPrintPositionInRect(rc2 Rect,
                                                    v2 TextDim,
                                                    u32 AlignX,
-                                                   u32 AlignY,
-                                                   f32 TextScale)
+                                                   u32 AlignY)
 {
     v2 Result;
     
+    ui_params* Params = UIGetParams();
+    
     Result.x = GetPrintHorizontalPosition(Rect.Min.x, Rect.Max.x,
-                                          TextDim.x, AlignX, TextScale);
+                                          TextDim.x, AlignX, Params->Scale);
     Result.y = GetPrintVerticalPosition(Rect.Min.y, Rect.Max.y,
-                                        TextDim.y, AlignY, TextScale);
+                                        TextDim.y, AlignY, Params->Scale);
     
     return(Result);
 }
 
 INTERNAL_FUNCTION rc2 PrintText(char* Text,
                                 v2 P,
-                                f32 Scale = 1.0f,
                                 v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f),
                                 b32 WithShadow = true)
 {
-    render_commands* Commands = Global_UI->Params.Commands;
-    font* Font = Global_UI->Params.Font;
+    ui_params* Params = UIGetParams();
+    font* Font = Params->Font;
     
     rc2 Result = PrintText(Font,
                            Text,
                            P,
-                           Scale, C,
+                           Params->Scale, 
+                           C,
                            WithShadow);
     
     return(Result);
@@ -295,17 +313,15 @@ INTERNAL_FUNCTION rc2 PrintTextAligned(char* Text,
                                        rc2 Rect,
                                        u32 AlignX = TextAlign_Center,
                                        u32 AlignY = TextAlign_Center,
-                                       f32 Scale = 1.0f,
                                        v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f),
                                        b32 WithShadow = true)
 {
-    v2 TextSize = GetTextSize(Text, Scale);
+    v2 TextSize = GetTextSize(Text);
     
     v2 PrintP = GetPrintPositionInRect(Rect, TextSize,
-                                       AlignX, AlignY,
-                                       Scale);
+                                       AlignX, AlignY);
     
-    rc2 Result = PrintText(Text, PrintP, Scale, C, WithShadow);
+    rc2 Result = PrintText(Text, PrintP, C, WithShadow);
     
     return(Result);
 }
@@ -315,13 +331,11 @@ INTERNAL_FUNCTION rc2 PrintTextAligned(char* Text,
                                        v2 Point,
                                        u32 AlignX = TextAlign_Center,
                                        u32 AlignY = TextAlign_Center,
-                                       f32 Scale = 1.0f,
                                        v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f),
                                        b32 WithShadow = true)
 {
     rc2 Result = PrintTextAligned(Text, RectMinMax(Point, Point), 
                                   AlignX, AlignY,
-                                  Scale,
                                   C, WithShadow);
     
     return(Result);
@@ -346,53 +360,244 @@ INTERNAL_FUNCTION inline v2 UVToScreenPoint(v2 UV)
     return(Result);
 }
 
-INTERNAL_FUNCTION void BeginLayout(v2 At = V2(0.0f, 0.0f))
+INTERNAL_FUNCTION inline v4 UIGetColor(u32 Color)
 {
-    Global_UI->CurrentLayout = &Global_UI->Layout;
+    v4 Result = Global_UI->Colors.Colors[Color];
     
-    Global_UI->CurrentLayout->At = At;
-    Global_UI->CurrentLayout->At.y += GetLineBase();
+    return(Result);
 }
 
-INTERNAL_FUNCTION void EndLayout()
+INTERNAL_FUNCTION void InitUIColors()
 {
-    Global_UI->CurrentLayout = 0;
-}
-
-INTERNAL_FUNCTION void Text(char* Txt, b32 Highligth = false)
-{
-    Assert(Global_UI);
+    ui_colors* Colors_ =  &Global_UI->Colors;
     
-    ui_params* Params = &Global_UI->Params;
+    v4* Colors = Colors_->Colors;
     
-    v4 Color = ColorWhite();
-    if(Highligth)
-    {
-        Color = ColorYellow();
-    }
-    
-    rc2 Bounds = PrintText(Params->Font, 
-                           Txt, 
-                           Global_UI->CurrentLayout->At, 
-                           Params->Scale, Color);
-    
-    if(Highligth)
-    {
-        PushRectOutline(Bounds, 2,
-                        Color);
-    }
-    
-    Global_UI->CurrentLayout->At.y += GetLineAdvance();
-}
-
-#include "flower_ui_graphs.cpp"
-
-INTERNAL_FUNCTION inline void SetParamsUI(ui_params Params)
-{
-    Global_UI->Params = Params;
+    Colors[UIColor_Text] = ColorWhite();
+    Colors[UIColor_TextActive] = ColorYellow();
 }
 
 INTERNAL_FUNCTION void InitUI(memory_arena* Arena)
 {
     Global_UI = PushStruct(Arena, ui_state);
+    
+    Global_UI->Arena = Arena;
+    
+    InitUIColors();
+    
+    Global_UI->FirstLayout = 0;
+}
+
+// NOTE(Dima): UI parameters
+INTERNAL_FUNCTION inline void UISetParams(ui_params Params)
+{
+    Global_UI->Params = Params;
+}
+
+inline void UIPushScale(f32 Scale)
+{
+    ui_params* Params = UIGetParams();
+    
+    Assert(Params->ScaleStackIndex < ArrayCount(Params->ScaleStack));
+    
+    Params->ScaleStack[Params->ScaleStackIndex++] = Scale;
+    Params->Scale = Scale;
+}
+
+inline void UIPopScale()
+{
+    ui_params* Params = UIGetParams();
+    
+    Assert(Params->ScaleStackIndex > 0);
+    
+    Params->ScaleStack[Params->ScaleStackIndex] = 0.0f;
+    Params->Scale = Params->ScaleStack[--Params->ScaleStackIndex];
+}
+
+INTERNAL_FUNCTION void UIBeginFrame()
+{
+    window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
+    
+    ui_params ParamsUI = {};
+    ParamsUI.Commands = Global_RenderCommands;
+    ParamsUI.Font = &Global_Assets->LiberationMono;
+    ParamsUI.WindowDims = WndDims;
+    
+    UISetParams(ParamsUI);
+    
+    // NOTE(Dima): Init font scale stack
+    ParamsUI.ScaleStackIndex = 0;
+    UIPushScale(1.0f);
+    
+    // NOTE(Dima): Initializing layouts
+    ui_layout* LayoutAt = Global_UI->FirstLayout;
+    
+    while(LayoutAt)
+    {
+        LayoutAt->At = V2(0.0f);
+        LayoutAt->JustStarted = true;
+        LayoutAt->StayOnSameLine = false;
+        
+        LayoutAt = LayoutAt->Next;
+    }
+}
+
+// NOTE(Dima): Layouts stuff
+INTERNAL_FUNCTION b32 BeginLayout(const char* Name)
+{
+    ui_layout* Found = 0;
+    
+    // NOTE(Dima): FInding layout
+    if(Global_UI->FirstLayout)
+    {
+        ui_layout* At = Global_UI->FirstLayout;
+        
+        while(At != 0)
+        {
+            if(StringsAreEqual((char*)Name, (char*)At->Name))
+            {
+                Found = At;
+                break;
+            }
+            
+            At = At->Next;
+        }
+    }
+    
+    // NOTE(Dima): If not found - then allocate
+    if(!Found)
+    {
+        Found = PushStruct(Global_UI->Arena, ui_layout);
+        
+        Found->Name = Name;
+        Found->Next = Global_UI->FirstLayout;
+        
+        Global_UI->FirstLayout = Found;
+    }
+    
+    b32 Result = true;
+    
+    Assert(Global_UI->CurrentLayout == 0);
+    Global_UI->CurrentLayout = Found;
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline ui_layout* GetCurrentLayout()
+{
+    ui_layout* Layout = Global_UI->CurrentLayout;
+    
+    return(Layout);
+}
+
+INTERNAL_FUNCTION void EndLayout()
+{
+    Assert(Global_UI->CurrentLayout);
+    
+    Global_UI->CurrentLayout = 0;
+}
+
+INTERNAL_FUNCTION void SameLine()
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    Layout->StayOnSameLine = true;
+}
+
+INTERNAL_FUNCTION inline void PreAdvance()
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    if(Layout->JustStarted)
+    {
+        Layout->JustStarted = false;
+        
+        Layout->At.y += GetLineBase();
+    }
+    else
+    {
+        f32 VerticalAdvance = GetLineAdvance();
+        f32 HorizontalP = 0.0f;
+        
+        if(Layout->StayOnSameLine)
+        {
+            Layout->StayOnSameLine = false;
+            
+            VerticalAdvance = 0.0f;
+            HorizontalP = Layout->LastBB.Total.Max.x + GetLineBase();
+        }
+        
+        Layout->At.y += VerticalAdvance;
+        Layout->At.x = HorizontalP;
+    }
+}
+
+INTERNAL_FUNCTION inline void DescribeElement(rc2 Active, rc2 Total)
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    Layout->LastBB.Active = Active;
+    Layout->LastBB.Total = Total;
+}
+
+// NOTE(Dima): Elements
+INTERNAL_FUNCTION void ShowTextUnformatted(char* Text)
+{
+    ui_params* Params = UIGetParams();
+    
+    PreAdvance();
+    
+    rc2 Bounds = PrintText(Params->Font, 
+                           Text, 
+                           Global_UI->CurrentLayout->At, 
+                           Params->Scale, 
+                           UIGetColor(UIColor_Text));
+    
+    DescribeElement(Bounds, Bounds);
+}
+
+INTERNAL_FUNCTION int ShowText(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    int Result = stbsp_vsnprintf(Global_UI->StringFormatBuffer, 
+                                 ArrayCount(Global_UI->StringFormatBuffer), 
+                                 fmt, args);
+    va_end(args);
+    
+    ShowTextUnformatted(Global_UI->StringFormatBuffer);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION b32 Button(const char* Name)
+{
+    ui_params* Params = UIGetParams();
+    
+    PreAdvance();
+    
+    v2 TextPrintP = Global_UI->CurrentLayout->At;
+    rc2 Bounds = GetTextRect((char*)Name, TextPrintP);
+    
+    b32 Pressed = false;
+    v4 TextC = UIGetColor(UIColor_Text);
+    if(MouseInRect(Bounds))
+    {
+        TextC = UIGetColor(UIColor_TextActive);
+        
+        if(GetKeyDown(KeyMouse_Left))
+        {
+            Pressed = true;
+        }
+    }
+    
+    PushRect(Bounds, ColorRed());
+    
+    PrintText((char*)Name, 
+              TextPrintP, 
+              TextC);
+    
+    DescribeElement(Bounds, Bounds);
+    
+    return(Pressed);
 }

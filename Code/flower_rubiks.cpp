@@ -16,11 +16,11 @@ inline int GetCurrentIndex(rubiks_cube* Cube, int x, int y, int z)
     return(Result);
 }
 
-inline rubiks_cubie* GetCubie(rubiks_cube* Cube, int x, int y, int z)
+inline int GetVisibleCubie(rubiks_cube* Cube, int x, int y, int z)
 {
     int ResultIndex = GetCubieIndex(Cube, x, y, z);
     
-    rubiks_cubie* Result = Cube->Cubies + ResultIndex;
+    int Result = Cube->CubiesToVisible[ResultIndex];
     
     return(Result);
 }
@@ -563,7 +563,7 @@ INTERNAL_FUNCTION void RubiksPrecomputeMeshes(rubiks_cube* Cube)
         {
             for(int z = 0; z < Cube->Dim; z++)
             {
-                rubiks_cubie* Cubie = GetCubie(Cube, x, y, z);
+                int VisibleCubie = GetVisibleCubie(Cube, x, y, z);
                 rubiks_is_outer_bool OuterBool = RubiksIsOuterCubie(Cube, x, y, z);
                 
                 std::string UniqueName = OuterCombinationUniqueName(&OuterBool);
@@ -584,11 +584,11 @@ INTERNAL_FUNCTION void RubiksPrecomputeMeshes(rubiks_cube* Cube)
 #endif
                     }
                     
-                    Cubie->MeshIndex = UniqueMeshMap[UniqueName];
+                    Cube->Visible.MeshIndex[VisibleCubie] = UniqueMeshMap[UniqueName];
                 }
                 else
                 {
-                    Cubie->MeshIndex = -1;
+                    Cube->Visible.MeshIndex[VisibleCubie] = -1;
                 }
             }
         }
@@ -836,6 +836,34 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
     }
 }
 
+INTERNAL_FUNCTION void AddCommandToCube(rubiks_cube* Cube,
+                                        int Axis,
+                                        int FaceIndex,
+                                        int IsClockwise)
+{
+    rubiks_command* NewCommand = &Cube->Commands[Cube->AddIndex];
+    
+    NewCommand->Axis = Axis;
+    NewCommand->FaceIndex = FaceIndex;
+    NewCommand->IsClockwise = IsClockwise;
+    
+    Cube->AddIndex = (Cube->AddIndex + 1) % Cube->CommandsCount;
+    
+    Assert(Cube->AddIndex != Cube->DoIndex);
+}
+
+INTERNAL_FUNCTION void FinishCommandExecution(rubiks_cube* Cube)
+{
+    Cube->DoIndex = (Cube->DoIndex + 1) % Cube->CommandsCount;
+}
+
+INTERNAL_FUNCTION b32 CanExecuteCommand(rubiks_cube* Cube)
+{
+    b32 Result = (Cube->AddIndex != Cube->DoIndex) && !Cube->IsRotatingNow;
+    
+    return(Result);
+}
+
 INTERNAL_FUNCTION void FinishCubeRotation(rubiks_cube* Cube)
 {
     rubiks_beginned_rotation* Beginned = &Cube->BeginnedRotation;
@@ -848,20 +876,76 @@ INTERNAL_FUNCTION void FinishCubeRotation(rubiks_cube* Cube)
         FaceCubieIndex++)
     {
         int CubieIndex = Cube->RotateFace.Face[FaceCubieIndex];
-        rubiks_cubie* Cubie = &Cube->Cubies[CubieIndex];
+        int VisibleCubie = Cube->CubiesToVisible[CubieIndex];
         
-        Cubie->Transform = Cubie->Transform * Beginned->AppliedRotation;
-        Cubie->AppliedRotation = IdentityMatrix4();
+        if(VisibleCubie != -1)
+        {
+            Cube->Visible.Transform[VisibleCubie] = Cube->Visible.Transform[VisibleCubie] * Beginned->AppliedRotation;
+            Cube->Visible.AppliedRotation[VisibleCubie] = IdentityMatrix4();
+        }
     }
     
     RotateInternalStructure(Cube);
     
     Beginned->AppliedRotation = IdentityMatrix4();
     Cube->IsRotatingNow = false;
+    
+    FinishCommandExecution(Cube);
+}
+
+// NOTE(Dima): Function returns true if rotation was beginned
+INTERNAL_FUNCTION b32 BeginRotateFace(rubiks_cube* Cube, 
+                                      int Axis,
+                                      int FaceIndex,
+                                      f32 Speed,
+                                      b32 IsClockwise)
+{
+    rubiks_beginned_rotation* BeginnedRotation = &Cube->BeginnedRotation;
+    
+    b32 Result = false;
+    
+    if(!Cube->IsRotatingNow)
+    {
+        BeginnedRotation->InRotationTime = 0.0f;
+        BeginnedRotation->TimeForRotation = RUBIKS_TIME_FOR_ROTATION / Speed;
+        
+        switch(Axis)
+        {
+            case RubiksAxis_X:
+            {
+                BeginnedRotation->RotationMatrix = RotationMatrixX;
+                BeginnedRotation->GetFace = GetFaceX;
+            }break;
+            
+            case RubiksAxis_Y:
+            {
+                BeginnedRotation->RotationMatrix = RotationMatrixY;
+                BeginnedRotation->GetFace = GetFaceY;
+                
+            }break;
+            
+            case RubiksAxis_Z:
+            {
+                BeginnedRotation->RotationMatrix = RotationMatrixZ;
+                BeginnedRotation->GetFace = GetFaceZ;
+            }break;
+        }
+        BeginnedRotation->FaceIndex = FaceIndex;
+        BeginnedRotation->IsClockwise = IsClockwise;
+        BeginnedRotation->DirectionMultiplier = FaceIndex > (Cube->Dim / 2) ? -1.0f : 1.0f;
+        
+        Cube->IsRotatingNow = true;
+        
+        Result = true;
+    }
+    
+    return(Result);
 }
 
 INTERNAL_FUNCTION void UpdateBeginnedRotation(rubiks_cube* Cube)
 {
+    FUNCTION_TIMING();
+    
     rubiks_beginned_rotation* BeginnedRotation = &Cube->BeginnedRotation;
     
     if(Cube->IsRotatingNow)
@@ -887,9 +971,12 @@ INTERNAL_FUNCTION void UpdateBeginnedRotation(rubiks_cube* Cube)
             CubieIndex < RotateFace->Count;
             CubieIndex++)
         {
-            rubiks_cubie* Cubie = &Cube->Cubies[RotateFace->Face[CubieIndex]];
+            int VisibleCubie = Cube->CubiesToVisible[RotateFace->Face[CubieIndex]];
             
-            Cubie->AppliedRotation = AppliedRotation;
+            if(VisibleCubie != -1)
+            {
+                Cube->Visible.AppliedRotation[VisibleCubie] = AppliedRotation;
+            }
         }
         
         // NOTE(Dima): Finishing rotation (updating cube structure)
@@ -902,9 +989,10 @@ INTERNAL_FUNCTION void UpdateBeginnedRotation(rubiks_cube* Cube)
     }
 }
 
-
-INTERNAL_FUNCTION inline void ResetCubies(rubiks_cube* Cube)
+INTERNAL_FUNCTION inline void InitToVisibleMapping(rubiks_cube* Cube)
 {
+    std::unordered_set<std::string> UniqueNames;
+    
     // NOTE(Dima): Initializing cubies
     for(int x = 0; x < Cube->Dim; x++)
     {
@@ -912,19 +1000,64 @@ INTERNAL_FUNCTION inline void ResetCubies(rubiks_cube* Cube)
         {
             for(int z = 0; z < Cube->Dim; z++)
             {
-                v3 CubieP = GetCubieP(Cube, x, y, z);
+                int VisibleIndex = -1;
+                
+                if(RubiksIsOuter(Cube, x, y, z))
+                {
+                    char Buf[128];
+                    stbsp_sprintf(Buf, "x%d y%d z%d", x, y, z);
+                    
+                    std::string Name = std::string(Buf);
+                    
+                    VisibleIndex = UniqueNames.size();
+                    UniqueNames.insert(Name);
+                }
                 
                 int CubieIndex = GetCubieIndex(Cube, x, y, z);
-                Cube->Current[CubieIndex] = CubieIndex;
-                
-                rubiks_cubie* Cubie = GetCubie(Cube, x, y, z);
-                
-                Cubie->Transform = TranslationMatrix(CubieP);
-                Cubie->AppliedRotation = IdentityMatrix4();
-                Cubie->InitP = CubieP;
+                Cube->CubiesToVisible[CubieIndex] = VisibleIndex;
             }
         }
     }
+    
+    Assert(UniqueNames.size() == Cube->Visible.Count);
+}
+
+INTERNAL_FUNCTION inline void ResetCubies(rubiks_cube* Cube)
+{
+    rubiks_visible_cubies* Vis = &Cube->Visible;
+    
+    // NOTE(Dima): Initializing cubies
+    for(int x = 0; x < Cube->Dim; x++)
+    {
+        for(int y = 0; y < Cube->Dim; y++)
+        {
+            for(int z = 0; z < Cube->Dim; z++)
+            {
+                int CubieIndex = GetCubieIndex(Cube, x, y, z);
+                Cube->Current[CubieIndex] = CubieIndex;
+                
+                int VisibleCubie = GetVisibleCubie(Cube, x, y, z);
+                if(VisibleCubie != -1)
+                {
+                    v3 CubieP = GetCubieP(Cube, x, y, z);
+                    
+                    Vis->Transform[VisibleCubie] = TranslationMatrix(CubieP);
+                    Vis->AppliedRotation[VisibleCubie] = IdentityMatrix4();
+                    Vis->InitP[VisibleCubie] = CubieP;
+                }
+            }
+        }
+    }
+}
+
+inline int GetVisibleCubiesCount(int Dim)
+{
+    int OuterDim = Dim;
+    int InnerDim = FlowerMax(Dim - 2, 0);
+    
+    int Result = OuterDim * OuterDim * OuterDim - InnerDim * InnerDim * InnerDim;
+    
+    return(Result);
 }
 
 inline rubiks_cube CreateCube(memory_arena* Arena, 
@@ -937,8 +1070,19 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     int OneFaceCount = CubeDim * CubeDim;
     Result.CubiesCount = OneFaceCount * CubeDim;
     Result.Dim = CubeDim;
-    Result.Cubies = PushArray(Arena, rubiks_cubie, Result.CubiesCount);
+    Result.CubiesToVisible = PushArray(Arena, int, Result.CubiesCount);
     Result.Current = PushArray(Arena, int, Result.CubiesCount);
+    
+    // NOTE(Dima): Init visible cubies
+    int VisibleCount = GetVisibleCubiesCount(CubeDim);
+    Result.Visible.Count = VisibleCount;
+    Result.Visible.FinalTransform = PushArray(Arena, m44, VisibleCount);
+    Result.Visible.Transform = PushArray(Arena, m44, VisibleCount);
+    Result.Visible.AppliedRotation = PushArray(Arena, m44, VisibleCount);
+    Result.Visible.InitP = PushArray(Arena, v3, VisibleCount);
+    Result.Visible.MeshIndex = PushArray(Arena, int, VisibleCount);
+    
+    InitToVisibleMapping(&Result);
     
     Result.SideLen = SideLen;
     Result.BeginnedRotation.InRotationTime = 0.0f;
@@ -965,46 +1109,28 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     GenerateStickerMeshes(&Result, RoundStickers);
     
     // NOTE(Dima): Initializing cubies
+    
     ResetCubies(&Result);
     RubiksPrecomputeMeshes(&Result);
     RubiksGenerateInnerMeshes(&Result);
     
-    return(Result);
-}
-
-// NOTE(Dima): Function returns true if rotation was beginned
-INTERNAL_FUNCTION b32 BeginRotateFace(rubiks_cube* Cube, 
-                                      rubiks_rotation_function* RotationMatrix,
-                                      rubiks_get_face_function* RubiksGetFace,
-                                      int FaceIndex,
-                                      f32 Speed,
-                                      b32 IsClockwise)
-{
-    rubiks_beginned_rotation* BeginnedRotation = &Cube->BeginnedRotation;
-    
-    b32 Result = false;
-    
-    if(!Cube->IsRotatingNow)
-    {
-        BeginnedRotation->InRotationTime = 0.0f;
-        BeginnedRotation->TimeForRotation = RUBIKS_TIME_FOR_ROTATION / Speed;
-        BeginnedRotation->RotationMatrix = RotationMatrix;
-        BeginnedRotation->GetFace = RubiksGetFace;
-        BeginnedRotation->FaceIndex = FaceIndex;
-        BeginnedRotation->IsClockwise = IsClockwise;
-        BeginnedRotation->DirectionMultiplier = FaceIndex > (Cube->Dim / 2) ? -1.0f : 1.0f;
-        
-        Cube->IsRotatingNow = true;
-        
-        Result = true;
-    }
+    // NOTE(Dima): Commands
+    Result.DoIndex = 0;
+    Result.AddIndex = 0;
+    Result.CommandsCount = CubeDim * CubeDim * 4 + 100;
+    Result.Commands = PushArray(Arena, rubiks_command, Result.CommandsCount);
     
     return(Result);
 }
 
+// TODO(Dima): Walk only on outer cubies
 INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
 {
+    FUNCTION_TIMING();
+    
     m44 OffsetMatrix = TranslationMatrix(P);
+    
+    rubiks_visible_cubies* Vis = &Cube->Visible;
     
     if(Cube->IsRotatingNow && !DebugMode)
     {
@@ -1026,24 +1152,36 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
         }
     }
     
-    for(int x = 0; x < Cube->Dim; x++)
     {
-        for(int y = 0; y < Cube->Dim; y++)
+        BLOCK_TIMING("Cube Transforms Calculation");
+        
+        // NOTE(Dima): Transformations calculation
+        for(int VisibleIndex = 0;
+            VisibleIndex < Vis->Count;
+            VisibleIndex++)
         {
-            for(int z = 0; z < Cube->Dim; z++)
+            Vis->FinalTransform[VisibleIndex] = Vis->Transform[VisibleIndex] * Vis->AppliedRotation[VisibleIndex] * OffsetMatrix;
+        }
+    }
+    
+    // NOTE(Dima): For DEBUG mode
+    if(DebugMode)
+    {
+        for(int x = 0; x < Cube->Dim; x++)
+        {
+            for(int y = 0; y < Cube->Dim; y++)
             {
-                rubiks_cubie* Cubie = GetCubie(Cube, x, y, z);
-                
-                int CubieCurrentIndex = GetCurrentIndex(Cube, x, y, z);
-                
-                if(DebugMode)
+                for(int z = 0; z < Cube->Dim; z++)
                 {
                     if(RubiksIsOuter(Cube, x, y, z))
                     {
+                        int CubieCurrentIndex = GetCurrentIndex(Cube, x, y, z);
+                        int VisibleCubie = Cube->CubiesToVisible[CubieCurrentIndex];
+                        
                         char Buf[16];
                         IntegerToString(CubieCurrentIndex, Buf);
                         
-                        v3 NumP = Cubie->InitP;
+                        v3 NumP = Vis->InitP[VisibleCubie];
                         
                         PrintText3D(Global_UI->Params.Font,
                                     Buf,
@@ -1054,28 +1192,72 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
                                     false);
                     }
                 }
-                else
-                {
-                    if(RubiksIsOuter(Cube, x, y, z) && Cubie->MeshIndex != -1)
-                    {
-                        mesh* Mesh = &Cube->UniqueMeshes[Cubie->MeshIndex];
-                        
-                        v3 Color = V3(1.0f);
-                        m44 Transform = Cubie->Transform * Cubie->AppliedRotation * OffsetMatrix;
-                        
-#if 1
-                        PushInstanceMesh(Cube->Dim * Cube->Dim,
-                                         Mesh, 0,
-                                         Transform);
-#else
-                        
-                        PushMesh(Global_RenderCommands, 
-                                 Mesh, 0,
-                                 Transform);
-#endif
-                    }
-                }
             }
         }
     }
+    else
+    {
+        BLOCK_TIMING("Cube Push to Render");
+        
+        // NOTE(Dima): Showing cubies
+        for(int VisibleIndex = 0;
+            VisibleIndex < Vis->Count;
+            VisibleIndex++)
+        {
+            int MeshIndex = Vis->MeshIndex[VisibleIndex];
+            mesh* Mesh = &Cube->UniqueMeshes[MeshIndex];
+            
+            v3 Color = V3(1.0f);
+            
+#if 1
+            PushInstanceMesh(Cube->Dim * Cube->Dim,
+                             Mesh, 0,
+                             Vis->FinalTransform[VisibleIndex]);
+#else
+            
+            PushMesh(Mesh, 0, Transform);
+#endif
+        }
+        
+    }
+}
+
+INTERNAL_FUNCTION void GenerateScrubmle(rubiks_cube* Cube, int Seed = 123)
+{
+    random_generation Random = SeedRandom(Seed);
+    
+    int ScrumbleCount = RandomBetweenU32(&Random, Cube->Dim * 8, Cube->Dim * 10);
+    
+    for(int ScrumbleIndex = 0;
+        ScrumbleIndex < ScrumbleCount;
+        ScrumbleIndex++)
+    {
+        AddCommandToCube(Cube,
+                         RandomBetweenU32(&Random, 0, RubiksAxis_Count),
+                         RandomBetweenU32(&Random, 0, Cube->Dim),
+                         RandomBool(&Random));
+    }
+}
+
+INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube,
+                                  v3 P, 
+                                  f32 Speed = 1.0f, 
+                                  b32 DebugMode = false)
+{
+    FUNCTION_TIMING();
+    
+    UpdateBeginnedRotation(Cube);
+    
+    if(CanExecuteCommand(Cube))
+    {
+        rubiks_command* Command = &Cube->Commands[Cube->DoIndex];
+        
+        BeginRotateFace(Cube, 
+                        Command->Axis,
+                        Command->FaceIndex,
+                        Speed,
+                        Command->IsClockwise);
+    }
+    
+    ShowCube(Cube, P, DebugMode);
 }

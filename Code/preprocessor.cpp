@@ -13,6 +13,7 @@ struct parsed_scene
 {
     std::string Name;
     std::string File;
+    
     std::string InitMethod;
     std::string UpdateMethod;
     std::string OnGUIMethod;
@@ -56,6 +57,14 @@ void ParseSceneField(parse_scene_context* Context, parsed_scene* Scene)
     {
         Scene->File = JsonReadString(Tokenz);
     }
+    else if(StringsAreEqual(FieldName.c_str(), "Method_OnGUI"))
+    {
+        b32 HasOnGUI = JsonReadBool(Tokenz);
+        if(HasOnGUI)
+        {
+            Scene->OnGUIMethod = Scene->Name + "_OnGUI";
+        }
+    }
     
     b32 IsEndOfBlock = ProcessEndOfField(Tokenz);
 }
@@ -70,7 +79,7 @@ void ParseScene(parse_scene_context* Context)
     Scene.Name = JsonReadString(Tokenz);
     Scene.InitMethod = Scene.Name + "_Init";
     Scene.UpdateMethod = Scene.Name + "_Update";
-    Scene.OnGUIMethod = Scene.Name + "_OnGUI";
+    Scene.OnGUIMethod = "0";
     
     RequireToken(Tokenz, JsonToken_Colon);
     RequireToken(Tokenz, JsonToken_OpenBlock);
@@ -86,6 +95,7 @@ void ParseScene(parse_scene_context* Context)
     Context->ParsedScenes.push_back(Scene);
     
     b32 IsEndOfBlock = ProcessEndOfField(Tokenz);
+    
 }
 
 void ParseScenes(parse_scene_context* Context)

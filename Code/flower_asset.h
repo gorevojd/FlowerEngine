@@ -70,6 +70,7 @@ struct asset_system
     font LifeIsGoofy;
     font Arial;
     font BerlinSans;
+    font LiberationMono;
     
     image BearDiffuse;
     image BearNormal;
