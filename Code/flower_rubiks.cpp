@@ -1076,11 +1076,11 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     // NOTE(Dima): Init visible cubies
     int VisibleCount = GetVisibleCubiesCount(CubeDim);
     Result.Visible.Count = VisibleCount;
-    Result.Visible.FinalTransform = PushArray(Arena, m44, VisibleCount);
-    Result.Visible.Transform = PushArray(Arena, m44, VisibleCount);
-    Result.Visible.AppliedRotation = PushArray(Arena, m44, VisibleCount);
-    Result.Visible.InitP = PushArray(Arena, v3, VisibleCount);
-    Result.Visible.MeshIndex = PushArray(Arena, int, VisibleCount);
+    Result.Visible.FinalTransform = PushArray(Arena, m44, CeilAlign(VisibleCount, 4));
+    Result.Visible.Transform = PushArray(Arena, m44, CeilAlign(VisibleCount, 4));
+    Result.Visible.AppliedRotation = PushArray(Arena, m44, CeilAlign(VisibleCount, 4));
+    Result.Visible.InitP = PushArray(Arena, v3, CeilAlign(VisibleCount, 4));
+    Result.Visible.MeshIndex = PushArray(Arena, int, CeilAlign(VisibleCount, 4));
     
     InitToVisibleMapping(&Result);
     
@@ -1152,6 +1152,7 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
         }
     }
     
+#if 0  
     {
         BLOCK_TIMING("Cube Transforms Calculation");
         
@@ -1163,6 +1164,38 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             Vis->FinalTransform[VisibleIndex] = Vis->Transform[VisibleIndex] * Vis->AppliedRotation[VisibleIndex] * OffsetMatrix;
         }
     }
+#else
+    m44_4x OffsetMatrix4x = M44_4X(OffsetMatrix);
+    
+    {
+        BLOCK_TIMING("Cube Transforms Calculation SIMD");
+        
+        // NOTE(Dima): Transformations calculation
+        for(int VisibleIndex = 0;
+            VisibleIndex < Vis->Count;
+            VisibleIndex += 4)
+        {
+#if 0            
+            m44_4x Transform = M44_4X_Load((f32*)&Vis->Transform[VisibleIndex]);
+            m44_4x AppliedRotation = M44_4X_Load((f32*)&Vis->AppliedRotation[VisibleIndex]);
+#else
+            m44_4x Transform = M44_4X(Vis->Transform[VisibleIndex + 0],
+                                      Vis->Transform[VisibleIndex + 1],
+                                      Vis->Transform[VisibleIndex + 2],
+                                      Vis->Transform[VisibleIndex + 3]);
+            
+            m44_4x AppliedRotation = M44_4X(Vis->AppliedRotation[VisibleIndex + 0],
+                                            Vis->AppliedRotation[VisibleIndex + 1],
+                                            Vis->AppliedRotation[VisibleIndex + 2],
+                                            Vis->AppliedRotation[VisibleIndex + 3]);
+#endif
+            
+            m44_4x FinalTransform = Transform * AppliedRotation * OffsetMatrix4x;
+            
+            M44_4X_Store((f32*)&Vis->FinalTransform[VisibleIndex], FinalTransform);
+        }
+    }
+#endif
     
     // NOTE(Dima): For DEBUG mode
     if(DebugMode)

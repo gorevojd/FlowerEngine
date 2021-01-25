@@ -13,7 +13,7 @@ SCENE_INIT(RubiksCube)
     
     InitCamera(&State->Camera, Camera_RotateAround);
     
-    State->Cube3 = CreateCube(Scene->Arena, 50, 2.0f, false);
+    State->Cube3 = CreateCube(Scene->Arena, 70, 1.0f, false);
 }
 
 SCENE_UPDATE(RubiksCube)
@@ -90,13 +90,12 @@ SCENE_UPDATE(RubiksCube)
         AddCommandToCube(Cube, RubiksAxis_Y, Cube->Dim / 2, !ShiftIsPressed);
     }
     
-    
     if(GetKeyDown(Key_P))
     {
         AddCommandToCube(Cube, RubiksAxis_Z, Cube->Dim / 2, !ShiftIsPressed);
     }
     
-    UpdateCube(&State->Cube3, V3(0.0f), 3.0f);
+    UpdateCube(&State->Cube3, V3(0.0f), 2.0f);
     
     //UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
     

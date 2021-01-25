@@ -374,7 +374,15 @@ INTERNAL_FUNCTION void InitUIColors()
     v4* Colors = Colors_->Colors;
     
     Colors[UIColor_Text] = ColorWhite();
-    Colors[UIColor_TextActive] = ColorYellow();
+    Colors[UIColor_TextHot] = ColorYellow();
+    Colors[UIColor_ButtonBackground] = ColorRed();
+    Colors[UIColor_Borders] = ColorBlack();
+    Colors[UIColor_GraphBackground] = V4(0.0f, 0.0f, 0.0f, 0.65f);
+    
+    Colors[UIColor_GraphFrameNew] = ColorRed();
+    Colors[UIColor_GraphFrameOld] = V4(0.2f, 0.3f, 0.9f, 1.0f);
+    Colors[UIColor_GraphFrameCollation] = ColorGreen();
+    Colors[UIColor_GraphFrameView] = ColorYellow();
 }
 
 INTERNAL_FUNCTION void InitUI(memory_arena* Arena)
@@ -386,6 +394,19 @@ INTERNAL_FUNCTION void InitUI(memory_arena* Arena)
     InitUIColors();
     
     Global_UI->FirstLayout = 0;
+    
+    // NOTE(Dima): Init sentinels
+    CopyStringsSafe(Global_UI->ElementsFreeSentinel.DisplayName,
+                    ArrayCount(Global_UI->ElementsFreeSentinel.DisplayName),
+                    "SentinelFree");
+    CopyStringsSafe(Global_UI->ElementsUseSentinel.DisplayName,
+                    ArrayCount(Global_UI->ElementsUseSentinel.DisplayName),
+                    "SentinelUse");
+    DLIST_REFLECT_PTRS(Global_UI->ElementsFreeSentinel, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Global_UI->ElementsUseSentinel, NextAlloc, PrevAlloc);
+    
+    Global_UI->HotInteraction = {};
+    Global_UI->ActiveInteraction = {};
 }
 
 // NOTE(Dima): UI parameters
@@ -442,6 +463,335 @@ INTERNAL_FUNCTION void UIBeginFrame()
     }
 }
 
+inline b32 InteractionIsHot(ui_interaction* Interaction)
+{
+    b32 Result = Global_UI->HotInteraction.Id == Interaction->Context.Id;
+    
+    return(Result);
+}
+
+inline void InteractionSetHot(ui_interaction* Interaction,
+                              b32 ToSet)
+{
+    Assert(Interaction);
+    
+    if(ToSet)
+    {
+        if(Interaction->Context.Priority >= Global_UI->HotInteraction.Priority)
+        {
+            Global_UI->HotInteraction = Interaction->Context;
+        }
+    }
+    else{
+        if(Global_UI->HotInteraction.Id == Interaction->Context.Id){
+            Global_UI->HotInteraction = {};
+        }
+    }
+}
+
+inline b32 InteractionIsActive(ui_interaction* Interaction)
+{
+    b32 Result = Global_UI->ActiveInteraction.Id == Interaction->Context.Id;
+    
+    return(Result);
+}
+
+inline void InteractionSetActive(ui_interaction* Interaction)
+{
+    if(InteractionIsHot(Interaction) && 
+       Interaction->Context.Priority >= Global_UI->ActiveInteraction.Priority)
+    {
+        Global_UI->ActiveInteraction = Interaction->Context;
+        InteractionSetHot(Interaction, false);
+    }
+}
+
+inline void ReleaseInteraction(ui_interaction* Interaction)
+{
+    if(Interaction){
+        if(InteractionIsActive(Interaction))
+        {
+            Global_UI->ActiveInteraction = {};
+        }
+    }
+}
+
+inline void ProcessMouseKeyInteractionInRect(ui_interaction* Interaction, 
+                                             u32 MouseKey, 
+                                             rc2 Rect,
+                                             b32 Interactible = true,
+                                             b32 Clickable = true)
+{
+    Interaction->WasHotInInteraction = false;
+    Interaction->WasActiveInInteraction = false;
+    
+    if(MouseInRect(Rect) && Interactible)
+    {
+        InteractionSetHot(Interaction, true);
+        Interaction->WasHotInInteraction = true;
+        
+        if(GetKeyDown(MouseKey) && Clickable)
+        {
+            InteractionSetActive(Interaction);
+            Interaction->WasActiveInInteraction = true;
+        }
+    }
+    else
+    {
+        InteractionSetHot(Interaction, false);
+    }
+    
+    if(InteractionIsActive(Interaction) && GetKeyUp(MouseKey))
+    {
+        ReleaseInteraction(Interaction);
+    }
+}
+
+// NOTE(Dima): Layouts
+INTERNAL_FUNCTION inline ui_layout* GetCurrentLayout()
+{
+    ui_layout* Layout = Global_UI->CurrentLayout;
+    
+    return(Layout);
+}
+
+INTERNAL_FUNCTION inline ui_element* UIAllocateElement()
+{
+    if(DLIST_FREE_IS_EMPTY(Global_UI->ElementsFreeSentinel, NextAlloc))
+    {
+        // NOTE(Dima): Allocate new elements and insert them
+        int ToAddFreeCount = 256;
+        ui_element* ToAdd = PushArray(Global_UI->Arena, ui_element, ToAddFreeCount);
+        
+        for(int i = 0;
+            i < ToAddFreeCount;
+            i++)
+        {
+            ui_element* ElemI = &ToAdd[i];
+            
+            // NOTE(Dima): Inserting to free list
+            DLIST_INSERT_AFTER_SENTINEL(ElemI, Global_UI->ElementsFreeSentinel, NextAlloc, PrevAlloc);
+        }
+    }
+    
+    // NOTE(Dima): Getting new element
+    ui_element* Found = Global_UI->ElementsFreeSentinel.NextAlloc;
+    
+    // NOTE(Dima): Deleting from free list
+    DLIST_REMOVE(Found, NextAlloc, PrevAlloc);
+    
+    // NOTE(Dima): Inserting to use list
+    DLIST_INSERT_AFTER_SENTINEL(Found, Global_UI->ElementsUseSentinel, NextAlloc, PrevAlloc);
+    
+    return(Found);
+}
+
+INTERNAL_FUNCTION inline void UIDeallocateElement(ui_element* Element)
+{
+    // NOTE(Dima): Deleting from Use list
+    DLIST_REMOVE(Element, NextAlloc, PrevAlloc);
+    
+    // NOTE(Dima): Inserting to Free list
+    DLIST_INSERT_AFTER_SENTINEL(Element, Global_UI->ElementsFreeSentinel, NextAlloc, PrevAlloc);
+}
+
+INTERNAL_FUNCTION inline void UIInitChildSentinel(ui_element* Parent)
+{
+    ui_element* ChildSentinel = UIAllocateElement();
+    
+    Parent->ChildSentinel = ChildSentinel;
+    ChildSentinel->Parent = Parent;
+    
+    DLIST_REFLECT_POINTER_PTRS(ChildSentinel, Next, Prev);
+    
+    char* Name = "ChildSentinel";
+    CopyStringsSafe(ChildSentinel->DisplayName,
+                    ArrayCount(ChildSentinel->DisplayName),
+                    Name);
+    CopyStringsSafe(ChildSentinel->IdName,
+                    ArrayCount(ChildSentinel->IdName),
+                    Name);
+    ChildSentinel->IdNameHash = StringHashFNV(Name);
+}
+
+INTERNAL_FUNCTION inline b32 UIElementIsOpenedInTree(ui_element* Elem)
+{
+    ui_element* At = Elem->Parent;
+    
+    b32 Opened = true;
+    while(At)
+    {
+        if(At->IsOpen == false)
+        {
+            Opened = false;
+            
+            break;
+        }
+        
+        At = At->Parent;
+    }
+    
+    return(Opened);
+}
+
+INTERNAL_FUNCTION inline int UIElementTreeDepth(ui_layout* Layout)
+{
+    ui_element* Elem = Layout->CurrentElement;
+    
+    ui_element* At = Elem->Parent;
+    
+    int Result = 0;
+    while(At)
+    {
+        if(At->Type == UIElement_TreeNode)
+        {
+            Result++;
+            
+            break;
+        }
+        
+        At = At->Parent;
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void ParseToHashString(char* ToHash, char* ToDisplay, char* From)
+{
+    char* At = From;
+    char* AtDisplay = ToDisplay;
+    char* ToCopyFrom = 0;
+    
+    while(At && *At)
+    {
+        if(At[0] == '#' &&
+           At[1] == '#')
+        {
+            ToCopyFrom = At + 2;
+            
+            break;
+        }
+        else
+        {
+            *AtDisplay++ = *At++;
+        }
+    }
+    *AtDisplay = 0;
+    
+    
+    // NOTE(Dima): Copying to Hash
+    char* Dst = ToHash;
+    char* Src = From;
+    
+    if(ToCopyFrom)
+    {
+        Src = ToCopyFrom;
+    }
+    
+    while(*Src)
+    {
+        *Dst++ = *Src++;
+    }
+    *Dst = 0;
+}
+
+/*
+NOTE(Dima):
+
+By default Name is Hashed and will be used to calculate ID;
+By you can specify string that will be hashed by adding two ## symbols 
+and add string that has to be hashed after them
+For example "Some text ## This text is for ID calculation"
+
+text1 - use text1 as Display name and as Name for ID calculation
+text1##text2 - use text1 as Display name and text2 as name for ID calculation
+*/
+
+INTERNAL_FUNCTION ui_element* UIBeginElement(char* Name, u32 Type)
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    ui_element* Found = 0;
+    
+    char IdName[UI_ELEMENT_NAME_SIZE];
+    char DisplayName[UI_ELEMENT_NAME_SIZE];
+    ParseToHashString(IdName, DisplayName, Name);
+    u32 NameHash = StringHashFNV(IdName);
+    
+    ui_element* Parent = Layout->CurrentElement;
+    u32 ParentID = 1;
+    
+    if(Parent && (Type != UIElement_Static))
+    {
+        ui_element* At = Parent->ChildSentinel->Next;
+        
+        while(At != Parent->ChildSentinel)
+        {
+            if(At->IdNameHash == NameHash)
+            {
+                if(StringsAreEqual(At->IdName, (char*)IdName))
+                {
+                    Found = At;
+                    break;
+                }
+            }
+            
+            At = At->Next;
+        }
+        
+        ParentID = Parent->Id;
+    }
+    
+    if(!Found)
+    {
+        Found = UIAllocateElement();
+        
+        // NOTE(Dima): Initializing element
+        CopyStringsSafe(Found->IdName, UI_ELEMENT_NAME_SIZE, IdName);
+        Found->IdNameHash = NameHash;
+        Found->Id = ParentID * NameHash * 479001599 + 993319;
+        
+        // NOTE(Dima): Allocating child sentinel
+        UIInitChildSentinel(Found);
+        
+        Found->Parent = Parent;
+        Found->IsOpen = true;
+        Found->Type = Type;
+        
+        if(Parent)
+        {
+            // NOTE(Dima): Inserting to Parent's children
+            DLIST_INSERT_AFTER(Found, Parent->ChildSentinel, Next, Prev);
+        }
+    }
+    
+    CopyStringsSafe(Found->DisplayName, UI_ELEMENT_NAME_SIZE, DisplayName);
+    
+    Layout->CurrentElement = Found;
+    
+    return(Found);
+}
+
+INTERNAL_FUNCTION void UIEndElement(u32 Type)
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    ui_element* CurrentElement = Layout->CurrentElement;
+    
+    Assert(CurrentElement->Type == Type);
+    
+    ui_element* Parent = CurrentElement->Parent;
+    
+    if(Type == UIElement_Static)
+    {
+        DLIST_REMOVE(CurrentElement, Next, Prev);
+        UIDeallocateElement(CurrentElement->ChildSentinel);
+        UIDeallocateElement(CurrentElement);
+    }
+    
+    Layout->CurrentElement = Parent;
+}
+
 // NOTE(Dima): Layouts stuff
 INTERNAL_FUNCTION b32 BeginLayout(const char* Name)
 {
@@ -465,43 +815,63 @@ INTERNAL_FUNCTION b32 BeginLayout(const char* Name)
     }
     
     // NOTE(Dima): If not found - then allocate
+    b32 FoundJustAllocated = false;
     if(!Found)
     {
         Found = PushStruct(Global_UI->Arena, ui_layout);
-        
-        Found->Name = Name;
-        Found->Next = Global_UI->FirstLayout;
-        
-        Global_UI->FirstLayout = Found;
+        FoundJustAllocated = true;
     }
     
-    b32 Result = true;
-    
+    // NOTE(Dima): Setting root element of this layout
     Assert(Global_UI->CurrentLayout == 0);
     Global_UI->CurrentLayout = Found;
     
-    return(Result);
-}
-
-INTERNAL_FUNCTION inline ui_layout* GetCurrentLayout()
-{
-    ui_layout* Layout = Global_UI->CurrentLayout;
+    if(FoundJustAllocated)
+    {
+        Found->Name = Name;
+        Found->Next = Global_UI->FirstLayout;
+        Global_UI->FirstLayout = Found;
+        
+        Found->InitAt = V2(0.0f, 0.0f);
+        
+        Found->AdditionalYOffsetWasSet = false;
+        Found->AdditionalYOffset = 0.0f;
+        
+        Found->CurrentElement = 0;
+        Found->Root = UIBeginElement("Root", UIElement_Root);
+        Found->CurrentElement = Found->Root;
+    }
     
-    return(Layout);
+    b32 Result = true;
+    return(Result);
 }
 
 INTERNAL_FUNCTION void EndLayout()
 {
-    Assert(Global_UI->CurrentLayout);
+    ui_layout* Layout = GetCurrentLayout();
+    
+    Assert(Layout);
+    
+    Assert(Layout->CurrentElement->Type == UIElement_Root);
     
     Global_UI->CurrentLayout = 0;
 }
 
-INTERNAL_FUNCTION void SameLine()
+
+// NOTE(Dima): Manipulation
+INTERNAL_FUNCTION inline void SameLine()
 {
     ui_layout* Layout = GetCurrentLayout();
     
     Layout->StayOnSameLine = true;
+}
+
+INTERNAL_FUNCTION inline void StepLittleY()
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    Layout->AdditionalYOffsetWasSet = true;
+    Layout->AdditionalYOffset += GetLineBase() * 0.25f;
 }
 
 INTERNAL_FUNCTION inline void PreAdvance()
@@ -516,28 +886,44 @@ INTERNAL_FUNCTION inline void PreAdvance()
     }
     else
     {
-        f32 VerticalAdvance = GetLineAdvance();
-        f32 HorizontalP = 0.0f;
+        f32 VerticalP = Layout->LastBounds.Max.y + Layout->AdditionalYOffset + GetLineBase();
+        f32 HorizontalP = Layout->InitAt.x + (f32)(UIElementTreeDepth(Layout) * UI_TAB_SPACES) * GetLineBase();
+        
+        if(Layout->AdditionalYOffsetWasSet)
+        {
+            Layout->AdditionalYOffset = 0.0f;
+            Layout->AdditionalYOffsetWasSet = false;
+        }
         
         if(Layout->StayOnSameLine)
         {
             Layout->StayOnSameLine = false;
             
-            VerticalAdvance = 0.0f;
-            HorizontalP = Layout->LastBB.Total.Max.x + GetLineBase();
+            VerticalP = Layout->At.y;
+            HorizontalP = Layout->LastBounds.Max.x + GetLineBase();
+        }
+        else
+        {
+            
+            Layout->CurrentRowBounds = {};
         }
         
-        Layout->At.y += VerticalAdvance;
+        Layout->At.y = VerticalP;
         Layout->At.x = HorizontalP;
     }
 }
 
-INTERNAL_FUNCTION inline void DescribeElement(rc2 Active, rc2 Total)
+INTERNAL_FUNCTION inline void DescribeElement(rc2 ElementBounds)
 {
     ui_layout* Layout = GetCurrentLayout();
     
-    Layout->LastBB.Active = Active;
-    Layout->LastBB.Total = Total;
+    Layout->LastBounds = ElementBounds;
+    
+    if(GetArea(ElementBounds) > 1 &&
+       GetArea(Layout->CurrentRowBounds) > 1)
+    {
+        Layout->CurrentRowBounds = UnionRect(ElementBounds, Layout->CurrentRowBounds);
+    }
 }
 
 // NOTE(Dima): Elements
@@ -545,15 +931,22 @@ INTERNAL_FUNCTION void ShowTextUnformatted(char* Text)
 {
     ui_params* Params = UIGetParams();
     
-    PreAdvance();
+    ui_element* Element = UIBeginElement(Text, UIElement_Static);
     
-    rc2 Bounds = PrintText(Params->Font, 
-                           Text, 
-                           Global_UI->CurrentLayout->At, 
-                           Params->Scale, 
-                           UIGetColor(UIColor_Text));
+    if(UIElementIsOpenedInTree(Element))
+    {
+        PreAdvance();
+        
+        rc2 Bounds = PrintText(Params->Font, 
+                               Text, 
+                               Global_UI->CurrentLayout->At, 
+                               Params->Scale, 
+                               UIGetColor(UIColor_Text));
+        
+        DescribeElement(Bounds);
+    }
     
-    DescribeElement(Bounds, Bounds);
+    UIEndElement(UIElement_Static);
 }
 
 INTERNAL_FUNCTION int ShowText(const char* fmt, ...)
@@ -570,34 +963,211 @@ INTERNAL_FUNCTION int ShowText(const char* fmt, ...)
     return(Result);
 }
 
+enum ui_button_flags
+{
+    TextElement_IsInteractible = (1 << 0),
+    TextElement_IsClickable = (1 << 1),
+    TextElement_BackgroundRectangle = (1 << 2),
+    TextElement_UseCustomRectangle = (1 << 3),
+};
+
+INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree, 
+                                  rc2 CustomRect = {},
+                                  u32 AlignHorizontal = TextAlign_Left,
+                                  u32 AlignVertical = TextAlign_Top)
+{
+    b32 Pressed = false;
+    
+    ui_layout* Layout = GetCurrentLayout();
+    
+    ui_element* Element = Layout->CurrentElement;
+    
+    b32 IsOpened = UIElementIsOpenedInTree(Element);
+    
+    if(IsOpened)
+    {
+        char* NameToPrint = Element->DisplayName;
+        
+        // NOTE(Dima): Calculating bounds rectangle
+        rc2 Bounds;
+        if(BoolFlag(Flags, TextElement_UseCustomRectangle))
+        {
+            Bounds = CustomRect;
+            
+            v2 TextSize = GetTextSize(NameToPrint);
+        }
+        else
+        {
+            PreAdvance();
+            
+            Bounds = GetTextRect(Element->DisplayName, Layout->At);
+            
+            AlignHorizontal = TextAlign_Left;
+            AlignVertical = TextAlign_Top;
+        }
+        
+        // NOTE(Dima): Interaction
+        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_Avg);
+        
+        ProcessMouseKeyInteractionInRect(&Interaction, 
+                                         KeyMouse_Left, 
+                                         Bounds,
+                                         BoolFlag(Flags, TextElement_IsInteractible),
+                                         BoolFlag(Flags, TextElement_IsClickable));
+        
+        v4 TextC = UIGetColor(UIColor_Text);
+        if(Interaction.WasHotInInteraction)
+        {
+            TextC = UIGetColor(UIColor_TextHot);
+            
+            if(Interaction.WasActiveInInteraction)
+            {
+                Pressed = true;
+            }
+        }
+        
+        // NOTE(Dima): Pushing background
+        if(Flags & TextElement_BackgroundRectangle)
+        {
+            PushRect(Bounds, UIGetColor(UIColor_ButtonBackground));
+        }
+        
+        // NOTE(Dima): Printing text
+        PrintTextAligned(NameToPrint,
+                         Bounds, 
+                         AlignHorizontal,
+                         AlignVertical,
+                         TextC);
+        
+        // NOTE(Dima): Describing element
+        DescribeElement(Bounds);
+    }
+    
+    if(OpenedInTree)
+    {
+        *OpenedInTree = IsOpened;
+    }
+    
+    return(Pressed);
+}
+
 INTERNAL_FUNCTION b32 Button(const char* Name)
 {
     ui_params* Params = UIGetParams();
     
+    ui_element* Element = UIBeginElement((char*)Name, UIElement_Static);
+    
+    u32 ButtonFlags = (TextElement_IsInteractible |
+                       TextElement_IsClickable |
+                       TextElement_BackgroundRectangle);
+    
+    b32 Pressed = TextElement(ButtonFlags, 0);
+    
+    UIEndElement(UIElement_Static);
+    
+    return(Pressed);
+}
+
+INTERNAL_FUNCTION b32 BoolButton(const char* Name, b32* BoolSource, 
+                                 char* PositiveText = 0, 
+                                 char* NegativeText = 0)
+{
+    ui_params* Params = UIGetParams();
+    
+    ui_layout* Layout = GetCurrentLayout();
+    ui_element* Element = UIBeginElement((char*)Name, UIElement_Static);
+    
+    u32 ButtonFlags = (TextElement_IsInteractible |
+                       TextElement_IsClickable |
+                       TextElement_BackgroundRectangle |
+                       TextElement_UseCustomRectangle);
+    
+    if(!PositiveText)
+    {
+        PositiveText = "True";
+    }
+    
+    if(!NegativeText)
+    {
+        NegativeText = "False";
+    }
+    
+    v2 PositiveTextSize = GetTextSize(PositiveText);
+    v2 NegativeTextSize = GetTextSize(NegativeText);
+    
     PreAdvance();
     
-    v2 TextPrintP = Global_UI->CurrentLayout->At;
-    rc2 Bounds = GetTextRect((char*)Name, TextPrintP);
-    
-    b32 Pressed = false;
-    v4 TextC = UIGetColor(UIColor_Text);
-    if(MouseInRect(Bounds))
+    // NOTE(Dima): calculate button rectangle
+    rc2 ButtonRect;
+    v2 RectMinP = V2(Layout->At.x, Layout->At.y - GetLineBase());
+    if(PositiveTextSize.x > NegativeTextSize.x)
     {
-        TextC = UIGetColor(UIColor_TextActive);
-        
-        if(GetKeyDown(KeyMouse_Left))
+        ButtonRect = RectMinDim(RectMinP, PositiveTextSize);
+    }
+    else
+    {
+        ButtonRect = RectMinDim(RectMinP, NegativeTextSize);
+    }
+    
+    // NOTE(Dima): Choosing which text to display
+    char* DisplayText = "Null";
+    if(BoolSource)
+    {
+        if(*BoolSource)
         {
-            Pressed = true;
+            DisplayText = PositiveText;
+        }
+        else
+        {
+            DisplayText = NegativeText;
         }
     }
     
-    PushRect(Bounds, ColorRed());
+    CopyStringsSafe(Element->DisplayName, 
+                    ArrayCount(Element->DisplayName), 
+                    DisplayText);
+    b32 Pressed = TextElement(ButtonFlags, 0, ButtonRect,
+                              TextAlign_Center,
+                              TextAlign_Top);
     
-    PrintText((char*)Name, 
-              TextPrintP, 
-              TextC);
+    if(Pressed && BoolSource)
+    {
+        *BoolSource = !*BoolSource;
+    }
     
-    DescribeElement(Bounds, Bounds);
+    UIEndElement(UIElement_Static);
+    
+    SameLine();
+    
+    ShowTextUnformatted((char*)Name);
     
     return(Pressed);
+}
+
+INTERNAL_FUNCTION void TreePop()
+{
+    UIEndElement(UIElement_TreeNode);
+}
+
+INTERNAL_FUNCTION b32 TreeNode(const char* Name)
+{
+    ui_element* Element = UIBeginElement((char*)Name, UIElement_TreeNode);
+    
+    u32 Flags = (TextElement_IsInteractible | TextElement_IsClickable);
+    
+    b32 OpenedInTree;
+    b32 Pressed = TextElement(Flags, &OpenedInTree);
+    if(Pressed)
+    {
+        Element->IsOpen = !Element->IsOpen;
+    }
+    
+    // NOTE(Dima): Returning result
+    b32 Result = OpenedInTree && Element->IsOpen;
+    if(!Result)
+    {
+        TreePop();
+    }
+    
+    return(Result);
 }

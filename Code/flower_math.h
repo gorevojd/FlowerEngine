@@ -12,8 +12,6 @@
 #define F_ONE_OVER_255 0.00392156862f
 #define F_SQRT_TWO 1.41421356237f
 
-#define F_ENABLE_SIMD_MATH 1
-
 // NOTE(Dima): Structures
 union v2 {
 	struct {
@@ -104,8 +102,10 @@ struct m44
         
         v4 Rows[4];
         
+#if 0        
 #if F_ENABLE_SIMD_MATH
         __m128 mmRows[4];
+#endif
 #endif
     };
 };
@@ -131,87 +131,8 @@ struct rc2
     v2 Max;
 };
 
-// NOTE(Dima): Basic functions
-inline float CopySign(float Val1, float Val2){
-    float Result = abs(Val1) * (Val2 > 0.0f ? 1.0f : -1.0f);
-    return(Result);
-}
-
-inline float Sqrt(float Value) {
-	float Result = sqrtf(Value);
-	return(Result);
-}
-
-inline float RSqrt(float Value) {
-	float Result = 1.0f / sqrtf(Value);
-	return(Result);
-}
-
-inline float Floor(float Value) {
-	float Result = floorf(Value);
-	return(Result);
-}
-
-inline float Ceil(float Value) {
-	float Result = ceilf(Value);
-	return(Result);
-}
-
-inline float Sin(float Rad) {
-	float Result = sinf(Rad);
-	return(Result);
-}
-
-inline float Cos(float Rad) {
-	float Result = cosf(Rad);
-	return(Result);
-}
-
-inline float Tan(float Rad) {
-	float Result = tanf(Rad);
-	return(Result);
-}
-
-inline float ASin(float Value) {
-	float Result = asinf(Value);
-	return(Result);
-}
-
-inline float ACos(float Value) {
-	float Result = acosf(Value);
-	return(Result);
-}
-
-inline float ATan(float Value) {
-	float Result = atan(Value);
-	return(Result);
-}
-
-inline float ATan2(float Y, float X) {
-	float Result = atan2f(Y, X);
-	return(Result);
-}
-
-inline float Exp(float Value) {
-	float Result = expf(Value);
-	return(Result);
-}
-
-inline float Log(float Value) {
-	float Result = logf(Value);
-	return(Result);
-}
-
-inline float Pow(float a, float b) {
-	float Result = powf(a, b);
-	return(Result);
-}
-
-inline float Lerp(float a, float b, float t) {
-	float Result = a + (b - a) * t;
-    
-	return(Result);
-}
+#include "flower_intrinsics.h"
+#include "flower_simd.h"
 
 inline float PingPong(float Value, float MaxValue)
 {
@@ -1407,10 +1328,19 @@ inline v3 QuatToEuler(quat q)
     
     // pitch (y-axis rotation)
     float sinp = 2.0f * (q.w * q.y - q.z * q.x);
-    if (abs(sinp) >= 1.0f)
-        Result.Pitch = CopySign(F_PI / 2.0f, sinp); // use 90 degrees if out of range
+    if (abs(sinp) >= 1.0f){
+        
+        float sinpSign = -1.0f;
+        if(sinp > 0.0f)
+        {
+            sinpSign = 1.0f;
+        }
+        Result.Pitch = F_PI * 0.5f * sinpSign; // use 90 degrees if out of range
+    }
     else
+    {
         Result.Pitch = ASin(sinp);
+    }
     
     // yaw (z-axis rotation)
     float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
@@ -1692,6 +1622,29 @@ inline v2 GetDim(rc2 Rect)
     return(Result);
 }
 
+inline f32 GetArea(rc2 Rect)
+{
+    v2 Dim = GetDim(Rect);
+    
+    f32 Result = Dim.x * Dim.y;
+    
+    return(Result);
+}
+
+inline f32 GetWidth(rc2 Rect)
+{
+    f32 Result = Rect.Max.x - Rect.Min.x;
+    
+    return(Result);
+}
+
+inline f32 GetHeight(rc2 Rect)
+{
+    f32 Result = Rect.Max.y - Rect.Min.y;
+    
+    return(Result);
+}
+
 inline v2 GetCenter(rc2 Rect)
 {
     v2 Result = Rect.Min + GetDim(Rect) * 0.5f;
@@ -1734,11 +1687,34 @@ inline rc2 RectCenterDim(v2 Center, v2 Dim)
 inline rc2 GrowRect(rc2 Rect, f32 Scale)
 {
     v2 HalfDim = GetDim(Rect) * 0.5f;
+    v2 Center = Rect.Min + HalfDim;
     
-    Rect.Min -= HalfDim * Scale;
-    Rect.Max += HalfDim * Scale;
+    Rect.Min = Center - HalfDim * Scale;
+    Rect.Max = Center - HalfDim * Scale;
     
     return(Rect);
+}
+
+inline rc2 GrowRectByPixels(rc2 Rect, int Pixels)
+{
+    v2 GrowValue = V2(Pixels);
+    
+    Rect.Min -= GrowValue;
+    Rect.Max += GrowValue;
+    
+    return(Rect);
+}
+
+inline rc2 UnionRect(rc2 A, rc2 B)
+{
+    rc2 Result;
+    
+    Result.Min = V2(MinFloat(A.Min.x, B.Min.x), 
+                    MinFloat(A.Min.y, B.Min.y));
+    Result.Max = V2(MinFloat(A.Max.x, B.Max.x),
+                    MinFloat(A.Max.y, B.Max.y));
+    
+    return(Result);
 }
 
 inline b32 PointInRect(v2 Point, rc2 Rect)

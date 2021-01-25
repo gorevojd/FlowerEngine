@@ -1,6 +1,12 @@
 #ifndef FLOWER_UI_H
 #define FLOWER_UI_H
 
+#define UI_TAB_SPACES 2
+
+#define UI_GRAPH_WIDTH_UNITS 40.0f
+#define UI_GRAPH_HEIGHT_SMALL_UNITS 6.0f
+#define UI_GRAPH_HEIGHT_BIG_UNITS 20.0f
+
 enum text_align_type
 {
     TextAlign_Left,
@@ -23,14 +29,53 @@ struct ui_element_bb
     rc2 Total;
 };
 
+enum ui_element_type
+{
+    UIElement_Root,
+    UIElement_Static,
+    UIElement_TreeNode,
+    UIElement_Cached,
+};
+
+struct ui_element
+{
+#define UI_ELEMENT_NAME_SIZE 256
+    char DisplayName[UI_ELEMENT_NAME_SIZE];
+    char IdName[UI_ELEMENT_NAME_SIZE];
+    u32 IdNameHash;
+    u32 Id;
+    
+    b32 IsOpen;
+    u32 Type;
+    
+    ui_element* Parent;
+    
+    ui_element* Next;
+    ui_element* Prev;
+    
+    ui_element* NextAlloc;
+    ui_element* PrevAlloc;
+    
+    ui_element* ChildSentinel;
+};
+
 // NOTE(Dima): Layouts
 struct ui_layout
 {
     const char* Name;
+    v2 InitAt;
     v2 At;
     b32 JustStarted;
     b32 StayOnSameLine;
-    ui_element_bb LastBB;
+    
+    rc2 LastBounds;
+    rc2 CurrentRowBounds;
+    
+    b32 AdditionalYOffsetWasSet;
+    b32 AdditionalYOffset;
+    
+    ui_element* CurrentElement;
+    ui_element* Root;
     
     ui_layout* Next;
 };
@@ -80,7 +125,15 @@ struct ui_slider_graph
 enum ui_color_type
 {
     UIColor_Text,
-    UIColor_TextActive,
+    UIColor_TextHot,
+    UIColor_ButtonBackground,
+    UIColor_Borders,
+    UIColor_GraphBackground,
+    
+    UIColor_GraphFrameNew,
+    UIColor_GraphFrameOld,
+    UIColor_GraphFrameCollation,
+    UIColor_GraphFrameView,
     
     UIColor_Count,
 };
@@ -90,6 +143,48 @@ struct ui_colors
     v4 Colors[UIColor_Count];
 };
 
+// NOTE(Dima): Interactions
+enum ui_interaction_priority
+{
+    InteractionPriority_SuperLow,
+    InteractionPriority_Low,
+    InteractionPriority_Avg,
+    InteractionPriority_High,
+    InteractionPriority_SuperHigh,
+};
+
+struct ui_interaction_ctx
+{
+    u32 Id;
+    char* Name;
+    u32 Priority;
+};
+
+struct ui_interaction
+{
+    ui_element* Owner;
+    
+    ui_interaction_ctx Context;
+    
+    b32 WasHotInInteraction;
+    b32 WasActiveInInteraction;
+};
+
+inline ui_interaction CreateInteraction(ui_element* Owner,
+                                        u32 Priority = InteractionPriority_Low)
+{
+    ui_interaction Result = {};
+    
+    Result.Owner = Owner;
+    
+    Result.Context.Id = Owner->Id;
+    Result.Context.Name = Owner->IdName;
+    Result.Context.Priority = Priority;
+    
+    return(Result);
+}
+
+// NOTE(Dima): UI state
 struct ui_state
 {
     memory_arena* Arena;
@@ -104,9 +199,15 @@ struct ui_state
     // NOTE(Dima): Immediate mode stuff
     ui_colors Colors;
     
+    ui_interaction_ctx HotInteraction;
+    ui_interaction_ctx ActiveInteraction;
+    
     char StringFormatBuffer[2048];
     
     ui_layout* FirstLayout;
+    
+    ui_element ElementsUseSentinel;
+    ui_element ElementsFreeSentinel;
 };
 
 #endif //FLOWER_UI_H

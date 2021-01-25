@@ -2,6 +2,47 @@
 
 GLOBAL_VARIABLE debug_state* Global_Debug;
 
+inline debug_thread_frame* 
+GetThreadFrameByIndex(debug_thread* Thread, int FrameIndex)
+{
+    debug_thread_frame* Frame = &Thread->Frames[FrameIndex];
+    
+    return(Frame);
+}
+
+inline debug_common_frame* GetFrameByIndex(int FrameIndex)
+{
+    debug_common_frame* Frame = &Global_Debug->Frames[FrameIndex];
+    
+    return(Frame);
+}
+
+inline u64 GetClocksFromStat(debug_timing_stat* Stat, 
+                             b32 IncludingChildren)
+{
+    u64 Result = Stat->Stat.ClocksElapsed;
+    if(!IncludingChildren){
+        Result -= Stat->Stat.ClocksElapsedInChildren;
+    }
+    
+    return(Result);
+}
+
+inline int GetValuesOffsetForGraph(debug_state* State)
+{
+    int Result = State->NewestFrameIndex + 1;
+    
+    return(Result);
+}
+
+inline int GetCountFramesForGraph()
+{
+    int Result = DEBUG_PROFILED_FRAMES_COUNT - 1;
+    
+    return(Result);
+}
+
+
 void DEBUGParseNameFromUnique(char* To, int ToSize,
                               char* From)
 {
@@ -444,8 +485,7 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State)
                     
                     debug_thread_frame* OldFrame = GetThreadFrameByIndex(MainThread, 
                                                                          State->CollationFrameIndex);
-                    debug_common_frame* OldFrameCommon = GetFrameByIndex(State, 
-                                                                         State->CollationFrameIndex);
+                    debug_common_frame* OldFrameCommon = GetFrameByIndex(State->CollationFrameIndex);
                     
                     // NOTE(Dima): Finding frame update node
                     FindFrameUpdateNode(OldFrame);
@@ -472,12 +512,13 @@ INTERNAL_FUNCTION void DEBUGInitMenus(debug_state* State)
     
     Menus->Visible = true;
     Menus->IncludingChildren = false;
-    Menus->SelectedStatGUID = 0;
     
     Menus->GraphsSizeY = 80.0f;
     
     Menus->FPSGraph_FrameTimes = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
     Menus->FPSGraph_FPSValues = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
+    
+    Menus->TopClocks_SelectedStatID = -1;
     
     Menus->SelectedFunFloatsIncl = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
     Menus->SelectedFunFloatsExcl = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);

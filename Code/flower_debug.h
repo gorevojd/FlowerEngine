@@ -93,8 +93,10 @@ struct debug_menus
     float* FPSGraph_FrameTimes;
     float* FPSGraph_FPSValues;
     
-    bool Visible;
-    bool IncludingChildren;
+    int TopClocks_SelectedStatID;
+    
+    b32 Visible;
+    b32 IncludingChildren;
 };
 
 struct debug_state{
@@ -129,44 +131,6 @@ struct debug_state{
     u32 RootNodesNameHash;
     u32 SentinelElementsNameHash;
 };
-
-inline debug_thread_frame* 
-GetThreadFrameByIndex(debug_thread* Thread, int FrameIndex){
-    debug_thread_frame* Frame = &Thread->Frames[FrameIndex];
-    
-    return(Frame);
-}
-
-inline debug_common_frame* GetFrameByIndex(debug_state* State, int FrameIndex){
-    debug_common_frame* Frame = &State->Frames[FrameIndex];
-    
-    return(Frame);
-}
-
-inline u64 GetClocksFromStat(debug_timing_stat* Stat, 
-                             b32 IncludingChildren)
-{
-    u64 Result = Stat->Stat.ClocksElapsed;
-    if(!IncludingChildren){
-        Result -= Stat->Stat.ClocksElapsedInChildren;
-    }
-    
-    return(Result);
-}
-
-inline int GetValuesOffsetForGraph(debug_state* State)
-{
-    int Result = State->NewestFrameIndex + 1;
-    
-    return(Result);
-}
-
-inline int GetCountFramesForGraph()
-{
-    int Result = DEBUG_PROFILED_FRAMES_COUNT - 1;
-    
-    return(Result);
-}
 
 #endif //INTERNAL_BUILD
 

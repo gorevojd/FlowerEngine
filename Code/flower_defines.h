@@ -59,78 +59,21 @@ typedef double f64;
 // NOTE(Dima): Memory index
 typedef size_t mi;
 
-#define DLIST_REFLECT_PTRS(value, next, prev) {\
-(value).##next = &(value); \
-(value).##prev = &(value);}
+inline int CeilAlign(int Value, int Align)
+{
+    int Result = (Value + (Align - 1)) & ~(Align - 1);
+    
+    return(Result);
+}
 
-#define DLIST_REFLECT_POINTER_PTRS(ptr, next, prev) {\
-(ptr)->##next = (ptr); \
-(ptr)->##prev = (ptr);}
+inline b32 BoolFlag(u32 Flags, u32 FlagMask)
+{
+    b32 Result = (Flags & FlagMask) != 0;
+    
+    return(Result);
+}
 
-#define DLIST_FREE_IS_EMPTY(free_value, next) ((free_value).##next == &(free_value))
-
-#define DLIST_INSERT_AFTER_SENTINEL(entry_ptr, sent_value, next, prev) \
-{\
-(entry_ptr)->##next = (sent_value).##next##; \
-(entry_ptr)->##prev = &(sent_value); \
-(entry_ptr)->##prev##->##next = (entry_ptr); \
-(entry_ptr)->##next##->##prev = (entry_ptr);}
-
-#define DLIST_INSERT_BEFORE_SENTINEL(entry_ptr, sent_value, next, prev) \
-{\
-(entry_ptr)->##next = &(sent_value);\
-(entry_ptr)->##prev = (sent_value).##prev##; \
-(entry_ptr)->##prev##->##next = (entry_ptr); \
-(entry_ptr)->##next##->##prev = (entry_ptr);}
-
-#define DLIST_INSERT_AFTER(elem, after, next, prev) \
-(elem)->##next = (after)->##next; \
-(elem)->##prev = after; \
-\
-(elem)->##next##->##prev = elem; \
-(elem)->##prev##->##next = elem;
-
-#define DLIST_INSERT_BEFORE(elem, before, next, prev) \
-(elem)->##next = after; \
-(elem)->##prev = (after)->##prev; \
-\
-(elem)->##next##->##prev = elem; \
-(elem)->##prev##->##next = elem;
-
-#define DLIST_REMOVE(elem, next, prev) \
-{(elem)->##prev##->##next = (elem)->##next; \
-(elem)->##next##->##prev = (elem)->##prev;
-
-#define DLIST_REMOVE_ENTRY(entry_ptr, next, prev) \
-{\
-entry_ptr->##next##->##prev = entry_ptr->##prev##;\
-entry_ptr->##prev##->##next = entry_ptr->##next##;}
-
-#define DLIST_REFLECT(elem, next, prev) \
-(elem)->##next = elem; \
-(elem)->##prev = elem;
-
-#define DLIST_EMPTY(elem, next) ((elem)->##next == elem)
-
-#define DLIST_FREE_IS_EMPTY(free_value, next) ((free_value).##next == &(free_value))
-
-// NOTE(Dima): DLIST allocate function body
-#define DLIST_ALLOCATE_FUNCTION_BODY(type, mem_region_ptr, next, prev, free_sent_value, use_sent_value, grow_count, result_ptr_name) \
-if(DLIST_FREE_IS_EMPTY(free_sent_value, next)){\
-type* Pool = PushArray(mem_region_ptr, type, (grow_count));\
-for(int Index = 0; Index < (grow_count); Index++){\
-type* Prim = &Pool[Index];\
-DLIST_INSERT_BEFORE_SENTINEL(Prim, free_sent_value, next, prev);\
-}\
-}\
-type* result_ptr_name = (free_sent_value).##next##; \
-DLIST_REMOVE_ENTRY(Result, next, prev); \
-DLIST_INSERT_BEFORE_SENTINEL(Result, use_sent_value, next, prev);
-
-// NOTE(Dima): DLIST deallocate function body
-#define DLIST_DEALLOCATE_FUNCTION_BODY(entry_ptr, next, prev, free_sent_value) \
-DLIST_REMOVE_ENTRY(entry_ptr, next, prev);\
-DLIST_INSERT_BEFORE_SENTINEL(entry_ptr, free_sent_value, next, prev);
+// NOTE(Dima): DLIST defines
 #define DLIST_REFLECT_PTRS(value, next, prev) {\
 (value).##next = &(value); \
 (value).##prev = &(value);}
@@ -157,7 +100,7 @@ DLIST_INSERT_BEFORE_SENTINEL(entry_ptr, free_sent_value, next, prev);
 
 #define DLIST_INSERT_AFTER(entry_ptr, after_ptr, next, prev) \
 {\
-(entry_ptr)->##next = (after_ptr)->##next##; \
+(entry_ptr)->##next = (after_ptr)->##next; \
 (entry_ptr)->##prev = (after_ptr); \
 (entry_ptr)->##prev##->##next = (entry_ptr); \
 (entry_ptr)->##next##->##prev = (entry_ptr);}
@@ -169,10 +112,10 @@ DLIST_INSERT_BEFORE_SENTINEL(entry_ptr, free_sent_value, next, prev);
 (entry_ptr)->##prev##->##next = (entry_ptr); \
 (entry_ptr)->##next##->##prev = (entry_ptr);}
 
-#define DLIST_REMOVE_ENTRY(entry_ptr, next, prev) \
+#define DLIST_REMOVE(entry_ptr, next, prev) \
 {\
-entry_ptr->##next##->##prev = entry_ptr->##prev##;\
-entry_ptr->##prev##->##next = entry_ptr->##next##;}
+(entry_ptr)->##next##->##prev = entry_ptr->##prev;\
+(entry_ptr)->##prev##->##next = entry_ptr->##next;}
 
 #define DLIST_REMOVE_ENTIRE_LIST(from_ptr, to_ptr, next, prev) \
 {\
@@ -193,7 +136,7 @@ DLIST_INSERT_BEFORE_SENTINEL(Prim, free_sent_value, next, prev);\
 }\
 }\
 type* result_ptr_name = (free_sent_value).##next##; \
-DLIST_REMOVE_ENTRY(Result, next, prev); \
+DLIST_REMOVE(Result, next, prev); \
 DLIST_INSERT_BEFORE_SENTINEL(Result, use_sent_value, next, prev);
 
 // NOTE(Dima): DLIST deallocate function body

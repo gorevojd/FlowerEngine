@@ -318,10 +318,14 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->TimesNewRoman = LoadFontFile("C:/Windows/Fonts/times.ttf");
     A->LifeIsGoofy = LoadFontFile("../Data/Fonts/Life is goofy.ttf");
     A->Arial = LoadFontFile("c:/windows/fonts/arial.ttf");
+    
     loading_params BerlinSansParams = DefaultLoadingParams();
     BerlinSansParams.Font_PixelHeight = 60;
     A->BerlinSans = LoadFontFile("../Data/Fonts/BerlinSans.ttf", BerlinSansParams);
-    A->LiberationMono = LoadFontFile("../Data/Fonts/liberation-mono.ttf");
+    
+    loading_params LibMonoParams = DefaultLoadingParams();
+    LibMonoParams.Font_PixelHeight = 24;
+    A->LiberationMono = LoadFontFile("../Data/Fonts/liberation-mono.ttf", LibMonoParams);
     
     AddFontToAtlas(&A->TimesNewRoman);
     AddFontToAtlas(&A->LifeIsGoofy);

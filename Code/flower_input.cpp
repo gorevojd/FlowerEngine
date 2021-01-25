@@ -6,6 +6,13 @@ inline b32 MouseInRect(rc2 Rect)
     return(Result);
 }
 
+inline v2 GetMouseP()
+{
+    v2 Result = Global_Input->MouseWindowP;
+    
+    return(Result);
+}
+
 // NOTE(Dima): Internal calls
 #define GET_BUTTON_COMMON(name) b32 name(key_state* Key)
 typedef GET_BUTTON_COMMON(get_button_common);

@@ -47,6 +47,7 @@ INTERNAL_FUNCTION inline u32 GetMeshHash(mesh* Mesh)
     
     u64 MeshInt = (u64)Mesh;
     
+#if 0    
     for(int i = 0; i < 8; i++)
     {
         SrcBuf[i] = (char)(MeshInt & 255);
@@ -57,6 +58,9 @@ INTERNAL_FUNCTION inline u32 GetMeshHash(mesh* Mesh)
     SrcBuf[8] = 0;
     
     u32 Result = StringHashFNV(SrcBuf);
+#else
+    u32 Result = (MeshInt * 479001599 + 993319);
+#endif
     
     return(Result);
 }
