@@ -1175,10 +1175,6 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             VisibleIndex < Vis->Count;
             VisibleIndex += 4)
         {
-#if 0            
-            m44_4x Transform = M44_4X_Load((f32*)&Vis->Transform[VisibleIndex]);
-            m44_4x AppliedRotation = M44_4X_Load((f32*)&Vis->AppliedRotation[VisibleIndex]);
-#else
             m44_4x Transform = M44_4X(Vis->Transform[VisibleIndex + 0],
                                       Vis->Transform[VisibleIndex + 1],
                                       Vis->Transform[VisibleIndex + 2],
@@ -1188,7 +1184,6 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
                                             Vis->AppliedRotation[VisibleIndex + 1],
                                             Vis->AppliedRotation[VisibleIndex + 2],
                                             Vis->AppliedRotation[VisibleIndex + 3]);
-#endif
             
             m44_4x FinalTransform = Transform * AppliedRotation * OffsetMatrix4x;
             
@@ -1248,7 +1243,7 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
                              Vis->FinalTransform[VisibleIndex]);
 #else
             
-            PushMesh(Mesh, 0, Transform);
+            PushMesh(Mesh, 0, Vis->FinalTransform[VisibleIndex]);
 #endif
         }
         

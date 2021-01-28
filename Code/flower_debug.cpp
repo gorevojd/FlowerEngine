@@ -297,16 +297,14 @@ CreateOrFindStatForUniqueName(debug_state* State,
     debug_timing_stat* Found = 0;
     debug_timing_stat* StatAt = Frame->StatTable[Key];
     
-    if(StatAt){
-        while(StatAt){
-            if(StatAt->NameID == NameID){
-                Found = StatAt;
-                
-                break;
-            }
+    while(StatAt){
+        if(StatAt->NameID == NameID){
+            Found = StatAt;
             
-            StatAt = StatAt->NextInHash;
+            break;
         }
+        
+        StatAt = StatAt->NextInHash;
     }
     
     if(!Found && AllocateIfNotFound)
@@ -325,6 +323,49 @@ CreateOrFindStatForUniqueName(debug_state* State,
     
     return(Found);
 }
+
+
+INTERNAL_FUNCTION debug_stat_average* CreateOrFindAverageStat(char* UniqueName, 
+                                                              b32 AllocateIfNotFound = true)
+{
+    u32 NameHash = StringHashFNV(UniqueName);
+    
+    u32 IndexInTable = NameHash % DEBUG_STATS_TABLE_SIZE;
+    
+    debug_stat_average* Found = 0;
+    debug_stat_average* InitAt = Global_Debug->Menus.StatAverageTable[IndexInTable];
+    debug_stat_average* StatAt = InitAt;
+    
+    while(StatAt)
+    {
+        if(StatAt->NameHash == NameHash)
+        {
+            Found = StatAt;
+            
+            break;
+        }
+        
+        StatAt = StatAt->NextInHash;
+    }
+    
+    if(!Found && AllocateIfNotFound)
+    {
+        Found = PushStruct(Global_Debug->Arena, debug_stat_average);
+        
+        Found->UniqueName = UniqueName;
+        Found->NameHash = NameHash;
+        Found->OnFrameCount = 0;
+        
+        Found->ValuesIncl = {};
+        Found->ValuesExcl = {};
+        
+        Found->NextInHash = InitAt;
+        Global_Debug->Menus.StatAverageTable[IndexInTable] = Found;
+    }
+    
+    return(Found);
+}
+
 
 INTERNAL_FUNCTION inline int IncrementFrameIndex(int Value){
     int Result = (Value + 1) % DEBUG_PROFILED_FRAMES_COUNT;
@@ -511,17 +552,27 @@ INTERNAL_FUNCTION void DEBUGInitMenus(debug_state* State)
     debug_menus* Menus = &State->Menus;
     
     Menus->Visible = true;
-    Menus->IncludingChildren = false;
     
     Menus->GraphsSizeY = 80.0f;
     
-    Menus->FPSGraph_FrameTimes = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
-    Menus->FPSGraph_FPSValues = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
+    Menus->FPSGraph_FrameTimesMax = 33.0f;
+    Menus->FPSGraph_FrameTimes = PushArray(State->Arena, f32, DEBUG_PROFILED_FRAMES_COUNT);
+    Menus->FPSGraph_FPSValuesMax = 400.0f;
+    Menus->FPSGraph_FPSValues = PushArray(State->Arena, f32, DEBUG_PROFILED_FRAMES_COUNT);
     
     Menus->TopClocks_SelectedStatID = -1;
+    Menus->TopClocks_SelectedStatGUID = 0;
+    Menus->ProfileMenuType = DebugProfileMenu_TopClocksEx;
     
-    Menus->SelectedFunFloatsIncl = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
-    Menus->SelectedFunFloatsExcl = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
+    // NOTE(Dima): Init stat average table
+    for(int FrameIndex = 0;
+        FrameIndex < DEBUG_STATS_TABLE_SIZE;
+        FrameIndex++)
+    {
+        Menus->StatAverageTable[FrameIndex] = 0;
+    }
+    
+    Menus->SelectedFunFloats = PushArray(State->Arena, float, DEBUG_PROFILED_FRAMES_COUNT);
 }
 #endif
 

@@ -814,36 +814,122 @@ inline f32_4x Dot(const v4_4x& A, const v4_4x& B)
 // *****************************
 // NOTE(Dima): Matrix operations
 // *****************************
-inline v4_4x MulVectorByMatrixSIMD(const v4_4x& V, v4_4x MatrixColumns[4])
+inline v4_4x MulVectorByMatrixSIMD(const v4_4x& V, const m44_4x& B)
 {
     v4_4x Result;
-    Result.x = DotInternal(V, MatrixColumns[0]);
-    Result.y = DotInternal(V, MatrixColumns[1]);
-    Result.z = DotInternal(V, MatrixColumns[2]);
-    Result.w = DotInternal(V, MatrixColumns[3]);
+    
+    Result.e[0] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(V.e[0], B.e[0]),
+                                        _mm_mul_ps(V.e[1], B.e[4])),
+                             _mm_add_ps(_mm_mul_ps(V.e[2], B.e[8]),
+                                        _mm_mul_ps(V.e[3], B.e[12])));
+    
+    Result.e[1] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(V.e[0], B.e[1]),
+                                        _mm_mul_ps(V.e[1], B.e[5])),
+                             _mm_add_ps(_mm_mul_ps(V.e[2], B.e[9]),
+                                        _mm_mul_ps(V.e[3], B.e[13])));
+    
+    Result.e[2] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(V.e[0], B.e[2]),
+                                        _mm_mul_ps(V.e[1], B.e[6])),
+                             _mm_add_ps(_mm_mul_ps(V.e[2], B.e[10]),
+                                        _mm_mul_ps(V.e[3], B.e[14])));
+    
+    Result.e[3] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(V.e[0], B.e[3]),
+                                        _mm_mul_ps(V.e[1], B.e[7])),
+                             _mm_add_ps(_mm_mul_ps(V.e[2], B.e[11]),
+                                        _mm_mul_ps(V.e[3], B.e[15])));
     
     return(Result);
 }
 
-inline m44_4x MulMatrixSIMD(const m44_4x& A, const m44_4x& B)
-{
-    v4_4x BColumns[4];
-    BColumns[0] = V4_4X(B.e[0], B.e[4], B.e[8], B.e[12]);
-    BColumns[1] = V4_4X(B.e[1], B.e[5], B.e[9], B.e[13]);
-    BColumns[2] = V4_4X(B.e[2], B.e[6], B.e[10], B.e[14]);
-    BColumns[3] = V4_4X(B.e[3], B.e[7], B.e[11], B.e[15]);
-    
-    m44_4x Result;
-    Result.Rows[0] = MulVectorByMatrixSIMD(A.Rows[0], BColumns);
-    Result.Rows[1] = MulVectorByMatrixSIMD(A.Rows[1], BColumns);
-    Result.Rows[2] = MulVectorByMatrixSIMD(A.Rows[2], BColumns);
-    Result.Rows[3] = MulVectorByMatrixSIMD(A.Rows[3], BColumns);
-    return(Result);
-}
-
+// NOTE(Dima): This is really fast if everything written from scratch
 inline m44_4x operator*(const m44_4x& A, const m44_4x& B)
 {
-    m44_4x Result = MulMatrixSIMD(A, B);
+    m44_4x Result;
+    // NOTE(Dima): First row
+    Result.e[0] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[0], B.e[0]),
+                                        _mm_mul_ps(A.e[1], B.e[4])),
+                             _mm_add_ps(_mm_mul_ps(A.e[2], B.e[8]),
+                                        _mm_mul_ps(A.e[3], B.e[12])));
+    
+    Result.e[1] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[0], B.e[1]),
+                                        _mm_mul_ps(A.e[1], B.e[5])),
+                             _mm_add_ps(_mm_mul_ps(A.e[2], B.e[9]),
+                                        _mm_mul_ps(A.e[3], B.e[13])));
+    
+    Result.e[2] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[0], B.e[2]),
+                                        _mm_mul_ps(A.e[1], B.e[6])),
+                             _mm_add_ps(_mm_mul_ps(A.e[2], B.e[10]),
+                                        _mm_mul_ps(A.e[3], B.e[14])));
+    
+    Result.e[3] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[0], B.e[3]),
+                                        _mm_mul_ps(A.e[1], B.e[7])),
+                             _mm_add_ps(_mm_mul_ps(A.e[2], B.e[11]),
+                                        _mm_mul_ps(A.e[3], B.e[15])));
+    
+    // NOTE(Dima): Second row
+    Result.e[4] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[4], B.e[0]),
+                                        _mm_mul_ps(A.e[5], B.e[4])),
+                             _mm_add_ps(_mm_mul_ps(A.e[6], B.e[8]),
+                                        _mm_mul_ps(A.e[7], B.e[12])));
+    
+    Result.e[5] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[4], B.e[1]),
+                                        _mm_mul_ps(A.e[5], B.e[5])),
+                             _mm_add_ps(_mm_mul_ps(A.e[6], B.e[9]),
+                                        _mm_mul_ps(A.e[7], B.e[13])));
+    
+    Result.e[6] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[4], B.e[2]),
+                                        _mm_mul_ps(A.e[5], B.e[6])),
+                             _mm_add_ps(_mm_mul_ps(A.e[6], B.e[10]),
+                                        _mm_mul_ps(A.e[7], B.e[14])));
+    
+    Result.e[7] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[4], B.e[3]),
+                                        _mm_mul_ps(A.e[5], B.e[7])),
+                             _mm_add_ps(_mm_mul_ps(A.e[6], B.e[11]),
+                                        _mm_mul_ps(A.e[7], B.e[15])));
+    
+    
+    // NOTE(Dima): Third row
+    Result.e[8] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[8], B.e[0]),
+                                        _mm_mul_ps(A.e[9], B.e[4])),
+                             _mm_add_ps(_mm_mul_ps(A.e[10], B.e[8]),
+                                        _mm_mul_ps(A.e[11], B.e[12])));
+    
+    Result.e[9] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[8], B.e[1]),
+                                        _mm_mul_ps(A.e[9], B.e[5])),
+                             _mm_add_ps(_mm_mul_ps(A.e[10], B.e[9]),
+                                        _mm_mul_ps(A.e[11], B.e[13])));
+    
+    Result.e[10] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[8], B.e[2]),
+                                         _mm_mul_ps(A.e[9], B.e[6])),
+                              _mm_add_ps(_mm_mul_ps(A.e[10], B.e[10]),
+                                         _mm_mul_ps(A.e[11], B.e[14])));
+    
+    Result.e[11] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[8], B.e[3]),
+                                         _mm_mul_ps(A.e[9], B.e[7])),
+                              _mm_add_ps(_mm_mul_ps(A.e[10], B.e[11]),
+                                         _mm_mul_ps(A.e[11], B.e[15])));
+    
+    
+    // NOTE(Dima): Fourth row
+    Result.e[12] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[12], B.e[0]),
+                                         _mm_mul_ps(A.e[13], B.e[4])),
+                              _mm_add_ps(_mm_mul_ps(A.e[14], B.e[8]),
+                                         _mm_mul_ps(A.e[15], B.e[12])));
+    
+    Result.e[13] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[12], B.e[1]),
+                                         _mm_mul_ps(A.e[13], B.e[5])),
+                              _mm_add_ps(_mm_mul_ps(A.e[14], B.e[9]),
+                                         _mm_mul_ps(A.e[15], B.e[13])));
+    
+    Result.e[14] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[12], B.e[2]),
+                                         _mm_mul_ps(A.e[13], B.e[6])),
+                              _mm_add_ps(_mm_mul_ps(A.e[14], B.e[10]),
+                                         _mm_mul_ps(A.e[15], B.e[14])));
+    
+    Result.e[15] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(A.e[12], B.e[3]),
+                                         _mm_mul_ps(A.e[13], B.e[7])),
+                              _mm_add_ps(_mm_mul_ps(A.e[14], B.e[11]),
+                                         _mm_mul_ps(A.e[15], B.e[15])));
     
     return(Result);
 }

@@ -44,6 +44,27 @@ struct debug_timing_stat{
     } Stat;
 };
 
+struct debug_stat_average_values
+{
+    f32 TotalSumFrameTime;
+    f32 TotalSumFramePercent;
+    u64 TotalSumCycles;
+};
+
+struct debug_stat_average
+{
+    char* UniqueName;
+    u32 NameHash;
+    
+    int OnFrameCount;
+    debug_stat_average_values ValuesIncl;
+    debug_stat_average_values ValuesExcl;
+    
+    f32 LastUpdateTime;
+    
+    debug_stat_average* NextInHash;
+};
+
 #define DEBUG_PROFILED_FRAMES_COUNT 256
 #define DEBUG_STATS_TABLE_SIZE 128
 #define DEBUG_STATS_TO_SORT_SIZE 4096
@@ -81,22 +102,34 @@ struct debug_thread{
     u16 ThreadID;
 };
 
+enum debug_profile_menu_type
+{
+    DebugProfileMenu_TopClocks,
+    DebugProfileMenu_TopClocksEx,
+    DebugProfileMenu_FrameTimeGraph,
+};
+
 struct debug_menus
 {
     float GraphsSizeY;
     
     char* SelectedStatGUID;
     
-    float* SelectedFunFloatsIncl;
-    float* SelectedFunFloatsExcl;
+    float* SelectedFunFloats;
     
-    float* FPSGraph_FrameTimes;
-    float* FPSGraph_FPSValues;
+    f32 FPSGraph_FrameTimesMax;
+    f32* FPSGraph_FrameTimes;
+    f32 FPSGraph_FPSValuesMax;
+    f32* FPSGraph_FPSValues;
     
     int TopClocks_SelectedStatID;
+    char* TopClocks_SelectedStatGUID;
     
+    debug_stat_average* StatAverageTable[DEBUG_STATS_TABLE_SIZE];
+    f32 LastAvgTableUpdateTime;
+    
+    u32 ProfileMenuType;
     b32 Visible;
-    b32 IncludingChildren;
 };
 
 struct debug_state{

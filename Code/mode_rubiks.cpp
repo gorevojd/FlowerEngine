@@ -13,7 +13,7 @@ SCENE_INIT(RubiksCube)
     
     InitCamera(&State->Camera, Camera_RotateAround);
     
-    State->Cube3 = CreateCube(Scene->Arena, 70, 1.0f, false);
+    State->Cube3 = CreateCube(Scene->Arena, 50, 1.0f, false);
 }
 
 SCENE_UPDATE(RubiksCube)
@@ -27,7 +27,7 @@ SCENE_UPDATE(RubiksCube)
     };
     
     LOCAL_PERSIST b32 CameraBehaviourIndex = 0;
-    if(GetKeyDown(Key_C))
+    if(GetKeyDown(Key_V))
     {
         CameraBehaviourIndex = !CameraBehaviourIndex;
     }

@@ -85,18 +85,27 @@ INTERNAL_FUNCTION inline void MoveCameraToViewTarget(game_camera* Camera)
 
 void UpdateCamera(game_camera* Camera, f32 CamSpeed = 1.0f)
 {
+    f32 MouseDeltaX = 0.0f;
+    f32 MouseDeltaY = 0.0f;
+    
     if(Global_Input->CapturingMouse)
     {
-        f32 MouseDeltaX = GetAxis(Axis_MouseX);
-        f32 MouseDeltaY = GetAxis(Axis_MouseY);
+        MouseDeltaX = GetAxis(Axis_MouseX);
+        MouseDeltaY = GetAxis(Axis_MouseY);
         
         if(Camera->State == Camera_ShowcaseRotateZ)
         {
             MouseDeltaX = Global_Time->DeltaTime * F_RAD2DEG * F_TWO_PI / Camera->ShowcaseRotateTime;
             MouseDeltaY = 0.0f;
         }
-        UpdateCameraRotation(Camera, MouseDeltaY, MouseDeltaX, 0.0f);
     }
+    
+    if(Camera->State == Camera_ShowcaseRotateZ)
+    {
+        MouseDeltaX = Global_Time->DeltaTime * F_RAD2DEG * F_TWO_PI / Camera->ShowcaseRotateTime;
+    }
+    
+    UpdateCameraRotation(Camera, MouseDeltaY, MouseDeltaX, 0.0f);
     
     if(Camera->State == Camera_FlyAround)
     {

@@ -1711,8 +1711,8 @@ inline rc2 UnionRect(rc2 A, rc2 B)
     
     Result.Min = V2(MinFloat(A.Min.x, B.Min.x), 
                     MinFloat(A.Min.y, B.Min.y));
-    Result.Max = V2(MinFloat(A.Max.x, B.Max.x),
-                    MinFloat(A.Max.y, B.Max.y));
+    Result.Max = V2(MaxFloat(A.Max.x, B.Max.x),
+                    MaxFloat(A.Max.y, B.Max.y));
     
     return(Result);
 }

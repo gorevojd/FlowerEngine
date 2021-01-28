@@ -376,6 +376,7 @@ INTERNAL_FUNCTION void InitUIColors()
     Colors[UIColor_Text] = ColorWhite();
     Colors[UIColor_TextHot] = ColorYellow();
     Colors[UIColor_ButtonBackground] = ColorRed();
+    Colors[UIColor_ButtonBackgroundInactive] = V4(0.5f, 0.1f, 0.1f, 1.0f);
     Colors[UIColor_Borders] = ColorBlack();
     Colors[UIColor_GraphBackground] = V4(0.0f, 0.0f, 0.0f, 0.65f);
     
@@ -431,8 +432,16 @@ inline void UIPopScale()
     
     Assert(Params->ScaleStackIndex > 0);
     
+    --Params->ScaleStackIndex;
     Params->ScaleStack[Params->ScaleStackIndex] = 0.0f;
-    Params->Scale = Params->ScaleStack[--Params->ScaleStackIndex];
+    if(Params->ScaleStackIndex - 1 >= 0)
+    {
+        Params->Scale = Params->ScaleStack[Params->ScaleStackIndex - 1];
+    }
+    else
+    {
+        Params->Scale = 1.0f;
+    }
 }
 
 INTERNAL_FUNCTION void UIBeginFrame()
@@ -456,8 +465,6 @@ INTERNAL_FUNCTION void UIBeginFrame()
     while(LayoutAt)
     {
         LayoutAt->At = V2(0.0f);
-        LayoutAt->JustStarted = true;
-        LayoutAt->StayOnSameLine = false;
         
         LayoutAt = LayoutAt->Next;
     }
@@ -634,11 +641,16 @@ INTERNAL_FUNCTION inline b32 UIElementIsOpenedInTree(ui_element* Elem)
     return(Opened);
 }
 
-INTERNAL_FUNCTION inline int UIElementTreeDepth(ui_layout* Layout)
+INTERNAL_FUNCTION inline int UIElementTreeDepth(ui_layout* Layout, 
+                                                b32 StartFromCurrent = false)
 {
     ui_element* Elem = Layout->CurrentElement;
     
     ui_element* At = Elem->Parent;
+    if(StartFromCurrent)
+    {
+        At = Elem;
+    }
     
     int Result = 0;
     while(At)
@@ -792,6 +804,168 @@ INTERNAL_FUNCTION void UIEndElement(u32 Type)
     Layout->CurrentElement = Parent;
 }
 
+
+// NOTE(Dima): Manipulation
+#if 0
+INTERNAL_FUNCTION inline void SameLine()
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    Layout->StayOnSameLine = true;
+}
+
+INTERNAL_FUNCTION inline void SameColumn()
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    Layout->StayOnSameColumn = true;
+}
+#endif
+
+
+INTERNAL_FUNCTION inline ui_row_or_column* UIFindAlreadyAdvanced(b32 IncludingThis = false)
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    int StartIndex = Layout->RowOrColumnIndex - 1;
+    if(IncludingThis)
+    {
+        StartIndex = Layout->RowOrColumnIndex;
+    }
+    
+    ui_row_or_column* Result = 0;
+    for(int i = StartIndex; i >= 0 ; i--)
+    {
+        ui_row_or_column* RowOrColumn = &Layout->RowOrColumns[i];
+        
+        if(RowOrColumn->AdvanceBehaviour == RowColumnAdvanceBehaviour_Advanced)
+        {
+            Result = RowOrColumn;
+            break;
+        }
+        else if(RowOrColumn->AdvanceBehaviour == RowColumnAdvanceBehaviour_Block)
+        {
+            break;
+        }
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline void BeginRowOrColumn(b32 IsRow, 
+                                               int AdvanceBehaviour = RowColumnAdvanceBehaviour_None)
+{
+    ui_layout* Layout = GetCurrentLayout();
+    int TargetIndex = ++Layout->RowOrColumnIndex;
+    
+    ui_row_or_column* Src = 0;
+    ui_row_or_column* Dst = &Layout->RowOrColumns[TargetIndex];
+    
+    if(TargetIndex - 1 >= 0)
+    {
+        Src = &Layout->RowOrColumns[TargetIndex - 1];
+    }
+    
+    ui_row_or_column* AlreadyAdvanced = UIFindAlreadyAdvanced(false);
+    
+    Dst->StartAt = Layout->At;
+    Dst->AdvanceBehaviour = AdvanceBehaviour;
+    if(!AlreadyAdvanced)
+    {
+        Dst->StartAt.x = Layout->InitAt.x + (f32)(Layout->CurrentTreeDepth * UI_TAB_SPACES) * GetLineBase();
+        Dst->AdvanceBehaviour = RowColumnAdvanceBehaviour_ShouldBeAdvanced;
+    }
+    
+    Dst->IsRow = IsRow;
+    Dst->Bounds = {};
+}
+
+INTERNAL_FUNCTION inline ui_row_or_column* GetRowOrColumnByIndex(ui_layout* Layout, int Index)
+{
+    ui_row_or_column* Result = 0;
+    
+    if(Index >= 0)
+    {
+        Result = &Layout->RowOrColumns[Index];
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline ui_row_or_column* GetParentRowOrColumn()
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    ui_row_or_column* Result = GetRowOrColumnByIndex(Layout, Layout->RowOrColumnIndex - 1);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline void EndRowOrColumn(b32 IsRow)
+{
+    ui_layout* Layout = GetCurrentLayout();
+    
+    ui_row_or_column* Src = &Layout->RowOrColumns[Layout->RowOrColumnIndex];
+    
+    Assert(Src->IsRow == IsRow);
+    
+    ui_row_or_column* Dst = GetRowOrColumnByIndex(Layout, --Layout->RowOrColumnIndex);
+    
+    if(Dst)
+    {
+        rc2 ResultBounds = Dst->Bounds;
+        
+        if(GetArea(Src->Bounds) > 1)
+        {
+            ResultBounds = Src->Bounds;
+            
+            if(GetArea(Dst->Bounds) > 1)
+            {
+                ResultBounds = UnionRect(ResultBounds, Dst->Bounds);
+            }
+        }
+        
+        Dst->Bounds = ResultBounds;
+        
+        if(Dst->IsRow)
+        {
+            Layout->At.x = Src->Bounds.Max.x + GetLineBase();
+            Layout->At.y = Src->StartAt.y;
+        }
+        else
+        {
+            Layout->At.x = Src->StartAt.x;
+            Layout->At.y = Src->Bounds.Max.y + GetLineBase();
+        }
+    }
+}
+
+INTERNAL_FUNCTION inline void BeginRow()
+{
+    BeginRowOrColumn(true);
+}
+
+INTERNAL_FUNCTION inline void EndRow()
+{
+    EndRowOrColumn(true);
+}
+
+INTERNAL_FUNCTION inline void BeginColumn()
+{
+    BeginRowOrColumn(false);
+}
+
+INTERNAL_FUNCTION inline void BeginTreeColumn()
+{
+    BeginRowOrColumn(false, RowColumnAdvanceBehaviour_Block);
+}
+
+INTERNAL_FUNCTION inline void EndColumn()
+{
+    EndRowOrColumn(false);
+}
+
+
 // NOTE(Dima): Layouts stuff
 INTERNAL_FUNCTION b32 BeginLayout(const char* Name)
 {
@@ -834,13 +1008,16 @@ INTERNAL_FUNCTION b32 BeginLayout(const char* Name)
         
         Found->InitAt = V2(0.0f, 0.0f);
         
-        Found->AdditionalYOffsetWasSet = false;
-        Found->AdditionalYOffset = 0.0f;
-        
         Found->CurrentElement = 0;
         Found->Root = UIBeginElement("Root", UIElement_Root);
         Found->CurrentElement = Found->Root;
     }
+    
+    Found->At = Found->InitAt + V2(0.0f, GetLineBase());
+    
+    // NOTE(Dima): Beginning column
+    Found->RowOrColumnIndex = -1;
+    BeginColumn();
     
     b32 Result = true;
     return(Result);
@@ -852,77 +1029,87 @@ INTERNAL_FUNCTION void EndLayout()
     
     Assert(Layout);
     
+    EndColumn();
+    
     Assert(Layout->CurrentElement->Type == UIElement_Root);
     
     Global_UI->CurrentLayout = 0;
-}
-
-
-// NOTE(Dima): Manipulation
-INTERNAL_FUNCTION inline void SameLine()
-{
-    ui_layout* Layout = GetCurrentLayout();
-    
-    Layout->StayOnSameLine = true;
 }
 
 INTERNAL_FUNCTION inline void StepLittleY()
 {
     ui_layout* Layout = GetCurrentLayout();
     
-    Layout->AdditionalYOffsetWasSet = true;
-    Layout->AdditionalYOffset += GetLineBase() * 0.25f;
+    Layout->At.y += GetLineBase() * 0.25f;
 }
 
 INTERNAL_FUNCTION inline void PreAdvance()
 {
     ui_layout* Layout = GetCurrentLayout();
     
-    if(Layout->JustStarted)
+    ui_row_or_column* RowOrColumn = &Layout->RowOrColumns[Layout->RowOrColumnIndex];
+    b32 IsRow = RowOrColumn->IsRow;
+    
+    f32 HorizontalP = Layout->At.x;
+    f32 VerticalP = Layout->At.y;
+    
+    b32 ShouldAdvance = true;
+    
+    for(int i = Layout->RowOrColumnIndex; i >= 0 ; i--)
     {
-        Layout->JustStarted = false;
+        ui_row_or_column* RowOrColumn = &Layout->RowOrColumns[i];
         
-        Layout->At.y += GetLineBase();
+        if(RowOrColumn->AdvanceBehaviour == RowColumnAdvanceBehaviour_ShouldBeAdvanced)
+        {
+            RowOrColumn->AdvanceBehaviour = RowColumnAdvanceBehaviour_Advanced;
+        }
+        else if(RowOrColumn->AdvanceBehaviour == RowColumnAdvanceBehaviour_Advanced)
+        {
+            ShouldAdvance = false;
+            break;
+        }
+        else if(RowOrColumn->AdvanceBehaviour == RowColumnAdvanceBehaviour_Block)
+        {
+            break;
+        }
     }
-    else
+    
+    if(ShouldAdvance)
     {
-        f32 VerticalP = Layout->LastBounds.Max.y + Layout->AdditionalYOffset + GetLineBase();
-        f32 HorizontalP = Layout->InitAt.x + (f32)(UIElementTreeDepth(Layout) * UI_TAB_SPACES) * GetLineBase();
-        
-        if(Layout->AdditionalYOffsetWasSet)
-        {
-            Layout->AdditionalYOffset = 0.0f;
-            Layout->AdditionalYOffsetWasSet = false;
-        }
-        
-        if(Layout->StayOnSameLine)
-        {
-            Layout->StayOnSameLine = false;
-            
-            VerticalP = Layout->At.y;
-            HorizontalP = Layout->LastBounds.Max.x + GetLineBase();
-        }
-        else
-        {
-            
-            Layout->CurrentRowBounds = {};
-        }
-        
-        Layout->At.y = VerticalP;
-        Layout->At.x = HorizontalP;
+        HorizontalP = Layout->InitAt.x + (f32)(UIElementTreeDepth(Layout) * UI_TAB_SPACES) * GetLineBase();
+        RowOrColumn->AdvanceBehaviour = RowColumnAdvanceBehaviour_Advanced;
     }
+    
+    Layout->At.y = VerticalP;
+    Layout->At.x = HorizontalP;
 }
 
 INTERNAL_FUNCTION inline void DescribeElement(rc2 ElementBounds)
 {
     ui_layout* Layout = GetCurrentLayout();
+    ui_row_or_column* RowOrColumn = &Layout->RowOrColumns[Layout->RowOrColumnIndex];
     
-    Layout->LastBounds = ElementBounds;
+    Assert(RowOrColumn);
     
-    if(GetArea(ElementBounds) > 1 &&
-       GetArea(Layout->CurrentRowBounds) > 1)
+    if(GetArea(ElementBounds) > 1)
     {
-        Layout->CurrentRowBounds = UnionRect(ElementBounds, Layout->CurrentRowBounds);
+        rc2 BoundsResult = ElementBounds;
+        
+        if(GetArea(RowOrColumn->Bounds) > 1)
+        {
+            BoundsResult = UnionRect(BoundsResult, RowOrColumn->Bounds);
+        }
+        
+        RowOrColumn->Bounds = BoundsResult;
+        
+        if(RowOrColumn->IsRow)
+        {
+            Layout->At.x = ElementBounds.Max.x + GetLineBase();
+        }
+        else
+        {
+            Layout->At.y = ElementBounds.Max.y + GetLineBase();
+        }
     }
 }
 
@@ -969,6 +1156,7 @@ enum ui_button_flags
     TextElement_IsClickable = (1 << 1),
     TextElement_BackgroundRectangle = (1 << 2),
     TextElement_UseCustomRectangle = (1 << 3),
+    TextElement_Highlighted = (1 << 4),
 };
 
 INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree, 
@@ -1029,7 +1217,13 @@ INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree,
         // NOTE(Dima): Pushing background
         if(Flags & TextElement_BackgroundRectangle)
         {
-            PushRect(Bounds, UIGetColor(UIColor_ButtonBackground));
+            v4 BackgroundColor = UIGetColor(UIColor_ButtonBackgroundInactive);
+            if(Flags & TextElement_Highlighted)
+            {
+                BackgroundColor = UIGetColor(UIColor_ButtonBackground);
+            }
+            
+            PushRect(Bounds, BackgroundColor);
         }
         
         // NOTE(Dima): Printing text
@@ -1051,7 +1245,7 @@ INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree,
     return(Pressed);
 }
 
-INTERNAL_FUNCTION b32 Button(const char* Name)
+INTERNAL_FUNCTION b32 Button(const char* Name, b32 Highlighted = true)
 {
     ui_params* Params = UIGetParams();
     
@@ -1060,6 +1254,11 @@ INTERNAL_FUNCTION b32 Button(const char* Name)
     u32 ButtonFlags = (TextElement_IsInteractible |
                        TextElement_IsClickable |
                        TextElement_BackgroundRectangle);
+    
+    if(Highlighted)
+    {
+        ButtonFlags |= TextElement_Highlighted;
+    }
     
     b32 Pressed = TextElement(ButtonFlags, 0);
     
@@ -1073,6 +1272,8 @@ INTERNAL_FUNCTION b32 BoolButton(const char* Name, b32* BoolSource,
                                  char* NegativeText = 0)
 {
     ui_params* Params = UIGetParams();
+    
+    BeginRow();
     
     ui_layout* Layout = GetCurrentLayout();
     ui_element* Element = UIBeginElement((char*)Name, UIElement_Static);
@@ -1137,21 +1338,28 @@ INTERNAL_FUNCTION b32 BoolButton(const char* Name, b32* BoolSource,
     
     UIEndElement(UIElement_Static);
     
-    SameLine();
-    
     ShowTextUnformatted((char*)Name);
+    
+    EndRow();
     
     return(Pressed);
 }
 
 INTERNAL_FUNCTION void TreePop()
 {
+    EndColumn();
     UIEndElement(UIElement_TreeNode);
+    
+    ui_layout* Layout = GetCurrentLayout();
+    Layout->CurrentTreeDepth = UIElementTreeDepth(Layout, true);
 }
 
 INTERNAL_FUNCTION b32 TreeNode(const char* Name)
 {
+    
     ui_element* Element = UIBeginElement((char*)Name, UIElement_TreeNode);
+    ui_layout* Layout = GetCurrentLayout();
+    Layout->CurrentTreeDepth = UIElementTreeDepth(Layout, true);
     
     u32 Flags = (TextElement_IsInteractible | TextElement_IsClickable);
     
@@ -1161,6 +1369,8 @@ INTERNAL_FUNCTION b32 TreeNode(const char* Name)
     {
         Element->IsOpen = !Element->IsOpen;
     }
+    
+    BeginTreeColumn();
     
     // NOTE(Dima): Returning result
     b32 Result = OpenedInTree && Element->IsOpen;

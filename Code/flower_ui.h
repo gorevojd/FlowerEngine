@@ -59,20 +59,37 @@ struct ui_element
     ui_element* ChildSentinel;
 };
 
+enum ui_row_or_column_advance_behaviour
+{
+    RowColumnAdvanceBehaviour_None,
+    RowColumnAdvanceBehaviour_Advanced,
+    RowColumnAdvanceBehaviour_Block,
+    RowColumnAdvanceBehaviour_ShouldBeAdvanced,
+};
+
+struct ui_row_or_column
+{
+    b32 IsRow;
+    
+    v2 StartAt;
+    rc2 Bounds;
+    
+    // 0 - Nothing
+    // 1 - Adnvanced
+    // 2 - Block
+    int AdvanceBehaviour;
+};
+
 // NOTE(Dima): Layouts
 struct ui_layout
 {
     const char* Name;
     v2 InitAt;
     v2 At;
-    b32 JustStarted;
-    b32 StayOnSameLine;
     
-    rc2 LastBounds;
-    rc2 CurrentRowBounds;
-    
-    b32 AdditionalYOffsetWasSet;
-    b32 AdditionalYOffset;
+    ui_row_or_column RowOrColumns[64];
+    int RowOrColumnIndex;
+    int CurrentTreeDepth;
     
     ui_element* CurrentElement;
     ui_element* Root;
@@ -127,6 +144,7 @@ enum ui_color_type
     UIColor_Text,
     UIColor_TextHot,
     UIColor_ButtonBackground,
+    UIColor_ButtonBackgroundInactive,
     UIColor_Borders,
     UIColor_GraphBackground,
     
