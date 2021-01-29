@@ -61,10 +61,12 @@ SCENE_UPDATE(TestGame)
                         Global_Time->Time,
                         &Global_Assets->BearSuccess);
             
+#if 1            
             RenderModel(&Global_Assets->Bear,
                         V3(-1.0f, 0.0f, 0.0f),
                         Global_Time->Time,
                         &Global_Assets->BearIdle);
+#endif
             
             RenderModel(&Global_Assets->Fox,
                         V3(-3.0f, 0.0f, 0.0f),

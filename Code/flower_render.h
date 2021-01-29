@@ -64,6 +64,18 @@ struct render_command_instanced_mesh
     int MaxInstanceCount;
 };
 
+struct render_precompute_transform_mesh
+{
+    mesh ResultMesh;
+    mesh** Meshes;
+    m44* Transforms;
+    
+    render_precompute_transform_mesh* Next;
+    
+    int Count;
+    int MaxCount;
+};
+
 struct render_mesh_instance
 {
     render_mesh_instance* NextInHash;
@@ -140,6 +152,10 @@ struct render_commands
     window_dimensions WindowDimensions;
     image* FontAtlas;
     
+    // NOTE(Dima): List of to precompute mesh arrays
+    render_precompute_transform_mesh* FirstPrecomputeMesh;
+    
+    // NOTE(Dima): Instance table
 #define RENDER_INSTANCE_TABLE_SIZE 256
     render_mesh_instance* InstanceTable[RENDER_INSTANCE_TABLE_SIZE];
 };

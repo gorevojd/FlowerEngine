@@ -28,6 +28,7 @@ struct opengl_shader
     GLint BoneIDsAttr;
     
     // NOTE(Dima): Uniforms
+    GLint ViewProjectionLoc;
     GLint ProjectionLoc;
     GLint ViewLoc;
     GLint ModelLoc;
@@ -36,6 +37,7 @@ struct opengl_shader
     GLint MeshIsSkinnedLoc;
     GLint InstanceModelMatricesLoc;
     GLint UseInstancingLoc;
+    GLint PremultipliedTransformLoc;
     
     GLint MultColorLoc;
     GLint TexDiffuseLoc;

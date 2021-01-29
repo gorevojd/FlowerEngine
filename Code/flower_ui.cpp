@@ -55,7 +55,7 @@ enum print_text_flags
 
 INTERNAL_FUNCTION rc2 PrintText_(font* Font, 
                                  char* Text, 
-                                 v3 Left, v3 Up,
+                                 v3 Left, v3 Up, v3 Forward,
                                  v3 P, 
                                  v2 Offset, 
                                  u32 Flags,
@@ -77,14 +77,11 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
         Buffer = &Global_RenderCommands->Rects3D;
         AtP = {};
         
-        Up = -Up;
-        Left = -Left;
-        
-        Scale *= 1.0f / (f32)Font->Size;
+        Scale *= 1.0f / Font->PixelsPerMeter;
         
         m44 TextTransform = Matrix4FromRows(V4(Left, 0.0f), 
                                             V4(Up, 0.0f), 
-                                            V4(NOZ(Cross(Left, Up)), 0.0f),
+                                            V4(Forward, 0.0f),
                                             V4(P.x, P.y, P.z, 1.0f));
         IndexToTransformMatrix = PushRectTransform(Buffer, &TextTransform);
     }
@@ -137,46 +134,17 @@ INTERNAL_FUNCTION rc2 PrintText(font* Font,
     if(WithShadow)
     {
         PrintText_(Font, Text, 
-                   V3_Left(), V3_Up(), 
+                   V3_Left(), V3_Up(), V3_Forward(), 
                    V3(P, 0.0f), V2(1.0f, 1.0f), 
                    0, Scale, false, 
                    V4(0.0f, 0.0f, 0.0f, 1.0f));
     }
-    rc2 Result = PrintText_( Font, Text, 
-                            V3_Left(), V3_Up(), 
+    rc2 Result = PrintText_(Font, Text, 
+                            V3_Left(), V3_Up(), V3_Forward(), 
                             V3(P, 0.0f), V2(0.0f, 0.0f), 
                             0, Scale, false,  C);
     
     return(Result);
-}
-
-INTERNAL_FUNCTION void PrintText3D(font* Font, 
-                                   char* Text,
-                                   v3 Left, v3 Up,
-                                   v3 P, 
-                                   v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f), 
-                                   f32 Scale = 1.0f, 
-                                   b32 WithShadow = true)
-{
-    
-#if 0    
-    if(WithShadow)
-    {
-        PrintText_(Font, Text, 
-                   Left, Up, P, 
-                   V2(1.0f, 1.0f), 
-                   PrintText_3D, 
-                   Scale, 
-                   V4(0.0f, 0.0f, 0.0f, 1.0f));
-    }
-#endif
-    
-    PrintText_(Font, Text, 
-               Left, Up, P, 
-               V2(0.0f, 0.0f), 
-               PrintText_3D, 
-               Scale, 
-               false, C);
 }
 
 INTERNAL_FUNCTION inline rc2 GetTextRect(char* Text, v2 P)
@@ -185,12 +153,16 @@ INTERNAL_FUNCTION inline rc2 GetTextRect(char* Text, v2 P)
     
     font* Font = Params->Font;
     
+    b32 IsGetSizePass = true;
+    
     rc2 Result = PrintText_(Font, 
                             Text, 
-                            V3_Left(), V3_Up(), 
+                            V3_Left(), V3_Up(), V3_Forward(), 
                             V3(P.x, P.y, 0.0f), 
                             V2(0.0f, 0.0f), 
-                            0, Params->Scale, true);
+                            0, 
+                            Params->Scale,
+                            IsGetSizePass);
     
     return(Result);
 }
@@ -202,6 +174,62 @@ INTERNAL_FUNCTION inline v2 GetTextSize(char* Text)
     v2 Result = GetDim(TextRect);
     
     return(Result);
+}
+
+INTERNAL_FUNCTION void PrintText3D(char* Text,
+                                   v3 P, 
+                                   v3 Left, v3 Up,
+                                   f32 Scale = 1.0f,
+                                   v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+{
+    PrintText_(Global_UI->Params.Font, 
+               Text, 
+               Left, Up, NOZ(Cross(Left, Up)),
+               P, 
+               V2(0.0f, 0.0f), 
+               PrintText_3D, 
+               Scale, 
+               false,
+               C);
+}
+
+INTERNAL_FUNCTION void PrintTextCentered3D(char* Text,
+                                           v3 P, 
+                                           v3 Normal,
+                                           f32 UnitHeight,
+                                           v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+{
+    v2 Size = GetTextSize(Text) / Global_UI->Params.Font->PixelsPerMeter * UnitHeight;
+    
+    Normal = -Normal;
+    
+    v3 Up, Left;
+    if(Dot(Normal, V3_Up()) < 0.99999999f)
+    {
+        Left = NOZ(Cross(V3_Up(), Normal));
+        Up = NOZ(Cross(Normal, Left));
+    }
+    else
+    {
+        // TODO(Dima): Maybe pass another parameter that controls the angle
+        Left = V3_Left();
+        Up = V3_Back();
+    }
+    
+    Left = -Left;
+    Up = -Up;
+    
+    P -= Left * Size.x * 0.5f;
+    
+    PrintText_(Global_UI->Params.Font, 
+               Text, 
+               Left, Up, Normal,
+               P, 
+               V2(0.0f, 0.0f), 
+               PrintText_3D, 
+               UnitHeight, 
+               false,
+               C);
 }
 
 INTERNAL_FUNCTION inline f32 GetPrintHorizontalPosition(f32 Min, f32 Max, 

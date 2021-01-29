@@ -41,6 +41,7 @@ struct mesh
     u32* Indices;
     int IndexCount;
     
+    b32 PremultipliedTransform;
     b32 IsSkinned;
     int MaterialIndexInModel;
     
@@ -131,7 +132,7 @@ struct font
     
     f32 LineAdvance;
     
-    int Size;
+    f32 PixelsPerMeter;
 };
 
 struct model_node

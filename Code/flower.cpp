@@ -133,6 +133,8 @@ INTERNAL_FUNCTION void UpdateGame(game* Game)
     
     
     // NOTE(Dima): Updating game
+    BeginRender();
+    
     scene* Scene = Game->Scenes + Game->CurrentSceneIndex;
     Scene->Update();
     
@@ -171,6 +173,11 @@ INTERNAL_FUNCTION void UpdateGame(game* Game)
         }
     }
     
+    if(GetKeyDown(Key_Backquote))
+    {
+        DEBUGToggleShowMenus();
+    }
+    
     if(Game->NextSceneIndex != Game->CurrentSceneIndex)
     {
         Game->CurrentSceneIndex = Game->NextSceneIndex;
@@ -185,7 +192,7 @@ INTERNAL_FUNCTION void UpdateGame(game* Game)
     Global_RenderCommands->ScreenOrthoProjection = OrthographicProjection(WndDims->Width, 
                                                                           WndDims->Height);
     
-    BeginRender();
+    PreRender();
     Platform.Render();
     EndRender();
     

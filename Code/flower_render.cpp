@@ -25,7 +25,7 @@ inline void PushClear(v3 Color, u32 Flags = RenderClear_Color)
 
 inline void PushMesh(mesh* Mesh, 
                      material* Material, 
-                     const m44& ModelToWorld,
+                     const m44& ModelToWorld = IdentityMatrix4(),
                      v3 C = V3(1.0f, 1.0f, 1.0f),
                      m44* SkinningMatrices = 0,
                      int SkinningMatricesCount = 0)
@@ -43,11 +43,10 @@ inline void PushMesh(mesh* Mesh,
 
 INTERNAL_FUNCTION inline u32 GetMeshHash(mesh* Mesh)
 {
-    char SrcBuf[16];
-    
     u64 MeshInt = (u64)Mesh;
     
 #if 0    
+    char SrcBuf[16];
     for(int i = 0; i < 8; i++)
     {
         SrcBuf[i] = (char)(MeshInt & 255);
@@ -88,6 +87,11 @@ INTERNAL_FUNCTION render_mesh_instance* FindMeshInstanceInTable(mesh* Mesh)
     return(Result);
 }
 
+/*
+NOTE
+This funciton allocates table entries. In the end of the frame the memory arena (that was used
+to allocate from) is freed. So there is no memory leaks!!!
+*/
 INTERNAL_FUNCTION render_mesh_instance* AddMeshInstanceToTable(mesh* Mesh, 
                                                                render_command_instanced_mesh* Command)
 {
@@ -106,6 +110,7 @@ INTERNAL_FUNCTION render_mesh_instance* AddMeshInstanceToTable(mesh* Mesh,
     }
     else
     {
+        // NOTE(Dima): Checking if there is any element with the same mesh. If so - crash
         render_mesh_instance* At = Global_RenderCommands->InstanceTable[Index];
         while(At)
         {
@@ -116,8 +121,8 @@ INTERNAL_FUNCTION render_mesh_instance* AddMeshInstanceToTable(mesh* Mesh,
             At = At->NextInHash;
         }
         
-        Result = PushStruct(&Global_RenderCommands->CommandsBuffer,
-                            render_mesh_instance);
+        Result = PushStruct(&Global_RenderCommands->CommandsBuffer, render_mesh_instance);
+        
     }
     
     if(Result)
@@ -154,7 +159,6 @@ inline void PushInstanceMesh(int MaxInstanceCount,
     {
         render_command_instanced_mesh* Entry = PushRenderCommand(RenderCommand_InstancedMesh, 
                                                                  render_command_instanced_mesh);
-        
         
         Entry->Mesh = Mesh;
         Entry->Material = Material;
@@ -203,6 +207,138 @@ inline void PushInstanceMesh(int MaxInstanceCount,
     
     // NOTE(Dima): Increasing instance count
     Instance->Command->InstanceCount++;
+}
+
+INTERNAL_FUNCTION inline 
+render_precompute_transform_mesh* BeginPrecomputeTransformMesh(int MaxMeshCount)
+{
+    render_precompute_transform_mesh* Result = PushStruct(&Global_RenderCommands->CommandsBuffer, 
+                                                          render_precompute_transform_mesh);
+    
+    // NOTE(Dima): Inserting to list
+    Result->Next = Global_RenderCommands->FirstPrecomputeMesh;
+    Global_RenderCommands->FirstPrecomputeMesh = Result;
+    
+    // NOTE(Dima): Setting data
+    Result->Meshes = PushArray(&Global_RenderCommands->CommandsBuffer, mesh*, MaxMeshCount);
+    Result->Transforms = PushArray(&Global_RenderCommands->CommandsBuffer, m44, MaxMeshCount);
+    Result->Count = 0;
+    Result->MaxCount = MaxMeshCount;
+    
+    Result->ResultMesh = {};
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline 
+void AddMeshToPrecompute(render_precompute_transform_mesh* PrecompMesh,
+                         mesh* Mesh, const m44& Transform)
+{
+    Assert(PrecompMesh->Count < PrecompMesh->MaxCount);
+    
+    PrecompMesh->Meshes[PrecompMesh->Count] = Mesh;
+    PrecompMesh->Transforms[PrecompMesh->Count] = Transform;
+    
+    PrecompMesh->Count++;
+}
+
+INTERNAL_FUNCTION inline 
+void PrecomputeMeshTransforms(render_precompute_transform_mesh* PrecompMesh)
+{
+    FUNCTION_TIMING();
+    
+    mesh* Dst = &PrecompMesh->ResultMesh;
+    
+    // NOTE(Dima): Precalculating count of vertices and indices
+    int TargetVertexCount = 0;
+    int TargetIndexCount = 0;
+    
+    for(int MeshIndex = 0;
+        MeshIndex < PrecompMesh->Count;
+        MeshIndex++)
+    {
+        mesh* Mesh = PrecompMesh->Meshes[MeshIndex];
+        
+        TargetVertexCount += Mesh->VertexCount;
+        TargetIndexCount += Mesh->IndexCount;
+    }
+    
+    // NOTE(Dima): Allocate target mesh
+    mesh_offsets* Offsets = &Dst->Offsets;
+    helper_byte_buffer Help = {};
+    
+    int AlignedVertexCount = CeilAlign(TargetVertexCount, 4);
+    
+    Offsets->OffsetP = Help.AddPlace("P", AlignedVertexCount, sizeof(v3));
+    Offsets->OffsetN = Help.AddPlace("N", AlignedVertexCount, sizeof(v3));
+    Offsets->OffsetUV = Help.AddPlace("UV", TargetVertexCount, sizeof(v2));
+    Offsets->OffsetC = Help.AddPlace("C", TargetVertexCount, sizeof(u32));
+    Help.AddPlace("Indices", TargetIndexCount, sizeof(u32));
+    
+    void* MeshMemory = PushSize(&Global_RenderCommands->CommandsBuffer, Help.DataSize);
+    Help.Generate(MeshMemory);
+    
+    Dst->P = (v3*)Help.GetPlace("P");
+    Dst->UV = (v2*)Help.GetPlace("UV");
+    Dst->N = (v3*)Help.GetPlace("N");
+    Dst->C = (u32*)Help.GetPlace("C");
+    Dst->Indices = (u32*)Help.GetPlace("Indices");
+    Dst->Free = Help.Data;
+    Dst->FreeSize = Help.DataSize;
+    
+    Dst->VertexCount = TargetVertexCount;
+    Dst->IndexCount = TargetIndexCount;
+    Dst->BoneWeights = 0;
+    Dst->BoneIndices = 0;
+    Dst->IsSkinned = false;
+    Dst->PremultipliedTransform = true;
+    
+    // NOTE(Dima): Copying vertex data
+    int VertexAt = 0;
+    int IndexAt = 0;
+    
+    int* TransformMatrixIndices = PushArray(&Global_RenderCommands->CommandsBuffer, 
+                                            int, AlignedVertexCount);
+    
+    for(int MeshIndex = 0;
+        MeshIndex < PrecompMesh->Count;
+        MeshIndex++)
+    {
+        mesh* Mesh = PrecompMesh->Meshes[MeshIndex];
+        
+        // NOTE(Dima): Copying mesh vertex data
+        int VertexBase = VertexAt;
+        for(int VertexIndex = 0;
+            VertexIndex < Mesh->VertexCount;
+            VertexIndex++)
+        {
+            Dst->P[VertexAt] = Mesh->P[VertexIndex];
+            Dst->N[VertexAt] = Mesh->N[VertexIndex];
+            Dst->UV[VertexAt] = Mesh->UV[VertexIndex];
+            Dst->C[VertexAt] = Mesh->C[VertexIndex];
+            TransformMatrixIndices[VertexAt] = MeshIndex;
+            
+            VertexAt++;
+        }
+        
+        // NOTE(Dima): Copying mesh index data
+        for(int i = 0; i < Mesh->IndexCount; i++)
+        {
+            Dst->Indices[IndexAt++] = Mesh->Indices[i] + VertexBase;
+        }
+    }
+    
+    // NOTE(Dima): Precompute loop
+    for(int VertexIndex = 0;
+        VertexIndex < Dst->VertexCount;
+        VertexIndex++)
+    {
+        int TransformMatrixIndex = TransformMatrixIndices[VertexIndex];
+        m44 Transform = PrecompMesh->Transforms[TransformMatrixIndex];
+        
+        Dst->P[VertexIndex] = MulPoint(Dst->P[VertexIndex], Transform);
+        Dst->N[VertexIndex] = MulDirection(Dst->N[VertexIndex], Transform);
+    }
 }
 
 inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
@@ -637,10 +773,33 @@ INTERNAL_FUNCTION void BeginRender()
 {
     render_commands* Commands = Global_RenderCommands;
     
+    // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();
     
+    // NOTE(Dima): Resetting to precompute mesh list
+    Commands->FirstPrecomputeMesh = 0;
+    
+    // NOTE(Dima): Pushing default matrices to buffer
     PushDefaultMatricesToRectBuffer(&Commands->Rects2D);
     PushDefaultMatricesToRectBuffer(&Commands->Rects3D);
+}
+
+INTERNAL_FUNCTION void PreRender()
+{
+    // NOTE(Dima): Walking through all meshes to precompute and pushing them
+    render_precompute_transform_mesh* PrecompAt = Global_RenderCommands->FirstPrecomputeMesh;
+    while(PrecompAt)
+    {
+        mesh* Mesh = &PrecompAt->ResultMesh;
+        if(Mesh->VertexCount)
+        {
+            PrecomputeMeshTransforms(PrecompAt);
+            
+            PushMesh(Mesh, 0);
+        }
+        
+        PrecompAt = PrecompAt->Next;
+    }
 }
 
 INTERNAL_FUNCTION void EndRender()

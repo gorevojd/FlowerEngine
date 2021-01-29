@@ -13,7 +13,7 @@ SCENE_INIT(RubiksCube)
     
     InitCamera(&State->Camera, Camera_RotateAround);
     
-    State->Cube3 = CreateCube(Scene->Arena, 50, 1.0f, false);
+    State->Cube3 = CreateCube(Scene->Arena, 100, 1.0f, true);
 }
 
 SCENE_UPDATE(RubiksCube)
@@ -96,8 +96,16 @@ SCENE_UPDATE(RubiksCube)
     }
     
     UpdateCube(&State->Cube3, V3(0.0f), 2.0f);
-    
     //UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
+    
+    
+#if 0    
+    ShowLabel3D(&State->Camera, 
+                "Hello world this is the cube",
+                V3_Up() * 1.5f,
+                0.25f,
+                ColorRed());
+#endif
     
     SetMatrices(GetViewMatrix(&State->Camera));
 }

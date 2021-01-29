@@ -75,7 +75,7 @@ void UpdateCameraRotation(game_camera* Camera,
 
 INTERNAL_FUNCTION inline void MoveCameraToViewTarget(game_camera* Camera)
 {
-    Camera->ViewTargetRadius -= Global_Input->MouseScroll;
+    Camera->ViewTargetRadius -= Global_Input->MouseScroll * 0.4f;
     Camera->ViewTargetRadius = Clamp(Camera->ViewTargetRadius, 
                                      Camera->ViewRadiusMin, 
                                      Camera->ViewRadiusMax);
@@ -149,6 +149,20 @@ m44 GetViewMatrix(game_camera* Camera)
     return(Result);
 }
 
+void ShowLabel3D(game_camera* Camera,
+                 char* Text,
+                 v3 P,
+                 f32 UnitHeight = 0.2f,
+                 v4 Color = ColorWhite())
+{
+    v3 Normal = -Camera->Transform.Rows[2];
+    
+    PrintTextCentered3D(Text, P,
+                        Normal,
+                        UnitHeight,
+                        Color);
+}
+
 INTERNAL_FUNCTION void SetMatrices(m44 ViewMatrix)
 {
     window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
@@ -177,10 +191,10 @@ void RenderModel(model* Model,
         
         SkinningMatrices = Model->Bone_SkinningMatrices;
         SkinningMatricesCount = Model->Shared.NumBones;
+        
+        CalculateToModelTransforms(Model);
+        CalculateSkinningMatrices(Model);
     }
-    
-    CalculateToModelTransforms(Model);
-    CalculateSkinningMatrices(Model);
     
     m44 ModelToWorld = TranslationMatrix(P);
     
@@ -208,6 +222,7 @@ void RenderModel(model* Model,
                     MeshTran = ModelToWorld;
                 }
                 
+#if 0                
                 PushInstanceMesh(1000, 
                                  Mesh,
                                  Model->Materials[Mesh->MaterialIndexInModel],
@@ -215,7 +230,20 @@ void RenderModel(model* Model,
                                  V3(1.0f),
                                  SkinningMatrices,
                                  SkinningMatricesCount);
+#endif
+                material* Material = Model->Materials[Mesh->MaterialIndexInModel];
                 
+                if(Mesh->IsSkinned)
+                {
+                    PushMesh(Mesh, Material, MeshTran,
+                             V3(1.0f),
+                             SkinningMatrices,
+                             SkinningMatricesCount);
+                }
+                else
+                {
+                    PushMesh(Mesh, Material, MeshTran);
+                }
             }
         }
     }

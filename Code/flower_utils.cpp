@@ -7,6 +7,7 @@ struct helper_byte_buffer
 {
     void* Data;
     mi DataSize;
+    b32 UsedCustomAllocator;
     
     std::unordered_map<std::string, mi> NameToOffset;
     std::unordered_map<std::string, int> NameToCount;
@@ -15,6 +16,7 @@ struct helper_byte_buffer
     {
         Data = 0;
         DataSize = 0;
+        UsedCustomAllocator = false;
     }
     
     u32 AddPlace(std::string Name, 
@@ -37,18 +39,30 @@ struct helper_byte_buffer
         return(Offset);
     }
     
-    void Generate()
+    void Generate(void* CustomPlace = 0)
     {
-        Data = malloc(DataSize);
+        if(CustomPlace != 0)
+        {
+            UsedCustomAllocator = true;
+            
+            Data = CustomPlace;
+        }
+        else
+        {
+            Data = malloc(DataSize);
+        }
     }
     
     void Free()
     {
-        if(Data != 0)
+        if(!UsedCustomAllocator)
         {
-            free(Data);
+            if(Data != 0)
+            {
+                free(Data);
+            }
+            Data = 0;
         }
-        Data = 0;
     }
     
     void* GetPlace(std::string GetName)

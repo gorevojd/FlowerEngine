@@ -79,7 +79,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer, int FontSize)
 {
     font Result = {};
     
-    Result.Size = FontSize;
+    Result.PixelsPerMeter = FontSize;
     
     stbtt_fontinfo StbFont;
     stbtt_InitFont(&StbFont, Buffer, 0);
@@ -278,6 +278,7 @@ INTERNAL_FUNCTION mesh MakeMesh(const helper_mesh& HelperMesh)
     Result.FreeSize = Help.DataSize;
     Result.VertexCount = HelperMesh.Vertices.size();
     Result.IsSkinned = HelperMesh.IsSkinned;
+    Result.PremultipliedTransform = false;
     
     // NOTE(Dima): Allocating indices
     Result.Indices = (u32*)Help.GetPlace("Indices");;

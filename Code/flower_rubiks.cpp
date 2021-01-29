@@ -1187,7 +1187,13 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             
             m44_4x FinalTransform = Transform * AppliedRotation * OffsetMatrix4x;
             
-            M44_4X_Store((f32*)&Vis->FinalTransform[VisibleIndex], FinalTransform);
+            
+            M44_4X_Store(FinalTransform, 
+                         Vis->FinalTransform[VisibleIndex],
+                         Vis->FinalTransform[VisibleIndex + 1],
+                         Vis->FinalTransform[VisibleIndex + 2],
+                         Vis->FinalTransform[VisibleIndex + 3]);
+            
         }
     }
 #endif
@@ -1211,13 +1217,11 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
                         
                         v3 NumP = Vis->InitP[VisibleCubie];
                         
-                        PrintText3D(Global_UI->Params.Font,
-                                    Buf,
-                                    V3_Left(), V3_Up(),
+                        PrintText3D(Buf,
                                     P + NumP,
-                                    ColorRed(),
+                                    V3_Left(), V3_Up(),
                                     0.3f, 
-                                    false);
+                                    ColorRed());
                     }
                 }
             }
@@ -1246,7 +1250,6 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             PushMesh(Mesh, 0, Vis->FinalTransform[VisibleIndex]);
 #endif
         }
-        
     }
 }
 

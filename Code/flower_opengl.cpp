@@ -207,6 +207,7 @@ INTERNAL_FUNCTION opengl_shader OpenGLLoadShader(char* ShaderName,
     OPENGL_LOAD_ATTRIB(BoneIDs);
     
     // NOTE(Dima): Loading uniforms
+    OPENGL_LOAD_UNIFORM(ViewProjection);
     OPENGL_LOAD_UNIFORM(Projection);
     OPENGL_LOAD_UNIFORM(View);
     OPENGL_LOAD_UNIFORM(Model);
@@ -215,6 +216,7 @@ INTERNAL_FUNCTION opengl_shader OpenGLLoadShader(char* ShaderName,
     OPENGL_LOAD_UNIFORM(MeshIsSkinned);
     OPENGL_LOAD_UNIFORM(InstanceModelMatrices);
     OPENGL_LOAD_UNIFORM(UseInstancing);
+    OPENGL_LOAD_UNIFORM(PremultipliedTransform);
     
     OPENGL_LOAD_UNIFORM(MultColor);
     OPENGL_LOAD_UNIFORM(TexDiffuse);
@@ -231,6 +233,7 @@ INTERNAL_FUNCTION opengl_shader OpenGLLoadShader(char* ShaderName,
     OPENGL_LOAD_UNIFORM(RectsIndicesToTransforms);
     OPENGL_LOAD_UNIFORM(RectOrthoMatrixIndex);
     OPENGL_LOAD_UNIFORM(RectPerspMatrixIndex);
+    
     
     return(Result);
 }
@@ -482,6 +485,16 @@ INTERNAL_FUNCTION mesh_handles OpenGLAllocateMesh(mesh* Mesh, opengl_shader* Sha
     return(Result);
 }
 
+INTERNAL_FUNCTION void OpenGLFreeMesh(mesh* Mesh)
+{
+    if(Mesh)
+    {
+        glDeleteBuffers(1, (const GLuint*)&Mesh->ApiHandles.ElementBufferObject);
+        glDeleteBuffers(1, (const GLuint*)&Mesh->ApiHandles.BufferObject);
+        glDeleteVertexArrays(1, (const GLuint*)&Mesh->ApiHandles.ArrayObject);
+    }
+}
+
 INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
                                         mesh* Mesh,
                                         material* Material,
@@ -505,41 +518,51 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
     
     glUseProgram(OpenGL.StdShader.ID);
     
-    glUniform3f(Shader->MultColorLoc, Color.r, Color.g, Color.b);
+    m44 ViewProjection = *View * *Projection;
+    glUniformMatrix4fv(Shader->ViewProjectionLoc, 1, GL_TRUE, ViewProjection.e);
     glUniformMatrix4fv(Shader->ProjectionLoc, 1, GL_TRUE, Projection->e);
     glUniformMatrix4fv(Shader->ViewLoc, 1, GL_TRUE, View->e);
     glUniformMatrix4fv(Shader->ModelLoc, 1, GL_TRUE, InstanceModelTransforms[0].e);
+    glUniform3f(Shader->MultColorLoc, Color.r, Color.g, Color.b);
     
-    b32 MaterialMissing = true;
-    b32 DiffuseWasSet = false;
-    
+    glUniform1i(Shader->PremultipliedTransformLoc, Mesh->PremultipliedTransform);
     glUniform1i(Shader->UseInstancingLoc, UseInstancing);
     
+    // NOTE(Dima): Uniform skinning matrices
+    GLuint SkinningMatricesBO;
+    GLuint SkinningMatricesTBO;
+    if(Mesh->IsSkinned)
+    {
+        
+        OpenGLCreateAndBindTextureBuffer(&SkinningMatricesBO,
+                                         &SkinningMatricesTBO,
+                                         sizeof(m44) * NumInstanceSkMat * MeshInstanceCount,
+                                         SkinningMatrices,
+                                         GL_RGBA32F,
+                                         1, 
+                                         Shader->SkinningMatricesLoc);
+    }
+    glUniform1i(Shader->SkinningMatricesCountLoc, NumInstanceSkMat);
+    glUniform1i(Shader->MeshIsSkinnedLoc, Mesh->IsSkinned);
+    
+    // NOTE(Dima): Instancing
     GLuint InstanceModelBO;
     GLuint InstanceModelTBO;
     if(UseInstancing)
     {
-        
         // NOTE(Dima): Uniform instance model matrices
         OpenGLCreateAndBindTextureBuffer(&InstanceModelBO,
                                          &InstanceModelTBO,
                                          sizeof(m44) * MeshInstanceCount,
                                          InstanceModelTransforms,
                                          GL_RGBA32F,
-                                         1, Shader->InstanceModelMatricesLoc);
+                                         2, 
+                                         Shader->InstanceModelMatricesLoc);
     }
     
-    // NOTE(Dima): Uniform skinning matrices
-    GLuint SkinningMatricesBO;
-    GLuint SkinningMatricesTBO;
-    OpenGLCreateAndBindTextureBuffer(&SkinningMatricesBO,
-                                     &SkinningMatricesTBO,
-                                     sizeof(m44) * NumInstanceSkMat * MeshInstanceCount,
-                                     SkinningMatrices,
-                                     GL_RGBA32F,
-                                     0, Shader->SkinningMatricesLoc);
-    glUniform1i(Shader->SkinningMatricesCountLoc, NumInstanceSkMat);
-    glUniform1i(Shader->MeshIsSkinnedLoc, Mesh->IsSkinned);
+    // NOTE(Dima): Setting material
+    b32 MaterialMissing = true;
+    b32 DiffuseWasSet = false;
     
     if(Material != 0)
     {
@@ -550,8 +573,8 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
             DiffuseWasSet = true;
             
             OpenGLInitImage(Material->Diffuse);
-            glUniform1i(Shader->TexDiffuseLoc, 1);
-            glActiveTexture(GL_TEXTURE1);
+            glUniform1i(Shader->TexDiffuseLoc, 0);
+            glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, Material->Diffuse->ApiHandle);
         }
     }
@@ -559,6 +582,7 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
     glUniform1i(Shader->MaterialMissingLoc, MaterialMissing);
     glUniform1i(Shader->HasDiffuseLoc, DiffuseWasSet);
     
+    // NOTE(Dima): Rendering
     if(UseInstancing)
     {
         glDrawElementsInstanced(GL_TRIANGLES, Mesh->IndexCount, GL_UNSIGNED_INT, 0, 
@@ -574,8 +598,16 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     
-    OpenGLFreeTextureBuffer(&SkinningMatricesBO,
-                            &SkinningMatricesTBO);
+    if(Mesh->PremultipliedTransform)
+    {
+        OpenGLFreeMesh(Mesh);
+    }
+    
+    if(Mesh->IsSkinned)
+    {
+        OpenGLFreeTextureBuffer(&SkinningMatricesBO,
+                                &SkinningMatricesTBO);
+    }
     
     if(UseInstancing)
     {

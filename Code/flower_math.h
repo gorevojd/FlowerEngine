@@ -662,7 +662,29 @@ inline m44 Mul(const m44& A, const m44& B)
     return(Res);
 }
 
-inline v4 Mul(v4 V, const m44& M) 
+inline v3 MulPoint(v3 V, const m44& M)
+{
+    v3 Result;
+    
+    Result.e[0] = V.e[0] * M.e[0] + V.e[1] * M.e[4] + V.e[2] * M.e[8] + M.e[12];
+    Result.e[1] = V.e[0] * M.e[1] + V.e[1] * M.e[5] + V.e[2] * M.e[9] + M.e[13];
+    Result.e[2] = V.e[0] * M.e[2] + V.e[1] * M.e[6] + V.e[2] * M.e[10] + M.e[14];
+    
+    return(Result);
+}
+
+inline v3 MulDirection(v3 V, const m44& M)
+{
+    v3 Result;
+    
+    Result.e[0] = V.e[0] * M.e[0] + V.e[1] * M.e[4] + V.e[2] * M.e[8];
+    Result.e[1] = V.e[0] * M.e[1] + V.e[1] * M.e[5] + V.e[2] * M.e[9];
+    Result.e[2] = V.e[0] * M.e[2] + V.e[1] * M.e[6] + V.e[2] * M.e[10];
+    
+    return(Result);
+}
+
+inline v4 operator*(v4 V, const m44& M)
 {
     v4 Result;
     
@@ -670,6 +692,13 @@ inline v4 Mul(v4 V, const m44& M)
     Result.e[1] = V.e[0] * M.e[1] + V.e[1] * M.e[5] + V.e[2] * M.e[9] + V.e[3] * M.e[13];
     Result.e[2] = V.e[0] * M.e[2] + V.e[1] * M.e[6] + V.e[2] * M.e[10] + V.e[3] * M.e[14];
     Result.e[3] = V.e[0] * M.e[3] + V.e[1] * M.e[7] + V.e[2] * M.e[11] + V.e[3] * M.e[15];
+    
+    return(Result);
+}
+
+inline v4 Mul(v4 V, const m44& M) 
+{
+    v4 Result = V * M;
     
     return(Result);
 }
