@@ -261,7 +261,33 @@ INTERNAL_FUNCTION inline controller* AddController(u32 Type)
     return(Result);
 }
 
-INTERNAL_FUNCTION inline void AddGamepadController(int PadIndex, char* Name)
+key_state* GetKeyOnController(controller* Controller, u32 Key)
+{
+    key_state* Result = 0;
+    
+    switch(Controller->Type)
+    {
+        case Controller_Keyboard:
+        {
+            Result = &Global_Input->Keyboard.KeyStates[Key];
+        } break;
+        
+        case Controller_Gamepad:
+        {
+            gamepad_controller* Pad = &Global_Input->Gamepads[Controller->GamepadIndex];
+            if(Pad->Connected)
+            {
+                gamepad_key* PadBut = &Pad->Keys[Key];
+                Result = &PadBut->PressState;
+            }
+            
+        } break;
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void AddGamepadController(int PadIndex, char* Name)
 {
     controller* NewControl = AddController(Controller_Gamepad);
     NewControl->GamepadIndex = PadIndex;
@@ -278,15 +304,9 @@ INTERNAL_FUNCTION inline void AddGamepadController(int PadIndex, char* Name)
     AssignKeyOnButton(NewControl, GamepadKey_DpadRight, Button_Right);
 }
 
-INTERNAL_FUNCTION inline void DisconnectGamepadController(int PadIndex)
-{
-    gamepad_controller* Pad = &Global_Input->Gamepads[PadIndex];
-    
-    Pad->Connected = false;
-}
 
 // NOTE(Dima): Returns index of returned gamepad or -1 if failed
-INTERNAL_FUNCTION int TryAddGamepadController(char* Name)
+int TryAddGamepadController(char* Name)
 {
     int Result = -1;
     
@@ -309,35 +329,17 @@ INTERNAL_FUNCTION int TryAddGamepadController(char* Name)
     return(Result);
 }
 
+
+INTERNAL_FUNCTION inline void DisconnectGamepadController(int PadIndex)
+{
+    gamepad_controller* Pad = &Global_Input->Gamepads[PadIndex];
+    
+    Pad->Connected = false;
+}
+
 INTERNAL_FUNCTION inline controller* AddKeyboardController()
 {
     controller* Result = AddController(Controller_Keyboard);
-    
-    return(Result);
-}
-
-INTERNAL_FUNCTION inline key_state* GetKeyOnController(controller* Controller, u32 Key)
-{
-    key_state* Result = 0;
-    
-    switch(Controller->Type)
-    {
-        case Controller_Keyboard:
-        {
-            Result = &Global_Input->Keyboard.KeyStates[Key];
-        } break;
-        
-        case Controller_Gamepad:
-        {
-            gamepad_controller* Pad = &Global_Input->Gamepads[Controller->GamepadIndex];
-            if(Pad->Connected)
-            {
-                gamepad_key* PadBut = &Pad->Keys[Key];
-                Result = &PadBut->PressState;
-            }
-            
-        } break;
-    }
     
     return(Result);
 }

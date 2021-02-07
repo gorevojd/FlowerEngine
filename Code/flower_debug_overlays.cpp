@@ -34,7 +34,6 @@ INTERNAL_FUNCTION void ShowFramesSlider()
     // NOTE(Dima): Showing graphs
     if (Button("REC"))
     {
-        Global_Debug->IsRecording = !Global_Debug->IsRecording;
         Global_Debug->RecordingChangeRequested = true;
     }
     

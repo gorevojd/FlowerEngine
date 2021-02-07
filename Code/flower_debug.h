@@ -146,6 +146,7 @@ struct debug_state{
     
     b32 IsRecording;
     b32 RecordingChangeRequested;
+    b32 SkipToNextFrameBarrier;
     u32 Filter;
     
     debug_profiled_tree_node TreeNodeFree;

@@ -141,7 +141,8 @@ INTERNAL_FUNCTION helper_mesh CombineHelperMeshes(const helper_mesh* A, const he
     return(Result);
 }
 
-INTERNAL_FUNCTION image AllocateImageInternal(u32 Width, u32 Height, void* PixData)
+INTERNAL_FUNCTION image AllocateImageInternal(u32 Width, u32 Height, 
+                                              void* PixData, u32 Format)
 {
     image Result = {};
     
@@ -149,8 +150,56 @@ INTERNAL_FUNCTION image AllocateImageInternal(u32 Width, u32 Height, void* PixDa
 	Result.Height = Height;
     
 	Result.WidthOverHeight = (float)Width / (float)Height;
+    Result.Format = Format;
     
 	Result.Pixels = PixData;
     
 	return(Result);
+}
+
+INTERNAL_FUNCTION image AllocateImageInternal(u32 Width, u32 Height, 
+                                              u32 Format,
+                                              b32 PremultiplyAlpha = false)
+{
+    mi DataSize = Width * Height * ImageFormatPixelSizes[Format];
+    void* Data = malloc(DataSize);
+    memset(Data, 0, DataSize);
+    
+    image Result = AllocateImageInternal(Width, Height, Data, Format);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline v4 GetPixelColor(image* Image, int x, int y)
+{
+    Assert(x < Image->Width);
+    Assert(y < Image->Height);
+    
+    u32* At = (u32*)Image->Pixels + y * Image->Width + x;
+    
+    v4 Result = UnpackRGBA(*At);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void CopyImage(image* Dst,
+                                 image* Src)
+{
+    Assert(Dst->Format == Src->Format);
+    Assert(Dst->Width == Src->Width);
+    Assert(Dst->Height == Src->Height);
+    
+    void* DstData = Dst->Pixels;
+    mi DstDataSize = Dst->Width * Dst->Height * ImageFormatPixelSizes[Dst->Format];
+    
+    memcpy(DstData, Src->Pixels, DstDataSize);
+    
+    *Dst = *Src;
+    
+    Dst->Pixels = DstData;
+}
+
+INTERNAL_FUNCTION inline void InvalidateImage(image* Image)
+{
+    Image->Invalidated = true;
 }

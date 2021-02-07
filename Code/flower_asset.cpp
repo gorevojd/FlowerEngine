@@ -2,49 +2,60 @@
 
 INTERNAL_FUNCTION void AddGlyphToAtlas(font* Font, int GlyphIndex)
 {
-    image* Src = &Font->GlyphImages[GlyphIndex];
     image* Dst = &Global_Assets->FontsAtlas;
     
     glyph* Glyph = &Font->Glyphs[GlyphIndex];
     
-    int SrcW = Src->Width;
-    int SrcH = Src->Height;
-    
     int DstSize = Global_Assets->FontsAtlas.Width;
-    
-    int DstPx = std::ceil(Global_Assets->FontAtlasAtP.x);
-    int DstPy = std::ceil(Global_Assets->FontAtlasAtP.y);
-    
-    if(DstPx + SrcW >= DstSize)
-    {
-        DstPx = 0;
-        DstPy = Global_Assets->FontAtlasMaxRowY;
-    }
-    
-    Assert(DstPy + SrcH < DstSize);
-    
     f32 OneOverSize = 1.0f / DstSize;
     
-    Glyph->MinUV = V2(DstPx, DstPy) * OneOverSize;
-    Glyph->MaxUV = V2(DstPx + SrcW, DstPy + SrcH) * OneOverSize;
-    
-    for(int y = 0; y < SrcH; y++)
+    for(int StyleIndex = 0; 
+        StyleIndex < FontStyle_Count;
+        StyleIndex++)
     {
-        for(int x = 0; x < SrcW; x++)
+        glyph_style* Style = &Glyph->Styles[StyleIndex];
+        
+        // NOTE(Dima): Getting image 
+        int ImageIndex = Style->ImageIndex;
+        if(ImageIndex != -1)
         {
-            int DstPixelY = DstPy + y;
-            int DstPixelX = DstPx + x;
+            image* Src = &Font->GlyphImages[ImageIndex];
+            int SrcW = Src->Width;
+            int SrcH = Src->Height;
             
-            u32* DstPixel = (u32*)Dst->Pixels + DstPixelY * DstSize + DstPixelX;
-            u32* SrcPixel = (u32*)Src->Pixels + y * SrcW + x;
+            int DstPx = std::ceil(Global_Assets->FontAtlasAtP.x);
+            int DstPy = std::ceil(Global_Assets->FontAtlasAtP.y);
             
-            *DstPixel = *SrcPixel;
+            Style->MinUV = V2(DstPx, DstPy) * OneOverSize;
+            Style->MaxUV = V2(DstPx + SrcW, DstPy + SrcH) * OneOverSize;
+            
+            if(DstPx + SrcW >= DstSize)
+            {
+                DstPx = 0;
+                DstPy = Global_Assets->FontAtlasMaxRowY;
+            }
+            
+            Assert(DstPy + SrcH < DstSize);
+            
+            // NOTE(Dima): Copy pixels
+            for(int y = 0; y < SrcH; y++)
+            {
+                for(int x = 0; x < SrcW; x++)
+                {
+                    int DstPixelY = DstPy + y;
+                    int DstPixelX = DstPx + x;
+                    
+                    u32* DstPixel = (u32*)Dst->Pixels + DstPixelY * DstSize + DstPixelX;
+                    u32* SrcPixel = (u32*)Src->Pixels + y * SrcW + x;
+                    
+                    *DstPixel = *SrcPixel;
+                }
+            }
+            
+            Global_Assets->FontAtlasAtP = V2(DstPx + SrcW, DstPy);
+            Global_Assets->FontAtlasMaxRowY = std::max(Global_Assets->FontAtlasMaxRowY, DstPy + SrcH);
         }
     }
-    
-    Global_Assets->FontAtlasAtP = V2(DstPx + SrcW, DstPy);
-    Global_Assets->FontAtlasMaxRowY = std::max(Global_Assets->FontAtlasMaxRowY,
-                                               DstPy + SrcH);
 }
 
 INTERNAL_FUNCTION void AddFontToAtlas(font* Font)
@@ -223,7 +234,8 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     void* FontsAtlasMem = calloc(FontAtlasSize * FontAtlasSize * sizeof(u32), 1);
     Global_Assets->FontsAtlas = AllocateImageInternal(FontAtlasSize,
                                                       FontAtlasSize,
-                                                      FontsAtlasMem);
+                                                      FontsAtlasMem,
+                                                      ImageFormat_RGBA);
     
 #if 0    
     Assert(ArrayCount(Global_AssetTypeSize) == Asset_Count);
@@ -314,10 +326,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     
 #if 1
+    
+#if 0
     // NOTE(Dima): Loading fonts
     A->TimesNewRoman = LoadFontFile("C:/Windows/Fonts/times.ttf");
     A->LifeIsGoofy = LoadFontFile("../Data/Fonts/Life is goofy.ttf");
     A->Arial = LoadFontFile("c:/windows/fonts/arial.ttf");
+#endif
     
     loading_params BerlinSansParams = DefaultLoadingParams();
     BerlinSansParams.Font_PixelHeight = 60;
@@ -327,9 +342,11 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     LibMonoParams.Font_PixelHeight = 24;
     A->LiberationMono = LoadFontFile("../Data/Fonts/liberation-mono.ttf", LibMonoParams);
     
+#if 0    
     AddFontToAtlas(&A->TimesNewRoman);
     AddFontToAtlas(&A->LifeIsGoofy);
     AddFontToAtlas(&A->Arial);
+#endif
     AddFontToAtlas(&A->BerlinSans);
     AddFontToAtlas(&A->LiberationMono);
     
@@ -344,8 +361,10 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     A->Mouse = LoadImageFile("E:/Media/Photos/Internet/Images/Mouse.png");
     A->Cheese = LoadImageFile("E:/Media/Photos/Internet/Images/Cheese.png");
+    A->Scenery = LoadImageFile("E:/Media/Photos/Internet/lake_mountains.jpg", CoinParams);
+    A->MultiCore = LoadImageFile("E:/Development/Other/Recording/Tutorials/LetsMakeEngine/EP13_Optimization/Materials/MultiThread/MT_6.png");
     
-    A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");;
+    A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");
     A->PlaneTexture = LoadImageFile("E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png");
     loading_params PaletteParams = DefaultLoadingParams();
     PaletteParams.Image_FilteringIsClosest = true;
@@ -426,8 +445,4 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Supra.Materials[0] = &A->PaletteMaterial;
 #endif
     
-    AddFontToAtlas(&A->TimesNewRoman);
-    AddFontToAtlas(&A->LifeIsGoofy);
-    AddFontToAtlas(&A->Arial);
-    AddFontToAtlas(&A->BerlinSans);
 }

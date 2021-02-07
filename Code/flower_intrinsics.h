@@ -2,114 +2,144 @@
 #define FLOWER_INTRINSICS_H
 
 #include <intrin.h>
+#include <math.h>
 
-inline float Sqrt(float Value)
+inline float Sqrt(f32 Value)
 {
-	float Result = _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(Value)));
+	f32 Result = _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(Value)));
     
 	return(Result);
 }
 
-inline float RSqrt(float Value)
+inline f32 RSqrt(f32 Value)
 {
-	float Result = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(Value)));
+	f32 Result = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(Value)));
     
 	return(Result);
 }
 
-inline float MinFloat(float A, float B)
+inline f32 MinFloat(f32 A, f32 B)
 {
     __m128 mmA = _mm_set_ss(A);
     __m128 mmB = _mm_set_ss(B);
     
-    float Result = _mm_cvtss_f32(_mm_min_ss(mmA, mmB));
+    f32 Result = _mm_cvtss_f32(_mm_min_ss(mmA, mmB));
     
     return(Result);
 }
 
-inline float MaxFloat(float A, float B)
+inline f32 MaxFloat(f32 A, f32 B)
 {
     __m128 mmA = _mm_set_ss(A);
     __m128 mmB = _mm_set_ss(B);
     
-    float Result = _mm_cvtss_f32(_mm_max_ss(mmA, mmB));
+    f32 Result = _mm_cvtss_f32(_mm_max_ss(mmA, mmB));
     
     return(Result);
 }
 
-inline float Floor(float Value)
+inline f32 ClampFloat(f32 Value, f32 MinValue, f32 MaxValue)
 {
-	float Result = floorf(Value);
+    __m128 mmV = _mm_set_ss(Value);
+    __m128 mmMin = _mm_set_ss(MinValue);
+    __m128 mmMax = _mm_set_ss(MaxValue);
+    
+    f32 Result = _mm_cvtss_f32(_mm_min_ss(mmMax, _mm_max_ss(mmV, mmMin)));
+    
+    return(Result);
+}
+
+inline f32 Clamp01Float(f32 Value)
+{
+    f32 Result = _mm_cvtss_f32(_mm_max_ss(_mm_min_ss(_mm_set_ss(1.0f), _mm_set_ss(Value)), _mm_set_ss(0.0f)));
+    
+    return(Result);
+}
+
+inline f32 SmoothstepFloat(f32 t)
+{
+    __m128 mmX = _mm_set_ss(t);
+    
+    __m128 mmRes = _mm_mul_ss(_mm_mul_ss(mmX, mmX), _mm_sub_ss(_mm_set_ss(3.0f), _mm_mul_ss(_mm_set_ss(2.0f), mmX)));
+    
+    f32 Result = _mm_cvtss_f32(mmRes);
+    
+    return(Result);
+}
+
+inline f32 Floor(f32 Value)
+{
+	f32 Result = floorf(Value);
 	return(Result);
 }
 
-inline float Ceil(float Value)
+inline f32 Ceil(f32 Value)
 {
-	float Result = ceilf(Value);
+	f32 Result = ceilf(Value);
 	return(Result);
 }
 
-inline float Sin(float Rad)
+inline f32 Sin(f32 Rad)
 {
-	float Result = sinf(Rad);
+	f32 Result = sinf(Rad);
 	return(Result);
 }
 
-inline float Cos(float Rad)
+inline f32 Cos(f32 Rad)
 {
-	float Result = cosf(Rad);
+	f32 Result = cosf(Rad);
 	return(Result);
 }
 
-inline float Tan(float Rad)
+inline f32 Tan(f32 Rad)
 {
-	float Result = tanf(Rad);
+	f32 Result = tanf(Rad);
 	return(Result);
 }
 
-inline float ASin(float Value)
+inline f32 ASin(f32 Value)
 {
-	float Result = asinf(Value);
+	f32 Result = asinf(Value);
 	return(Result);
 }
 
-inline float ACos(float Value) 
+inline f32 ACos(f32 Value) 
 {
-	float Result = acosf(Value);
+	f32 Result = acosf(Value);
 	return(Result);
 }
 
-inline float ATan(float Value)
+inline f32 ATan(f32 Value)
 {
-	float Result = atan(Value);
+	f32 Result = atan(Value);
 	return(Result);
 }
 
-inline float ATan2(float Y, float X) 
+inline f32 ATan2(f32 Y, f32 X) 
 {
-	float Result = atan2f(Y, X);
+	f32 Result = atan2f(Y, X);
 	return(Result);
 }
 
-inline float Exp(float Value)
+inline f32 Exp(f32 Value)
 {
-	float Result = expf(Value);
+	f32 Result = expf(Value);
 	return(Result);
 }
 
-inline float Log(float Value)
+inline f32 Log(f32 Value)
 {
-	float Result = logf(Value);
+	f32 Result = logf(Value);
 	return(Result);
 }
 
-inline float Pow(float a, float b)
+inline f32 Pow(f32 a, f32 b)
 {
-	float Result = powf(a, b);
+	f32 Result = powf(a, b);
 	return(Result);
 }
 
-inline float Lerp(float a, float b, float t)
+inline f32 Lerp(f32 a, f32 b, f32 t)
 {
     __m128 mmT = _mm_set_ss(t);
     __m128 mmA = _mm_set_ss(a);
@@ -117,7 +147,7 @@ inline float Lerp(float a, float b, float t)
     
     __m128 RightPart = _mm_mul_ss(_mm_sub_ss(mmB, mmA), mmT);
     
-	float Result = _mm_cvtss_f32(_mm_add_ss(mmA, RightPart));;
+	f32 Result = _mm_cvtss_f32(_mm_add_ss(mmA, RightPart));;
     
 	return(Result);
 }

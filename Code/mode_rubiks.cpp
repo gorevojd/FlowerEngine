@@ -13,7 +13,7 @@ SCENE_INIT(RubiksCube)
     
     InitCamera(&State->Camera, Camera_RotateAround);
     
-    State->Cube3 = CreateCube(Scene->Arena, 100, 1.0f, true);
+    State->Cube3 = CreateCube(Scene->Arena, 70, 1.0f, false);
 }
 
 SCENE_UPDATE(RubiksCube)
@@ -80,22 +80,22 @@ SCENE_UPDATE(RubiksCube)
     }
     
     // NOTE(Dima): CenterTests
-    if(GetKeyDown(Key_I))
+    if(GetKeyDown(Key_I) && Cube->Dim >= 3)
     {
-        AddCommandToCube(Cube, RubiksAxis_X, Cube->Dim / 2, !ShiftIsPressed);
+        AddCommandToCube(Cube, RubiksAxis_X, 1, Cube->Dim - 2, !ShiftIsPressed);
     }
     
-    if(GetKeyDown(Key_O))
+    if(GetKeyDown(Key_O) && Cube->Dim >= 3)
     {
-        AddCommandToCube(Cube, RubiksAxis_Y, Cube->Dim / 2, !ShiftIsPressed);
+        AddCommandToCube(Cube, RubiksAxis_Y, 1, Cube->Dim - 2, !ShiftIsPressed);
     }
     
-    if(GetKeyDown(Key_P))
+    if(GetKeyDown(Key_P) && Cube->Dim >= 3)
     {
-        AddCommandToCube(Cube, RubiksAxis_Z, Cube->Dim / 2, !ShiftIsPressed);
+        AddCommandToCube(Cube, RubiksAxis_Z, 1, Cube->Dim - 2, !ShiftIsPressed);
     }
     
-    UpdateCube(&State->Cube3, V3(0.0f), 2.0f);
+    UpdateCube(&State->Cube3, V3(0.0f), 1.0f);
     //UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
     
     
@@ -105,6 +105,10 @@ SCENE_UPDATE(RubiksCube)
                 V3_Up() * 1.5f,
                 0.25f,
                 ColorRed());
+#endif
+    
+#if 0    
+    PushImage(&Global_Assets->FontsAtlas, V2(0.0f), 1300);
 #endif
     
     SetMatrices(GetViewMatrix(&State->Camera));

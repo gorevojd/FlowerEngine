@@ -16,15 +16,40 @@
 #include <iostream>
 
 #include <SDL.h>
-#include <vector>
-#include <algorithm>
 
 #include "flower_defines.h"
-
+#include "flower_platform.h"
 #include "flower.h"
 
-#include "flower.cpp"
 #include "flower_standard.cpp"
+
+platform_api Platform;
+
+#if !defined(PLATFORM_IS_WINDOWS)
+#include "flower.cpp"
+#else
+
+GLOBAL_VARIABLE input_system* Global_Input;
+GLOBAL_VARIABLE time* Global_Time;
+GLOBAL_VARIABLE debug_global_table* Global_DebugTable;
+
+#include <Windows.h>
+
+#define STB_SPRINTF_IMPLEMENTATION
+#include "stb_sprintf.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#define STB_RECT_PACK_IMPLEMENTATION
+#include "stb_rect_pack.h"
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
+#include "flower_input.cpp"
+
+#endif
 
 struct app_state
 {
@@ -39,15 +64,22 @@ struct app_state
     f32 GamepadsCheckCounter;
     
     SDL_GLContext OpenGLContext;
+    
+#if defined(PLATFORM_IS_WINDOWS)
+    char GameDllFullPath[256];
+    char TempDllFullPath[256];
+    
+    FILETIME LastGameDllWriteTime;
+    
+    HINSTANCE TempDllHandle;
+#endif
+    game_update_and_render* GameUpdateAndRender;
+    game_init* GameInit;
 };
 
 GLOBAL_VARIABLE app_state* App;
 
 #include "flower_opengl.cpp"
-
-GLOBAL_VARIABLE memory_arena GlobalArena;
-
-platform_api Platform;
 
 // NOTE(Dima): Memory block functions
 PLATFORM_ALLOCATE_BLOCK(AppAllocBlock)
@@ -83,6 +115,21 @@ INTERNAL_FUNCTION inline  PLATFORM_GET_THREAD_ID(SDLGetThreadID)
     return(ThreadID);
 }
 
+// NOTE(Dima): Performance counters functions
+INTERNAL_FUNCTION inline PLATFORM_GET_PERFORMANCE_COUNTER(SDLGetPerfCounter)
+{
+    u64 Result = SDL_GetPerformanceCounter();
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline PLATFORM_GET_ELAPSED_TIME(SDLGetElapsedTime)
+{
+    f64 Result = ((f64)ClocksEnd - (f64)ClocksBegin) * Platform.OneOverPerfFrequency;
+    
+    return(Result);
+}
+
 INTERNAL_FUNCTION void SetFullscreen(b32 Fullscreen)
 {
     u32 Flags = 0;
@@ -109,28 +156,28 @@ INTERNAL_FUNCTION inline void ProcessKeyState(key_state* Key, b32 TransitionHapp
     }
 }
 
-INTERNAL_FUNCTION inline void PreProcessKeyState(input_system* Input, key_state* Key)
+INTERNAL_FUNCTION inline void PreProcessKeyState(key_state* Key)
 {
     Key->TransitionHappened = false;
-    Key->InTransitionTime += Global_Time->DeltaTime;
+    Key->InTransitionTime += Global_Input->DeltaTime;
 }
 
-INTERNAL_FUNCTION void PreProcessInput(input_system* Input)
+INTERNAL_FUNCTION void PreProcessInput()
 {
-    Input->MouseScroll = 0.0f;
+    Global_Input->MouseScroll = 0.0f;
     
     // NOTE(Dima): Preprocess keyboard
-    keyboard_controller* Keyboard = &Input->Keyboard;
+    keyboard_controller* Keyboard = &Global_Input->Keyboard;
     
     for(int KeyIndex = 0; KeyIndex < Key_Count; KeyIndex++)
     {
-        PreProcessKeyState(Input, &Keyboard->KeyStates[KeyIndex]);
+        PreProcessKeyState(&Keyboard->KeyStates[KeyIndex]);
     }
     
     // NOTE(Dima): Preprocess gamepads
     for(int GamepadIndex = 0; GamepadIndex < MAX_GAMEPADS; GamepadIndex++)
     {
-        gamepad_controller* Gamepad = &Input->Gamepads[GamepadIndex];
+        gamepad_controller* Gamepad = &Global_Input->Gamepads[GamepadIndex];
         
         if(Gamepad->Connected)
         {
@@ -138,30 +185,30 @@ INTERNAL_FUNCTION void PreProcessInput(input_system* Input)
                 KeyIndex < GamepadKey_Count; 
                 KeyIndex++)
             {
-                PreProcessKeyState(Input, &Gamepad->Keys[KeyIndex].PressState);
+                PreProcessKeyState(&Gamepad->Keys[KeyIndex].PressState);
             }
         }
     }
     
     // NOTE(Dima): Preprocess virtual buttons
     for(int ControlIndex = 0; 
-        ControlIndex < Input->ControllerCount; 
+        ControlIndex < Global_Input->ControllerCount; 
         ControlIndex++)
     {
-        controller* Control = &Input->Controllers[ControlIndex];
+        controller* Control = &Global_Input->Controllers[ControlIndex];
         
         for(int ButtonIndex = 0;
             ButtonIndex < Button_Count;
             ButtonIndex++)
         {
-            PreProcessKeyState(Input, &Control->Buttons[ButtonIndex].PressState);
+            PreProcessKeyState(&Control->Buttons[ButtonIndex].PressState);
         }
     }
 }
 
-INTERNAL_FUNCTION void ProcessMouseButtonEvents(input_system* Input, SDL_MouseButtonEvent* MouseButEvent)
+INTERNAL_FUNCTION void ProcessMouseButtonEvents(SDL_MouseButtonEvent* MouseButEvent)
 {
-    keyboard_controller* Keyboard = &Input->Keyboard;
+    keyboard_controller* Keyboard = &Global_Input->Keyboard;
     
     key_state* ProcessKey = 0;
     switch(MouseButEvent->button)
@@ -201,9 +248,9 @@ INTERNAL_FUNCTION void ProcessMouseButtonEvents(input_system* Input, SDL_MouseBu
     }
 }
 
-INTERNAL_FUNCTION void ProcessKeyboardEvents(input_system* Input, SDL_KeyboardEvent* KeyEvent)
+INTERNAL_FUNCTION void ProcessKeyboardEvents(SDL_KeyboardEvent* KeyEvent)
 {
-    keyboard_controller* Keyboard = &Input->Keyboard;
+    keyboard_controller* Keyboard = &Global_Input->Keyboard;
     
     SDL_Keysym Keysym = KeyEvent->keysym;
     
@@ -518,14 +565,12 @@ INTERNAL_FUNCTION void ProcessKeyboardEvents(input_system* Input, SDL_KeyboardEv
 
 INTERNAL_FUNCTION PLATFORM_SET_CAPTURING_MOUSE(SetCapturingMouse)
 {
-    Global_Input->CapturingMouse = IsCapture;
-    
     SDL_SetRelativeMouseMode(IsCapture ? SDL_TRUE : SDL_FALSE);
 }
 
-INTERNAL_FUNCTION void ProcessEvents(input_system* Input)
+INTERNAL_FUNCTION void ProcessEvents()
 {
-    keyboard_controller* Keyboard = &Input->Keyboard;
+    keyboard_controller* Keyboard = &Global_Input->Keyboard;
     
     SDL_Event Event;
     while(SDL_PollEvent(&Event))
@@ -535,19 +580,19 @@ INTERNAL_FUNCTION void ProcessEvents(input_system* Input)
             case SDL_KEYUP:
             case SDL_KEYDOWN:
             {
-                ProcessKeyboardEvents(Input, &Event.key);
+                ProcessKeyboardEvents(&Event.key);
             }break;
             
             
             case(SDL_MOUSEBUTTONUP):
             case(SDL_MOUSEBUTTONDOWN): 
             {
-                ProcessMouseButtonEvents(Input, &Event.button);
+                ProcessMouseButtonEvents(&Event.button);
             }break;
             
             case SDL_MOUSEWHEEL:
             {
-                Input->MouseScroll = Event.wheel.y;
+                Global_Input->MouseScroll = Event.wheel.y;
             }break;
             
             case(SDL_WINDOWEVENT): 
@@ -579,14 +624,14 @@ INTERNAL_FUNCTION void ProcessEvents(input_system* Input)
     }
 }
 
-INTERNAL_FUNCTION void ProcessVirtualButtons(input_system* Input)
+INTERNAL_FUNCTION void ProcessVirtualButtons()
 {
     // NOTE(Dima): Processing all virtual buttons
     for(int ControlIndex = 0; 
-        ControlIndex < Input->ControllerCount; 
+        ControlIndex < Global_Input->ControllerCount; 
         ControlIndex++)
     {
-        controller* Controller = &Input->Controllers[ControlIndex];
+        controller* Controller = &Global_Input->Controllers[ControlIndex];
         
         for(int ButtonIndex = 0;
             ButtonIndex < Button_Count;
@@ -630,7 +675,7 @@ INTERNAL_FUNCTION void ProcessVirtualButtons(input_system* Input)
     }
 }
 
-INTERNAL_FUNCTION void ProcessMouse(input_system* Input)
+INTERNAL_FUNCTION void ProcessMouse()
 {
     int MouseWindowP_X;
     int MouseWindowP_Y;
@@ -644,13 +689,13 @@ INTERNAL_FUNCTION void ProcessMouse(input_system* Input)
     int WindowHeight;
     SDL_GetWindowSize(App->Window, &WindowWidth, &WindowHeight);
     
-    Input->MouseWindowP = V2(MouseWindowP_X, MouseWindowP_Y);
-    Input->MouseDeltaP = -V2(MouseDeltaX, MouseDeltaY) * Input->MouseDefaultSpeed;
-    Input->MouseUV = V2((f32)MouseWindowP_X / (f32)WindowWidth, 
-                        (f32)MouseWindowP_Y / (f32)WindowHeight);
+    Global_Input->MouseWindowP = V2(MouseWindowP_X, MouseWindowP_Y);
+    Global_Input->MouseDeltaP = -V2(MouseDeltaX, MouseDeltaY) * Global_Input->MouseDefaultSpeed;
+    Global_Input->MouseUV = V2((f32)MouseWindowP_X / (f32)WindowWidth, 
+                               (f32)MouseWindowP_Y / (f32)WindowHeight);
 }
 
-INTERNAL_FUNCTION inline void ProcessGamepadAxis(input_system* Input, int PadIndex,
+INTERNAL_FUNCTION inline void ProcessGamepadAxis(int PadIndex,
                                                  u32 OurAxis, SDL_GameControllerAxis SDLAxis)
 {
     SDL_GameController* SDLPad = App->Gamepads[PadIndex];
@@ -671,15 +716,15 @@ INTERNAL_FUNCTION inline void ProcessGamepadAxis(input_system* Input, int PadInd
     
     AxisResult *= -1.0f;
     
-    gamepad_controller* Pad = &Input->Gamepads[PadIndex];
+    gamepad_controller* Pad = &Global_Input->Gamepads[PadIndex];
     Pad->Axes[OurAxis] = AxisResult;
 }
 
-INTERNAL_FUNCTION inline void ProcessGamepadButton(input_system* Input, int PadIndex,
+INTERNAL_FUNCTION inline void ProcessGamepadButton(int PadIndex,
                                                    u32 OurKey, SDL_GameControllerButton SDLButton)
 {
     SDL_GameController* SDLPad = App->Gamepads[PadIndex];
-    gamepad_controller* Pad = &Input->Gamepads[PadIndex];
+    gamepad_controller* Pad = &Global_Input->Gamepads[PadIndex];
     
     Uint8 Pressed = SDL_GameControllerGetButton(SDLPad, SDLButton);
     
@@ -691,12 +736,11 @@ INTERNAL_FUNCTION inline void ProcessGamepadButton(input_system* Input, int PadI
     ProcessKeyState(&OurPadKey->PressState, TransitionHappened, IsDown);
 }
 
-INTERNAL_FUNCTION inline void SetButtonNameForController(input_system* Input, 
-                                                         int PadIndex,
+INTERNAL_FUNCTION inline void SetButtonNameForController(int PadIndex,
                                                          u32 OurButton,
                                                          u32 SDLButton)
 {
-    gamepad_controller* Pad = &Input->Gamepads[PadIndex];
+    gamepad_controller* Pad = &Global_Input->Gamepads[PadIndex];
     
     char* ButtonName = (char*)SDL_GameControllerGetStringForButton((SDL_GameControllerButton)SDLButton);
     
@@ -704,64 +748,63 @@ INTERNAL_FUNCTION inline void SetButtonNameForController(input_system* Input,
     CopyStringsSafe(But->Name, sizeof(But->Name), ButtonName);
 }
 
-INTERNAL_FUNCTION void SetButtonNamesForGameController(input_system* Input, 
-                                                       int PadIndex)
+INTERNAL_FUNCTION void SetButtonNamesForGameController(int PadIndex)
 {
-    SetButtonNameForController(Input, PadIndex, GamepadKey_A, SDL_CONTROLLER_BUTTON_A);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_B, SDL_CONTROLLER_BUTTON_B);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_X, SDL_CONTROLLER_BUTTON_X);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_Y, SDL_CONTROLLER_BUTTON_Y);
+    SetButtonNameForController(PadIndex, GamepadKey_A, SDL_CONTROLLER_BUTTON_A);
+    SetButtonNameForController(PadIndex, GamepadKey_B, SDL_CONTROLLER_BUTTON_B);
+    SetButtonNameForController(PadIndex, GamepadKey_X, SDL_CONTROLLER_BUTTON_X);
+    SetButtonNameForController(PadIndex, GamepadKey_Y, SDL_CONTROLLER_BUTTON_Y);
     
-    SetButtonNameForController(Input, PadIndex, GamepadKey_Back, SDL_CONTROLLER_BUTTON_BACK);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_Guide, SDL_CONTROLLER_BUTTON_GUIDE);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_Start, SDL_CONTROLLER_BUTTON_START);
+    SetButtonNameForController(PadIndex, GamepadKey_Back, SDL_CONTROLLER_BUTTON_BACK);
+    SetButtonNameForController(PadIndex, GamepadKey_Guide, SDL_CONTROLLER_BUTTON_GUIDE);
+    SetButtonNameForController(PadIndex, GamepadKey_Start, SDL_CONTROLLER_BUTTON_START);
     
-    SetButtonNameForController(Input, PadIndex, GamepadKey_LeftStick, SDL_CONTROLLER_BUTTON_LEFTSTICK);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_RightStick, SDL_CONTROLLER_BUTTON_RIGHTSTICK);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_LeftShoulder, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_RightShoulder, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+    SetButtonNameForController(PadIndex, GamepadKey_LeftStick, SDL_CONTROLLER_BUTTON_LEFTSTICK);
+    SetButtonNameForController(PadIndex, GamepadKey_RightStick, SDL_CONTROLLER_BUTTON_RIGHTSTICK);
+    SetButtonNameForController(PadIndex, GamepadKey_LeftShoulder, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+    SetButtonNameForController(PadIndex, GamepadKey_RightShoulder, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
     
-    SetButtonNameForController(Input, PadIndex, GamepadKey_DpadUp, SDL_CONTROLLER_BUTTON_DPAD_UP);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_DpadDown, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_DpadLeft, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-    SetButtonNameForController(Input, PadIndex, GamepadKey_DpadRight, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+    SetButtonNameForController(PadIndex, GamepadKey_DpadUp, SDL_CONTROLLER_BUTTON_DPAD_UP);
+    SetButtonNameForController(PadIndex, GamepadKey_DpadDown, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+    SetButtonNameForController(PadIndex, GamepadKey_DpadLeft, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+    SetButtonNameForController(PadIndex, GamepadKey_DpadRight, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
 }
 
-INTERNAL_FUNCTION void ProcessGamepads(input_system* Input)
+INTERNAL_FUNCTION void ProcessGamepads()
 {
     for(int PadIndex = 0; PadIndex < MAX_GAMEPADS; PadIndex++)
     {
-        gamepad_controller* Pad = &Input->Gamepads[PadIndex];
+        gamepad_controller* Pad = &Global_Input->Gamepads[PadIndex];
         
         if(Pad->Connected)
         {
             // NOTE(Dima): Processing gamepad axes
-            ProcessGamepadAxis(Input, PadIndex, GamepadAxis_LeftX, SDL_CONTROLLER_AXIS_LEFTX);
-            ProcessGamepadAxis(Input, PadIndex, GamepadAxis_LeftY, SDL_CONTROLLER_AXIS_LEFTY);
-            ProcessGamepadAxis(Input, PadIndex, GamepadAxis_RightX, SDL_CONTROLLER_AXIS_RIGHTX);
-            ProcessGamepadAxis(Input, PadIndex, GamepadAxis_RightY, SDL_CONTROLLER_AXIS_RIGHTY);
-            ProcessGamepadAxis(Input, PadIndex, GamepadAxis_TriggerLeft, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
-            ProcessGamepadAxis(Input, PadIndex, GamepadAxis_TriggerRight, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+            ProcessGamepadAxis(PadIndex, GamepadAxis_LeftX, SDL_CONTROLLER_AXIS_LEFTX);
+            ProcessGamepadAxis(PadIndex, GamepadAxis_LeftY, SDL_CONTROLLER_AXIS_LEFTY);
+            ProcessGamepadAxis(PadIndex, GamepadAxis_RightX, SDL_CONTROLLER_AXIS_RIGHTX);
+            ProcessGamepadAxis(PadIndex, GamepadAxis_RightY, SDL_CONTROLLER_AXIS_RIGHTY);
+            ProcessGamepadAxis(PadIndex, GamepadAxis_TriggerLeft, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+            ProcessGamepadAxis(PadIndex, GamepadAxis_TriggerRight, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
             
             // NOTE(Dima): Processing gampad buttons
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_A, SDL_CONTROLLER_BUTTON_A);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_B, SDL_CONTROLLER_BUTTON_B);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_X, SDL_CONTROLLER_BUTTON_X);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_Y, SDL_CONTROLLER_BUTTON_Y);
+            ProcessGamepadButton(PadIndex, GamepadKey_A, SDL_CONTROLLER_BUTTON_A);
+            ProcessGamepadButton(PadIndex, GamepadKey_B, SDL_CONTROLLER_BUTTON_B);
+            ProcessGamepadButton(PadIndex, GamepadKey_X, SDL_CONTROLLER_BUTTON_X);
+            ProcessGamepadButton(PadIndex, GamepadKey_Y, SDL_CONTROLLER_BUTTON_Y);
             
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_Back, SDL_CONTROLLER_BUTTON_BACK);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_Guide, SDL_CONTROLLER_BUTTON_GUIDE);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_Start, SDL_CONTROLLER_BUTTON_START);
+            ProcessGamepadButton(PadIndex, GamepadKey_Back, SDL_CONTROLLER_BUTTON_BACK);
+            ProcessGamepadButton(PadIndex, GamepadKey_Guide, SDL_CONTROLLER_BUTTON_GUIDE);
+            ProcessGamepadButton(PadIndex, GamepadKey_Start, SDL_CONTROLLER_BUTTON_START);
             
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_LeftStick, SDL_CONTROLLER_BUTTON_LEFTSTICK);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_RightStick, SDL_CONTROLLER_BUTTON_RIGHTSTICK);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_LeftShoulder, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_RightShoulder, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+            ProcessGamepadButton(PadIndex, GamepadKey_LeftStick, SDL_CONTROLLER_BUTTON_LEFTSTICK);
+            ProcessGamepadButton(PadIndex, GamepadKey_RightStick, SDL_CONTROLLER_BUTTON_RIGHTSTICK);
+            ProcessGamepadButton(PadIndex, GamepadKey_LeftShoulder, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+            ProcessGamepadButton(PadIndex, GamepadKey_RightShoulder, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
             
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_DpadUp, SDL_CONTROLLER_BUTTON_DPAD_UP);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_DpadDown, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_DpadLeft, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-            ProcessGamepadButton(Input, PadIndex, GamepadKey_DpadRight, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+            ProcessGamepadButton(PadIndex, GamepadKey_DpadUp, SDL_CONTROLLER_BUTTON_DPAD_UP);
+            ProcessGamepadButton(PadIndex, GamepadKey_DpadDown, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+            ProcessGamepadButton(PadIndex, GamepadKey_DpadLeft, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+            ProcessGamepadButton(PadIndex, GamepadKey_DpadRight, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
         }
     }
 }
@@ -802,7 +845,7 @@ INTERNAL_FUNCTION b32 SDLGameControllerAlreadyConnected(SDL_GameController* Pad)
     return(Result);
 }
 
-INTERNAL_FUNCTION void CheckGamepadConnections(input_system* Input)
+INTERNAL_FUNCTION void CheckGamepadConnections()
 {
     for(int JoystickIndex = 0;
         JoystickIndex < SDL_NumJoysticks(); 
@@ -830,7 +873,7 @@ INTERNAL_FUNCTION void CheckGamepadConnections(input_system* Input)
                     {
                         App->Gamepads[PadIndex] = Controller;
                         
-                        SetButtonNamesForGameController(Input, PadIndex);
+                        SetButtonNamesForGameController(PadIndex);
                         
                         SDL_Log("Gamepad connected successfully on slot: %d\n", PadIndex);
                     }
@@ -854,7 +897,7 @@ INTERNAL_FUNCTION void CheckGamepadConnections(input_system* Input)
     }
 }
 
-INTERNAL_FUNCTION void CheckGamepadDisconnect(input_system* Input)
+INTERNAL_FUNCTION void CheckGamepadDisconnect()
 {
     for (int PadIndex = 0; PadIndex < MAX_GAMEPADS; PadIndex += 1)
     {
@@ -903,13 +946,13 @@ INTERNAL_FUNCTION void CheckGamepadDisconnect(input_system* Input)
 
 INTERNAL_FUNCTION void ProcessInput()
 {
-    App->GamepadsCheckCounter += Global_Time->DeltaTime;
+    App->GamepadsCheckCounter += Global_Input->DeltaTime;
     if(App->GamepadsCheckCounter >= 1.5f)
     {
         //SDL_Log("Checking gamepad connections and disconnections\n");
         
-        CheckGamepadConnections(Global_Input);
-        CheckGamepadDisconnect(Global_Input);
+        CheckGamepadConnections();
+        CheckGamepadDisconnect();
         
         App->GamepadsCheckCounter = 0.0f;
     }
@@ -920,11 +963,117 @@ INTERNAL_FUNCTION void ProcessInput()
                       &App->WndDims.Height);
     
     // NOTE(Dima): Processing input
-    PreProcessInput(Global_Input);
-    ProcessEvents(Global_Input);
-    ProcessMouse(Global_Input);
-    ProcessGamepads(Global_Input);
-    ProcessVirtualButtons(Global_Input);
+    PreProcessInput();
+    ProcessEvents();
+    ProcessMouse();
+    ProcessGamepads();
+    ProcessVirtualButtons();
+}
+
+void SetGlobalVariables(game* Game)
+{
+    Global_Input = Game->Input;
+    Global_Time = Game->Time;
+    Global_DebugTable = Game->DebugTable;
+}
+
+#if defined(PLATFORM_IS_WINDOWS)
+
+b32 GetLastWriteTimeToGameDLL(char* DllFullPath, FILETIME* ResultTime)
+{
+    // NOTE(Dima): Getting full file name
+    HANDLE FileHandle = CreateFile(DllFullPath, GENERIC_READ, 
+                                   FILE_SHARE_READ, NULL,
+                                   OPEN_EXISTING, 0, 0);
+    
+    FILETIME TimeCreate, TimeAccess, TimeWrite;
+    b32 Result = false;
+    if(FileHandle != INVALID_HANDLE_VALUE)
+    {
+        Result = true;
+        
+        GetFileTime(FileHandle, 
+                    &TimeCreate,
+                    &TimeAccess,
+                    ResultTime);
+        
+        CloseHandle(FileHandle);
+    }
+    
+    return(Result);
+}
+
+void LoadGameAndFunctionsFromDll()
+{
+    // NOTE(Dima): Copy the DLL
+    CopyFile(App->GameDllFullPath, 
+             App->TempDllFullPath,
+             false);
+    
+    SDL_Log("Game Code DLL: %s", App->TempDllFullPath);
+    HMODULE LibHandle = LoadLibraryA(App->TempDllFullPath);
+    Assert(LibHandle);
+    
+    App->GameUpdateAndRender = (game_update_and_render*)GetProcAddress(LibHandle, "GameUpdateAndRender");
+    App->GameInit = (game_init*)GetProcAddress(LibHandle, "GameInit");
+    
+    Assert(App->GameUpdateAndRender);
+    Assert(App->GameInit);
+    
+    App->TempDllHandle = LibHandle;
+}
+#endif
+
+INTERNAL_FUNCTION b32 RealoadIfNeededGameDLL()
+{
+    b32 Result = false;
+    
+#if defined(PLATFORM_IS_WINDOWS)
+    FILETIME LastSaved = App->LastGameDllWriteTime;
+    FILETIME LastWriteTime;
+    
+    // NOTE(Dima): If get time on DLL file was success - try to compare times
+    if(GetLastWriteTimeToGameDLL(App->GameDllFullPath, &LastWriteTime))
+    {
+        if(CompareFileTime(&LastWriteTime, &LastSaved) > 0)
+        {
+            App->LastGameDllWriteTime = LastWriteTime;
+            
+            BOOL FreeResult = FreeLibrary(App->TempDllHandle);
+            Assert(FreeResult);
+            
+            LoadGameAndFunctionsFromDll();
+            
+            Result = true;
+        }
+    }
+#else
+    
+#endif
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void InitGameCodeFromDll()
+{
+#if defined(PLATFORM_IS_WINDOWS)
+    GetFullPathNameA("../Build/Flower.dll",
+                     ArrayCount(App->GameDllFullPath),
+                     App->GameDllFullPath, 0);
+    
+    GetFullPathNameA("../Build/FlowerTemp.dll",
+                     ArrayCount(App->TempDllFullPath),
+                     App->TempDllFullPath, 0);
+    
+    b32 GetTimeResult = GetLastWriteTimeToGameDLL(App->GameDllFullPath, &App->LastGameDllWriteTime);
+    Assert(GetTimeResult);
+    
+    LoadGameAndFunctionsFromDll();
+#else
+    // TODO(Dima): Add support for other platforms that may want dynamic code reloading here
+    App->GameUpdateAndRender = GameUpdateAndRender;
+    App->GameInit = GameInit;
+#endif
 }
 
 int main(int ArgsCount, char** Args)
@@ -943,29 +1092,19 @@ int main(int ArgsCount, char** Args)
     Platform.AllocateMemory = StandardAllocateMemory;
     Platform.FreeMemory = StandardFreeMemory;
     Platform.GetThreadID = SDLGetThreadID;
-    
-    DEBUGInitGlobalTable(&GlobalArena);
-    
-    App = PushStruct(&GlobalArena, app_state);
+    Platform.GetPerfCounter = SDLGetPerfCounter;
+    Platform.GetElapsedTime = SDLGetElapsedTime;
+    Platform.PerfFrequency = SDL_GetPerformanceFrequency();
+    Platform.OneOverPerfFrequency = 1.0 / (f64)SDL_GetPerformanceFrequency();
     
     memory_arena GameArena = {};
+    App = PushStruct(&GameArena, app_state);
+    
     game* Game = PushStruct(&GameArena, game);
-    InitGame(Game, &GameArena);
+    InitGameCodeFromDll();
+    App->GameInit(Game, &GameArena, &Platform);
     
-    
-    //v3_4x Temp = V3_4X_Load(Dst);
-    f32 Src[64] = {
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-        32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-        48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63
-    };
-    f32 Dst[64];
-    //m44_4x Temp = M44_4X_Load(Src);
-    //M44_4X_Store(Dst, Temp);
-    
-    v3_4x Temp = V3_4X_Load(Src);
-    V3_4X_Store(Dst, Temp);
+    SetGlobalVariables(Game);
     
 #if 0    
     App->WndDims.InitWindowWidth = 1920;
@@ -976,7 +1115,6 @@ int main(int ArgsCount, char** Args)
 #endif
     App->WndDims.Width = App->WndDims.InitWidth;
     App->WndDims.Height = App->WndDims.InitHeight;
-    
     
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1011,8 +1149,6 @@ int main(int ArgsCount, char** Args)
     
     OpenGLInit();
     
-    Global_Time->PerformanceFrequency = SDL_GetPerformanceFrequency();
-    Global_Time->OneOverPerformanceFrequency = 1.0 / (f64)Global_Time->PerformanceFrequency;
     Global_Time->Time = 0.0f;
     Global_Time->DeltaTime = 0.001f;
     u64 LastClocks = SDL_GetPerformanceCounter();
@@ -1020,6 +1156,11 @@ int main(int ArgsCount, char** Args)
     App->Running = true;
     while(App->Running)
     {
+        // NOTE(Dima): Checking if need to reload game code here.
+        // It's important to do it before FRAME_BARRIER, so that only one frame 
+        // records are invalid.
+        b32 DllWasJustReloaded = RealoadIfNeededGameDLL();
+        
         FRAME_BARRIER(Global_Time->DeltaTime);
         
         BEGIN_TIMING(FRAME_UPDATE_NODE_NAME);
@@ -1029,7 +1170,7 @@ int main(int ArgsCount, char** Args)
         u64 ClocksElapsed = NewClocks - LastClocks;
         LastClocks = NewClocks;
         
-        Global_Time->DeltaTime = (f32)((f64)ClocksElapsed * Global_Time->OneOverPerformanceFrequency); 
+        Global_Time->DeltaTime = (f32)((f64)ClocksElapsed * Platform.OneOverPerfFrequency); 
         if(Global_Time->DeltaTime < 0.000001f)
         {
             Global_Time->DeltaTime = 0.000001f;
@@ -1037,11 +1178,15 @@ int main(int ArgsCount, char** Args)
         Global_Time->Time += Global_Time->DeltaTime;
         Global_Time->SinTime = Sin(Global_Time->Time);
         Global_Time->CosTime = Cos(Global_Time->Time);
+        Global_Input->Time = Global_Time->Time;
+        Global_Input->DeltaTime = Global_Time->DeltaTime;
+        
+        // NOTE(Dima): Tell the game that it's code has just been reloaded
+        Game->CodeDllWasJustReloaded = DllWasJustReloaded;
         
         // NOTE(Dima): Updating a game
-        Global_RenderCommands->WindowDimensions = App->WndDims;
-        
-        UpdateGame(Game);
+        Game->WindowDimensions = App->WndDims;
+        App->GameUpdateAndRender(Game);
         
         END_TIMING();
     }
@@ -1051,7 +1196,7 @@ int main(int ArgsCount, char** Args)
     SDL_GL_DeleteContext(App->OpenGLContext);
     SDL_DestroyWindow(App->Window);
     
-    FreeArena(&GlobalArena);
+    FreeArena(&GameArena);
     
     return(0);
 }

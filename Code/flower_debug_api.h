@@ -33,11 +33,6 @@ struct debug_record{
 struct debug_global_table{
     struct memory_arena* Arena;
     
-#define DEBUG_CIRCLE_SEGMENTS 16
-    v3 CircleVerticesX[DEBUG_CIRCLE_SEGMENTS];
-    v3 CircleVerticesY[DEBUG_CIRCLE_SEGMENTS];
-    v3 CircleVerticesZ[DEBUG_CIRCLE_SEGMENTS];
-    
     // NOTE(Dima): Debug records
     std::atomic_uint RecordAndTableIndex;
     

@@ -281,6 +281,9 @@ struct input_system
     v2 MouseUV;
     v2 MouseDeltaP;
     f32 MouseScroll;
+    
+    f64 Time;
+    f32 DeltaTime;
 };
 
 struct time
@@ -294,9 +297,6 @@ struct time
     // NOTE(Dima): Misc
     f32 CosTime;
     f32 SinTime;
-    
-    u64 PerformanceFrequency;
-    f64 OneOverPerformanceFrequency;
 };
 
 #endif //FLOWER_INPUT_H

@@ -160,4 +160,14 @@ struct render_commands
     render_mesh_instance* InstanceTable[RENDER_INSTANCE_TABLE_SIZE];
 };
 
+inline void* GetRenderCommand_(render_commands* Commands, int CommandIndex)
+{
+    render_command_header* Header = &Commands->CommandHeaders[CommandIndex];
+    
+    void* Result = Header->CommandData;
+    
+    return(Result);
+}
+#define GetRenderCommand(commands, index, struct_type) (struct_type*)GetRenderCommand_(commands, index)
+
 #endif //FLOWER_RENDER_H

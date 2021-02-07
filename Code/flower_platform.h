@@ -1,6 +1,12 @@
 #ifndef FLOWER_PLATFORM_H
 #define FLOWER_PLATFORM_H
 
+#include <intrin.h>
+
+#if defined(_WIN32) || defined(_WIN64)
+#define PLATFORM_IS_WINDOWS
+#endif
+
 #define PLATFORM_CALLBACK(name) void name(void* Data)
 typedef PLATFORM_CALLBACK(platform_callback);
 
@@ -19,13 +25,13 @@ typedef PLATFORM_PROCESS_INPUT(platform_process_input);
 typedef PLATFORM_SET_CAPTURING_MOUSE(platform_set_capturing_mouse);
 
 // NOTE(Dima): Renderer functions
-#define PLATFORM_RENDERER_BEGIN_FRAME(name) void name()
+#define PLATFORM_RENDERER_BEGIN_FRAME(name) void name(struct render_commands* Commands)
 typedef PLATFORM_RENDERER_BEGIN_FRAME(platform_renderer_begin_frame);
 
-#define PLATFORM_RENDERER_RENDER(name) void name()
+#define PLATFORM_RENDERER_RENDER(name) void name(struct render_commands* Commands)
 typedef PLATFORM_RENDERER_RENDER(platform_renderer_render);
 
-#define PLATFORM_RENDERER_SWAPBUFFERS(name) void name()
+#define PLATFORM_RENDERER_SWAPBUFFERS(name) void name(struct render_commands* Commands)
 typedef PLATFORM_RENDERER_SWAPBUFFERS(platform_renderer_swapbuffers);
 
 // NOTE(Dima): Read file functions
@@ -45,6 +51,13 @@ typedef PLATFORM_FREE_MEMORY(platform_free_memory);
 #define PLATFORM_GET_THREAD_ID(name) u16 name()
 typedef PLATFORM_GET_THREAD_ID(platform_get_thread_id);
 
+// NOTE(Dima): Performance counters
+#define PLATFORM_GET_PERFORMANCE_COUNTER(name) u64 name()
+typedef PLATFORM_GET_PERFORMANCE_COUNTER(platform_get_performance_counter);
+
+#define PLATFORM_GET_ELAPSED_TIME(name) f64 name(u64 ClocksBegin, u64 ClocksEnd)
+typedef PLATFORM_GET_ELAPSED_TIME(platform_get_elapsed_time);
+
 struct platform_api
 {
     platform_allocate_block* AllocateBlock;
@@ -57,11 +70,15 @@ struct platform_api
     platform_renderer_render* Render;
     platform_renderer_swapbuffers* SwapBuffers;
     
-    
     platform_read_file_and_null_terminate* ReadFileAndNullTerminate;
     platform_read_file* ReadFile;
     platform_allocate_memory* AllocateMemory;
     platform_free_memory* FreeMemory;
+    
+    platform_get_performance_counter* GetPerfCounter;
+    platform_get_elapsed_time* GetElapsedTime;
+    u64 PerfFrequency;
+    f64 OneOverPerfFrequency;
     
     platform_get_thread_id* GetThreadID;
 };

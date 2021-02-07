@@ -14,48 +14,15 @@ struct scene
 {
     char Name[64];
     
-    scene_init* Init_;
-    scene_update* Update_;
-    scene_ongui* OnGUI_;
+    scene_init* Init;
+    scene_update* Update;
+    scene_ongui* OnGUI;
     
     memory_arena* Arena;
     struct game* Game;
     
     void* SceneState;
     b32 Initialized;
-    
-    void Init()
-    {
-        if(Init_)
-        {
-            Init_(this);
-        }
-    }
-    
-    void Update()
-    {
-        FUNCTION_TIMING();
-        
-        if(!Initialized)
-        {
-            Init();
-            
-            Initialized = true;
-        }
-        
-        if(Update_)
-        {
-            Update_(this);
-        }
-    }
-    
-    void OnGUI()
-    {
-        if(OnGUI_)
-        {
-            OnGUI_(this);
-        }
-    }
 };
 
 #endif //FLOWER_SCENE_H

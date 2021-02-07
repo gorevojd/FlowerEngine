@@ -7,6 +7,14 @@
 #define UI_GRAPH_HEIGHT_SMALL_UNITS 6.0f
 #define UI_GRAPH_HEIGHT_BIG_UNITS 20.0f
 
+enum print_text_flags
+{
+    PrintText_3D = (1 << 0),
+    PrintText_StyleShadow = (1 << 1),
+    PrintText_StyleOutline = (1 << 2),
+    PrintText_IsGetSizePass = (1 << 3),
+};
+
 enum text_align_type
 {
     TextAlign_Left,
@@ -102,13 +110,32 @@ struct ui_params
     // NOTE(Dima): Ui params
     render_commands* Commands;
     font* Font;
+    u32 FontStyle;
     f32 Scale;
     
     f32 ScaleStack[64];
     int ScaleStackIndex;
     
-    window_dimensions* WindowDims;
+    font* FontStack[64];
+    int FontStackIndex;
+    
+    window_dimensions WindowDimensions;
 };
+
+inline u32 UIGetPrintFlagsFromFontStyle(u32 FontStyle)
+{
+    u32 FontStyleFlag = 0;
+    if(FontStyle == FontStyle_Shadow)
+    {
+        FontStyleFlag = PrintText_StyleShadow;
+    }
+    else if(FontStyle == FontStyle_Outline)
+    {
+        FontStyleFlag = PrintText_StyleOutline;
+    }
+    
+    return(FontStyleFlag);
+}
 
 struct ui_graph
 {
@@ -136,6 +163,16 @@ struct ui_slider_graph
     
     b32 ValueScreenPCalculated;
     v2 ValueScreenP;
+};
+
+struct ui_cell_grid_graph
+{
+    int HorzCount;
+    int VertCount;
+    
+    rc2 Rect;
+    
+    f32 CellDim;
 };
 
 // NOTE(Dima): Colors

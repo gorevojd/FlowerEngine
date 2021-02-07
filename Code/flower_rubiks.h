@@ -148,19 +148,18 @@ struct rubiks_rotate_face
     int Count;
     int AxisIndex;
     v3 RotateOrigin;
-    
-    int FaceIndex;
 };
 
 typedef m44 rubiks_rotation_function(float Angle);
-typedef rubiks_rotate_face* rubiks_get_face_function(struct rubiks_cube* Cube, int value);
+typedef rubiks_rotate_face* rubiks_get_face_function(struct rubiks_cube* Cube, int First, int Last);
 
 struct rubiks_beginned_rotation
 {
     rubiks_rotation_function* RotationMatrix;
     rubiks_get_face_function* GetFace;
-    int FaceIndex;
-    f32 DirectionMultiplier;
+    rubiks_rotate_face* RotateFace;
+    int FirstFaceIndex;
+    int LastFaceIndex;
     
     f32 InRotationTime;
     f32 TimeForRotation;
@@ -173,11 +172,14 @@ struct rubiks_beginned_rotation
 struct rubiks_command
 {
     int Axis;
-    int FaceIndex;
+    int FirstFaceIndex;
+    int LastFaceIndex;
     b32 IsClockwise;
 };
 
-#define RUBIKS_TIME_FOR_ROTATION 0.2f
+//#define RUBIKS_TIME_FOR_ROTATION 10.0f
+#define RUBIKS_TIME_FOR_ROTATION 0.1f
+
 struct rubiks_cube
 {
     int CubiesCount;

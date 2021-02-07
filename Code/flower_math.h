@@ -1586,6 +1586,18 @@ inline v4 PremultiplyAlpha(v4 Color)
     return(Color);
 }
 
+inline v4 InvertColor(v4 Color)
+{
+    v4 Result;
+    
+    Result.r = 1.0f - Color.r;
+    Result.g = 1.0f - Color.g;
+    Result.b = 1.0f - Color.b;
+    Result.a = Color.a;
+    
+    return(Result);
+}
+
 inline uint32_t PackRGBA(v4 Color)
 {
     uint32_t Res = 
@@ -1607,6 +1619,38 @@ inline v4 UnpackRGBA(uint32_t Color)
     Res.a = (float)((Color >> 24) & 0xFF) * F_ONE_OVER_255;
     
     return(Res);
+}
+
+inline uint8_t PackGrayscale(f32 Grayscale)
+{
+    uint8_t Result = (uint8_t)(Grayscale * 255.0f + 0.5f);
+    
+    return(Result);
+}
+
+inline v4 UnpackGrayscale(uint8_t Value)
+{
+    v4 Result;
+    
+    Result.r = 1.0f;
+    Result.g = 1.0f;
+    Result.b = 1.0f;
+    Result.a = (float)(Value & 0xFF) * F_ONE_OVER_255;
+    
+    return(Result);
+}
+
+inline v4 UnpackGrayscalePremultiplied(uint8_t Value)
+{
+    f32 ResultValue = (float)(Value & 0xFF) * F_ONE_OVER_255;
+    
+    v4 Result;
+    Result.r = ResultValue;
+    Result.g = ResultValue;
+    Result.b = ResultValue;
+    Result.a = ResultValue;
+    
+    return(Result);
 }
 
 inline uint32_t PackRGB(v3 Color)

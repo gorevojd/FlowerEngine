@@ -724,13 +724,15 @@ INTERNAL_FUNCTION inline void PushArrow2D(v2 Begin,
 inline void PushGlyph(rect_buffer* RectBuffer,
                       glyph* Glyph, 
                       v2 P, f32 Height, 
+                      int StyleIndex,
                       int ModelTransformMatrixIndex,
                       v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    v2 Dim = V2(Height * Glyph->WidthOverHeight, Height);
+    glyph_style* Style = &Glyph->Styles[StyleIndex];
+    v2 Dim = V2(Height * Style->WidthOverHeight, Height);
     
-    v2 MinUV = Glyph->MinUV;
-    v2 MaxUV = Glyph->MaxUV;
+    v2 MinUV = Style->MinUV;
+    v2 MaxUV = Style->MaxUV;
     
     rect_vertex Verts[4];
     Verts[0] = { V2(P.x, P.y), V2(MinUV.x, MinUV.y)};
@@ -740,16 +742,6 @@ inline void PushGlyph(rect_buffer* RectBuffer,
     
     PushRectInternal(RectBuffer, Verts, Rect_Textured, ModelTransformMatrixIndex, C);
 }
-
-inline void* GetRenderCommand_(render_commands* Commands, int CommandIndex)
-{
-    render_command_header* Header = &Commands->CommandHeaders[CommandIndex];
-    
-    void* Result = Header->CommandData;
-    
-    return(Result);
-}
-#define GetRenderCommand(commands, index, struct_type) (struct_type*)GetRenderCommand_(commands, index)
 
 INTERNAL_FUNCTION void PushDefaultMatricesToRectBuffer(rect_buffer* RectBuffer)
 {
@@ -769,9 +761,11 @@ INTERNAL_FUNCTION void ResetRectBuffer(rect_buffer* RectBuffer)
     RectBuffer->TransformsCount = 0;
 }
 
-INTERNAL_FUNCTION void BeginRender()
+INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions)
 {
     render_commands* Commands = Global_RenderCommands;
+    
+    Commands->WindowDimensions = WindowDimensions;
     
     // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();

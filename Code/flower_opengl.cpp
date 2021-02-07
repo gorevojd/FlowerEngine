@@ -256,7 +256,7 @@ INTERNAL_FUNCTION inline b32 ArrayIsValid(GLint Arr){
 
 INTERNAL_FUNCTION inline b32 OpenGLShouldInitImage(image* Image)
 {
-    b32 Result = Image->ApiHandle == 0;
+    b32 Result = !Image->ApiHandle;
     
     return(Result);
 }
@@ -265,7 +265,15 @@ INTERNAL_FUNCTION GLuint OpenGLInitImage(image* Image)
 {
     GLuint TexOpenGL = 0;
     
-    if(OpenGLShouldInitImage(Image))
+    b32 ImageDeleted = false;
+    if(Image->Invalidated && (Image->ApiHandle != 0))
+    {
+        glDeleteTextures(1, (const GLuint*)&Image->ApiHandle);
+        
+        ImageDeleted = true;
+    }
+    
+    if(OpenGLShouldInitImage(Image) || ImageDeleted)
     {
         glGenTextures(1, &TexOpenGL);
         glBindTexture(GL_TEXTURE_2D, TexOpenGL);
@@ -960,8 +968,6 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_BEGIN_FRAME(OpenGLBeginFrame)
 INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
 {
     FUNCTION_TIMING();
-    
-    render_commands* Commands = Global_RenderCommands;
     
     //glClearColor(0.3f, 0.4f, 0.8f, 1.0f);
     glClearColor(0.6f, 0.6f, 0.9f, 1.0f);

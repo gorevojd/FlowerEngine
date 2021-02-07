@@ -62,6 +62,13 @@ inline u32 RandomBetweenU32(random_generation* Random, u32 MinIncl, u32 MaxExcl)
     return(Result);
 }
 
+inline u32 RandomIndex(random_generation* Random, u32 OnePastLast)
+{
+    u32 Result = RandomBetweenU32(Random, 0, OnePastLast);
+    
+    return(Result);
+}
+
 inline f32 RandomBetweenFloats(random_generation* Random, f32 Min, f32 Max)
 {
     f32 t = RandomUnilateral(Random);

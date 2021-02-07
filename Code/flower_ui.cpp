@@ -48,11 +48,6 @@ INTERNAL_FUNCTION inline f32 GetKerning(font* Font, u32 CodepointFirst, u32 Code
     return(Kerning);
 }
 
-enum print_text_flags
-{
-    PrintText_3D = (1 << 0),
-};
-
 INTERNAL_FUNCTION rc2 PrintText_(font* Font, 
                                  char* Text, 
                                  v3 Left, v3 Up, v3 Forward,
@@ -60,7 +55,6 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
                                  v2 Offset, 
                                  u32 Flags,
                                  f32 Scale = 1.0f, 
-                                 b32 IsGetSizePass = false,
                                  v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     char* At = Text;
@@ -71,7 +65,17 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     
     int IndexToTransformMatrix = Buffer->IdentityMatrixIndex;
     
-    b32 Is3D = (Flags & PrintText_3D) != 0;
+    u32 FontStyle = FontStyle_Regular;
+    if(BoolFlag(Flags, PrintText_StyleShadow))
+    {
+        FontStyle = FontStyle_Shadow;
+    }
+    else if(BoolFlag(Flags, PrintText_StyleOutline))
+    {
+        FontStyle = FontStyle_Outline;
+    }
+    
+    b32 Is3D = BoolFlag(Flags, PrintText_3D);
     if(Is3D)
     {
         Buffer = &Global_RenderCommands->Rects3D;
@@ -99,15 +103,19 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
         
         glyph* Glyph = &Font->Glyphs[GlyphIndex];
         
+        b32 IsGetSizePass = BoolFlag(Flags, PrintText_IsGetSizePass);
+        
         if(!IsGetSizePass)
         {
-            image* Image = &GlyphImages[Glyph->ImageIndex];
+            glyph_style* GlyphStyle = &Glyph->Styles[FontStyle];
+            image* Image = &GlyphImages[GlyphStyle->ImageIndex];
             
             f32 TargetHeight = (f32)Image->Height * Scale;
             
             v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;
             PushGlyph(Buffer, Glyph, ImageP, 
                       TargetHeight, 
+                      FontStyle,
                       IndexToTransformMatrix, C);
         }
         
@@ -124,45 +132,20 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     return(Bounds);
 }
 
-INTERNAL_FUNCTION rc2 PrintText(font* Font, 
-                                char* Text, 
-                                v2 P, 
-                                f32 Scale = 1.0f, 
-                                v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f), 
-                                b32 WithShadow = true)
-{
-    if(WithShadow)
-    {
-        PrintText_(Font, Text, 
-                   V3_Left(), V3_Up(), V3_Forward(), 
-                   V3(P, 0.0f), V2(1.0f, 1.0f), 
-                   0, Scale, false, 
-                   V4(0.0f, 0.0f, 0.0f, 1.0f));
-    }
-    rc2 Result = PrintText_(Font, Text, 
-                            V3_Left(), V3_Up(), V3_Forward(), 
-                            V3(P, 0.0f), V2(0.0f, 0.0f), 
-                            0, Scale, false,  C);
-    
-    return(Result);
-}
-
 INTERNAL_FUNCTION inline rc2 GetTextRect(char* Text, v2 P)
 {
     ui_params* Params = UIGetParams();
-    
     font* Font = Params->Font;
     
-    b32 IsGetSizePass = true;
+    u32 FontStyleFlag = UIGetPrintFlagsFromFontStyle(Params->FontStyle);
     
     rc2 Result = PrintText_(Font, 
                             Text, 
                             V3_Left(), V3_Up(), V3_Forward(), 
                             V3(P.x, P.y, 0.0f), 
                             V2(0.0f, 0.0f), 
-                            0, 
-                            Params->Scale,
-                            IsGetSizePass);
+                            PrintText_IsGetSizePass | FontStyleFlag, 
+                            Params->Scale);
     
     return(Result);
 }
@@ -182,14 +165,18 @@ INTERNAL_FUNCTION void PrintText3D(char* Text,
                                    f32 Scale = 1.0f,
                                    v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    PrintText_(Global_UI->Params.Font, 
+    ui_params* Params = UIGetParams();
+    font* Font = Params->Font;
+    
+    u32 FontStyleFlag = UIGetPrintFlagsFromFontStyle(Params->FontStyle);
+    
+    PrintText_(Params->Font, 
                Text, 
                Left, Up, NOZ(Cross(Left, Up)),
                P, 
                V2(0.0f, 0.0f), 
-               PrintText_3D, 
+               PrintText_3D | FontStyleFlag, 
                Scale, 
-               false,
                C);
 }
 
@@ -199,6 +186,12 @@ INTERNAL_FUNCTION void PrintTextCentered3D(char* Text,
                                            f32 UnitHeight,
                                            v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
+    ui_params* Params = UIGetParams();
+    font* Font = Params->Font;
+    
+    u32 FontStyleFlag = UIGetPrintFlagsFromFontStyle(Params->FontStyle);
+    
+    
     v2 Size = GetTextSize(Text) / Global_UI->Params.Font->PixelsPerMeter * UnitHeight;
     
     Normal = -Normal;
@@ -221,14 +214,13 @@ INTERNAL_FUNCTION void PrintTextCentered3D(char* Text,
     
     P -= Left * Size.x * 0.5f;
     
-    PrintText_(Global_UI->Params.Font, 
+    PrintText_(Params->Font, 
                Text, 
                Left, Up, Normal,
                P, 
                V2(0.0f, 0.0f), 
-               PrintText_3D, 
+               PrintText_3D | FontStyleFlag, 
                UnitHeight, 
-               false,
                C);
 }
 
@@ -321,18 +313,19 @@ INTERNAL_FUNCTION inline v2 GetPrintPositionInRect(rc2 Rect,
 
 INTERNAL_FUNCTION rc2 PrintText(char* Text,
                                 v2 P,
-                                v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f),
-                                b32 WithShadow = true)
+                                v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     ui_params* Params = UIGetParams();
     font* Font = Params->Font;
     
-    rc2 Result = PrintText(Font,
-                           Text,
-                           P,
-                           Params->Scale, 
-                           C,
-                           WithShadow);
+    u32 FontStyleFlag = UIGetPrintFlagsFromFontStyle(Params->FontStyle);
+    
+    rc2 Result = PrintText_(Font, Text, 
+                            V3_Left(), V3_Up(), V3_Forward(), 
+                            V3(P, 0.0f), V2(0.0f, 0.0f), 
+                            FontStyleFlag, 
+                            Params->Scale, 
+                            C);
     
     return(Result);
 }
@@ -341,15 +334,14 @@ INTERNAL_FUNCTION rc2 PrintTextAligned(char* Text,
                                        rc2 Rect,
                                        u32 AlignX = TextAlign_Center,
                                        u32 AlignY = TextAlign_Center,
-                                       v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f),
-                                       b32 WithShadow = true)
+                                       v4 C = ColorWhite())
 {
     v2 TextSize = GetTextSize(Text);
     
     v2 PrintP = GetPrintPositionInRect(Rect, TextSize,
                                        AlignX, AlignY);
     
-    rc2 Result = PrintText(Text, PrintP, C, WithShadow);
+    rc2 Result = PrintText(Text, PrintP, C);
     
     return(Result);
 }
@@ -359,12 +351,11 @@ INTERNAL_FUNCTION rc2 PrintTextAligned(char* Text,
                                        v2 Point,
                                        u32 AlignX = TextAlign_Center,
                                        u32 AlignY = TextAlign_Center,
-                                       v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f),
-                                       b32 WithShadow = true)
+                                       v4 C = ColorWhite())
 {
     rc2 Result = PrintTextAligned(Text, RectMinMax(Point, Point), 
                                   AlignX, AlignY,
-                                  C, WithShadow);
+                                  C);
     
     return(Result);
 }
@@ -374,8 +365,8 @@ INTERNAL_FUNCTION inline v2 UVToScreenPoint(float x, float y)
 {
     v2 Result;
     
-    Result.x = x * Global_UI->Params.WindowDims->Width;
-    Result.y = y * Global_UI->Params.WindowDims->Height;
+    Result.x = x * Global_UI->Params.WindowDimensions.Width;
+    Result.y = y * Global_UI->Params.WindowDimensions.Height;
     
     return(Result);
 }
@@ -472,20 +463,49 @@ inline void UIPopScale()
     }
 }
 
-INTERNAL_FUNCTION void UIBeginFrame()
+inline void UIPushFont(font* Font)
 {
-    window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
+    ui_params* Params = UIGetParams();
     
+    Assert(Params->FontStackIndex < ArrayCount(Params->FontStack));
+    
+    Params->FontStack[Params->FontStackIndex++] = Font;
+    Params->Font = Font;
+}
+
+inline void UIPopFont()
+{
+    ui_params* Params = UIGetParams();
+    
+    Assert(Params->FontStackIndex > 0);
+    
+    --Params->FontStackIndex;
+    Params->FontStack[Params->FontStackIndex] = 0;
+    if(Params->FontStackIndex - 1 >= 0)
+    {
+        Params->Font = Params->FontStack[Params->FontStackIndex - 1];
+    }
+    else
+    {
+        Params->Font = Params->FontStack[Params->FontStackIndex];
+    }
+}
+
+INTERNAL_FUNCTION void UIBeginFrame(window_dimensions WindowDimensions)
+{
     ui_params ParamsUI = {};
     ParamsUI.Commands = Global_RenderCommands;
     ParamsUI.Font = &Global_Assets->LiberationMono;
-    ParamsUI.WindowDims = WndDims;
+    ParamsUI.WindowDimensions = WindowDimensions;
+    ParamsUI.FontStyle = 2;
     
     UISetParams(ParamsUI);
     
     // NOTE(Dima): Init font scale stack
     ParamsUI.ScaleStackIndex = 0;
+    ParamsUI.FontStackIndex = 0;
     UIPushScale(1.0f);
+    UIPushFont(ParamsUI.Font);
     
     // NOTE(Dima): Initializing layouts
     ui_layout* LayoutAt = Global_UI->FirstLayout;
@@ -1152,10 +1172,8 @@ INTERNAL_FUNCTION void ShowTextUnformatted(char* Text)
     {
         PreAdvance();
         
-        rc2 Bounds = PrintText(Params->Font, 
-                               Text, 
+        rc2 Bounds = PrintText(Text, 
                                Global_UI->CurrentLayout->At, 
-                               Params->Scale, 
                                UIGetColor(UIColor_Text));
         
         DescribeElement(Bounds);

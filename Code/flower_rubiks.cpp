@@ -621,57 +621,69 @@ INTERNAL_FUNCTION inline void AddCubieToRotatedFace(rubiks_cube* Cube,
     RotFace->Count++;
 }
 
-INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceX(rubiks_cube* Cube, int x)
+INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceX(rubiks_cube* Cube, 
+                                                      int FirstX,
+                                                      int LastX)
 {
     rubiks_rotate_face* Result = &Cube->RotateFace;
     
     Result->Count = 0;
     Result->AxisIndex = RubiksAxis_X;
-    Result->FaceIndex = x;
     
-    for(int z = Cube->Dim - 1; z >= 0; z--)
+    for(int x = FirstX; x <= LastX; x++)
     {
-        for(int y = 0; y < Cube->Dim; y++)
+        for(int z = Cube->Dim - 1; z >= 0; z--)
         {
-            AddCubieToRotatedFace(Cube, Result, x, y, z);
+            for(int y = 0; y < Cube->Dim; y++)
+            {
+                AddCubieToRotatedFace(Cube, Result, x, y, z);
+            }
         }
     }
     
     return(Result);
 }
 
-INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceY(rubiks_cube* Cube, int y)
+INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceY(rubiks_cube* Cube, 
+                                                      int FirstY,
+                                                      int LastY)
 {
     rubiks_rotate_face* Result = &Cube->RotateFace;
     
     Result->Count = 0;
     Result->AxisIndex = RubiksAxis_Y;
-    Result->FaceIndex = y;
     
-    for(int z = 0; z < Cube->Dim; z++)
+    for(int y = FirstY; y <= LastY; y++)
     {
-        for(int x = 0; x < Cube->Dim; x++)
+        for(int z = 0; z < Cube->Dim; z++)
         {
-            AddCubieToRotatedFace(Cube, Result, x, y, z);
+            for(int x = 0; x < Cube->Dim; x++)
+            {
+                AddCubieToRotatedFace(Cube, Result, x, y, z);
+            }
         }
     }
     
     return(Result);
 }
 
-INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceZ(rubiks_cube* Cube, int z)
+INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceZ(rubiks_cube* Cube, 
+                                                      int FirstZ,
+                                                      int LastZ)
 {
     rubiks_rotate_face* Result = &Cube->RotateFace;
     
     Result->Count = 0;
     Result->AxisIndex = RubiksAxis_Z;
-    Result->FaceIndex = z;
     
-    for(int y = 0; y < Cube->Dim; y++)
+    for(int z = FirstZ; z <= LastZ; z++)
     {
-        for(int x = Cube->Dim - 1; x >= 0; x--)
+        for(int y = 0; y < Cube->Dim; y++)
         {
-            AddCubieToRotatedFace(Cube, Result, x, y, z);
+            for(int x = Cube->Dim - 1; x >= 0; x--)
+            {
+                AddCubieToRotatedFace(Cube, Result, x, y, z);
+            }
         }
     }
     
@@ -793,41 +805,49 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
     rubiks_rotate_face* Face = &Cube->RotateFace;
     
     // NOTE(Dima): Updating internal rotation
-    b32 IsOuter = (Face->FaceIndex == 0) || (Face->FaceIndex == Cube->Dim - 1);
-    
-    int LoopIndex = 0;
-    int CurrentStart = 0;
-    int CurrentEnd = Cube->Dim - 1;
-    while(CurrentStart < CurrentEnd)
+    for(int FaceIndex = BeginnedRotation->FirstFaceIndex;
+        FaceIndex <= BeginnedRotation->LastFaceIndex;
+        FaceIndex++)
     {
-        // NOTE(Dima): Preparing
-        rubiks_precomp_face* PrecompFace = &Cube->PrecompFace;
-        int* ToRotateIndices = PrecompFace->InitLoops[LoopIndex];
-        int ToRotateCount = PrecompFace->LoopCubiesCount[LoopIndex];
+        b32 IsOuter = (FaceIndex == 0) || (FaceIndex == Cube->Dim - 1);
         
-        int* RotatedIndices = PrecompFace->RotatedCounterClockwise[LoopIndex];
-        if(BeginnedRotation->IsClockwise)
+        int FaceBase = (FaceIndex - BeginnedRotation->FirstFaceIndex) * Cube->Dim * Cube->Dim;
+        
+        int LoopIndex = 0;
+        int CurrentStart = 0;
+        int CurrentEnd = Cube->Dim - 1;
+        while(CurrentStart < CurrentEnd)
         {
-            RotatedIndices = PrecompFace->RotatedClockwise[LoopIndex];
-        }
-        
-        // NOTE(Dima): Using rotated indices
-        for(int i = 0;
-            i < ToRotateCount;
-            i++)
-        {
-            Face->Face[ToRotateIndices[i]] = Face->TempFace[RotatedIndices[i]];
-        }
-        
-        CurrentStart++;
-        CurrentEnd--;
-        LoopIndex++;
-        
-        if(!IsOuter)
-        {
-            break;
+            // NOTE(Dima): Preparing
+            rubiks_precomp_face* PrecompFace = &Cube->PrecompFace;
+            int* ToRotateIndices = PrecompFace->InitLoops[LoopIndex];
+            int ToRotateCount = PrecompFace->LoopCubiesCount[LoopIndex];
+            
+            int* RotatedIndices = PrecompFace->RotatedCounterClockwise[LoopIndex];
+            if(BeginnedRotation->IsClockwise)
+            {
+                RotatedIndices = PrecompFace->RotatedClockwise[LoopIndex];
+            }
+            
+            // NOTE(Dima): Using rotated indices
+            for(int i = 0;
+                i < ToRotateCount;
+                i++)
+            {
+                Face->Face[FaceBase + ToRotateIndices[i]] = Face->TempFace[FaceBase + RotatedIndices[i]];
+            }
+            
+            CurrentStart++;
+            CurrentEnd--;
+            LoopIndex++;
+            
+            if(!IsOuter)
+            {
+                break;
+            }
         }
     }
+    
     
     // NOTE(Dima): Copying rotated indices to Current
     for(int i = 0; i < Face->Count; i++)
@@ -838,18 +858,32 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
 
 INTERNAL_FUNCTION void AddCommandToCube(rubiks_cube* Cube,
                                         int Axis,
-                                        int FaceIndex,
+                                        int FirstFaceIndex,
+                                        int LastFaceIndex,
                                         int IsClockwise)
 {
     rubiks_command* NewCommand = &Cube->Commands[Cube->AddIndex];
     
     NewCommand->Axis = Axis;
-    NewCommand->FaceIndex = FaceIndex;
+    NewCommand->FirstFaceIndex = FirstFaceIndex;
+    NewCommand->LastFaceIndex = LastFaceIndex;
     NewCommand->IsClockwise = IsClockwise;
     
     Cube->AddIndex = (Cube->AddIndex + 1) % Cube->CommandsCount;
     
     Assert(Cube->AddIndex != Cube->DoIndex);
+}
+
+INTERNAL_FUNCTION void AddCommandToCube(rubiks_cube* Cube,
+                                        int Axis,
+                                        int FaceIndex,
+                                        int IsClockwise)
+{
+    AddCommandToCube(Cube,
+                     Axis,
+                     FaceIndex,
+                     FaceIndex,
+                     IsClockwise);
 }
 
 INTERNAL_FUNCTION void FinishCommandExecution(rubiks_cube* Cube)
@@ -866,13 +900,14 @@ INTERNAL_FUNCTION b32 CanExecuteCommand(rubiks_cube* Cube)
 
 INTERNAL_FUNCTION void FinishCubeRotation(rubiks_cube* Cube)
 {
-    rubiks_beginned_rotation* Beginned = &Cube->BeginnedRotation;
+    FUNCTION_TIMING();
     
-    int FaceCubiesCount = Cube->Dim * Cube->Dim;
+    rubiks_beginned_rotation* Beginned = &Cube->BeginnedRotation;
+    rubiks_rotate_face* RotateFace = Beginned->RotateFace;
     
     // NOTE(Dima): Updating transforms
     for(int FaceCubieIndex = 0;
-        FaceCubieIndex < FaceCubiesCount;
+        FaceCubieIndex < RotateFace->Count;
         FaceCubieIndex++)
     {
         int CubieIndex = Cube->RotateFace.Face[FaceCubieIndex];
@@ -896,7 +931,8 @@ INTERNAL_FUNCTION void FinishCubeRotation(rubiks_cube* Cube)
 // NOTE(Dima): Function returns true if rotation was beginned
 INTERNAL_FUNCTION b32 BeginRotateFace(rubiks_cube* Cube, 
                                       int Axis,
-                                      int FaceIndex,
+                                      int FirstFaceIndex,
+                                      int LastFaceIndex,
                                       f32 Speed,
                                       b32 IsClockwise)
 {
@@ -921,7 +957,6 @@ INTERNAL_FUNCTION b32 BeginRotateFace(rubiks_cube* Cube,
             {
                 BeginnedRotation->RotationMatrix = RotationMatrixY;
                 BeginnedRotation->GetFace = GetFaceY;
-                
             }break;
             
             case RubiksAxis_Z:
@@ -930,9 +965,13 @@ INTERNAL_FUNCTION b32 BeginRotateFace(rubiks_cube* Cube,
                 BeginnedRotation->GetFace = GetFaceZ;
             }break;
         }
-        BeginnedRotation->FaceIndex = FaceIndex;
+        
+        BeginnedRotation->FirstFaceIndex = FirstFaceIndex;
+        BeginnedRotation->LastFaceIndex = LastFaceIndex;
         BeginnedRotation->IsClockwise = IsClockwise;
-        BeginnedRotation->DirectionMultiplier = FaceIndex > (Cube->Dim / 2) ? -1.0f : 1.0f;
+        BeginnedRotation->RotateFace = BeginnedRotation->GetFace(Cube,
+                                                                 FirstFaceIndex,
+                                                                 LastFaceIndex);
         
         Cube->IsRotatingNow = true;
         
@@ -953,7 +992,6 @@ INTERNAL_FUNCTION void UpdateBeginnedRotation(rubiks_cube* Cube)
         f32 t = Clamp01(BeginnedRotation->InRotationTime / BeginnedRotation->TimeForRotation);
         
         f32 Angle = F_PI * 0.5f * t;
-        //f32 Angle = F_PI * 0.5f * t * BeginnedRotation->DirectionMultiplier;
         
         if(!BeginnedRotation->IsClockwise)
         {
@@ -962,7 +1000,7 @@ INTERNAL_FUNCTION void UpdateBeginnedRotation(rubiks_cube* Cube)
         
         // NOTE(Dima): Applying cubies rotation
         m44 AppliedRotation = BeginnedRotation->RotationMatrix(Angle);
-        rubiks_rotate_face* RotateFace = BeginnedRotation->GetFace(Cube, BeginnedRotation->FaceIndex);
+        rubiks_rotate_face* RotateFace = BeginnedRotation->RotateFace;
         
         BeginnedRotation->AxisIndex = RotateFace->AxisIndex;
         BeginnedRotation->AppliedRotation = AppliedRotation;
@@ -1088,9 +1126,9 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     Result.BeginnedRotation.InRotationTime = 0.0f;
     Result.BeginnedRotation.TimeForRotation = 0.0f;
     
-    Result.RotateFace.Face = PushArray(Arena, int, OneFaceCount);
-    Result.RotateFace.TempFace = PushArray(Arena, int, OneFaceCount);
-    Result.RotateFace.IndicesInCurrent = PushArray(Arena, int, OneFaceCount);
+    Result.RotateFace.Face = PushArray(Arena, int, Result.CubiesCount);
+    Result.RotateFace.TempFace = PushArray(Arena, int, Result.CubiesCount);
+    Result.RotateFace.IndicesInCurrent = PushArray(Arena, int, Result.CubiesCount);
     Result.RotateFace.Count = 0;
     
     Result.ToRotateIndices = PushArray(Arena, int, 4 * (CubeDim - 1));
@@ -1138,10 +1176,16 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
         
         if(Cube->InnerMeshIsGenerated[Rot->AxisIndex])
         {
+            f32 Diff = (f32)(Rot->LastFaceIndex - Rot->FirstFaceIndex);
+            f32 CenterValue = (f32)Rot->FirstFaceIndex + Diff * 0.5f;
             v3 RotationOrigin = (RubiksAxisValue[Rot->AxisIndex] * 
-                                 ((Cube->OneCubieLen * Rot->FaceIndex) + Cube->CubieOffset));
+                                 ((Cube->OneCubieLen * CenterValue) + Cube->CubieOffset));
             
-            m44 InnerTransform = TranslationMatrix(RotationOrigin) * Rot->AppliedRotation * OffsetMatrix;
+            v3 AxisValue = RubiksAxisValue[Rot->AxisIndex];
+            v3 FattenOnAxis = Hadamard(AxisValue, V3_One() * Diff);
+            v3 ScaleValue = V3_One() + FattenOnAxis;
+            
+            m44 InnerTransform = ScalingMatrix(ScaleValue) * TranslationMatrix(RotationOrigin) * Rot->AppliedRotation * OffsetMatrix;
             
             mesh* InnerMesh = &Cube->InnerMeshes[Rot->AxisIndex];
             
@@ -1285,7 +1329,8 @@ INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube,
         
         BeginRotateFace(Cube, 
                         Command->Axis,
-                        Command->FaceIndex,
+                        Command->FirstFaceIndex,
+                        Command->LastFaceIndex,
                         Speed,
                         Command->IsClockwise);
     }

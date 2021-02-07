@@ -1,7 +1,5 @@
 #if defined(INTERNAL_BUILD)
 
-GLOBAL_VARIABLE debug_state* Global_Debug;
-
 inline debug_thread_frame* 
 GetThreadFrameByIndex(debug_thread* Thread, int FrameIndex)
 {
@@ -373,6 +371,17 @@ INTERNAL_FUNCTION inline int IncrementFrameIndex(int Value){
     return(Result);
 }
 
+INTERNAL_FUNCTION inline void 
+DEBUGSkipToNextBarrier(b32 Value)
+{
+    Global_Debug->SkipToNextFrameBarrier = Value;
+    
+    if(Value)
+    {
+        Global_Debug->Filter = DebugRecord_FrameBarrier;
+    }
+}
+
 INTERNAL_FUNCTION inline void
 IncrementFrameIndices(debug_state* State){
     if(State->ViewFrameIndex != State->CollationFrameIndex){
@@ -396,8 +405,17 @@ ProcessRecordsIndicesInc(debug_state* State)
 {
     b32 ShouldIncrement = true;
     
+    if(State->SkipToNextFrameBarrier)
+    {
+        State->SkipToNextFrameBarrier = false;
+        State->Filter = DEBUG_DEFAULT_FILTER_VALUE;
+        
+        ShouldIncrement = false;
+    }
+    
     if(State->RecordingChangeRequested)
     {
+        State->IsRecording = !State->IsRecording;
         State->RecordingChangeRequested = false;
         
         if(State->IsRecording)
@@ -534,7 +552,10 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State)
                     // NOTE(Dima): Set frame time
                     OldFrameCommon->FrameTime = Record->Value.Float;
                     
-                    Assert(OldFrame->CurNode == &OldFrame->RootTreeNodeUse);
+                    if(!State->SkipToNextFrameBarrier)
+                    {
+                        Assert(OldFrame->CurNode == &OldFrame->RootTreeNodeUse);
+                    }
                     
                     // NOTE(Dima): Incrementing frame indices when we needed
                     ProcessRecordsIndicesInc(State);
@@ -551,7 +572,7 @@ INTERNAL_FUNCTION void DEBUGInitMenus(debug_state* State)
 {
     debug_menus* Menus = &State->Menus;
     
-    Menus->Visible = true;
+    Menus->Visible = false;
     
     Menus->GraphsSizeY = 80.0f;
     
@@ -607,6 +628,8 @@ INTERNAL_FUNCTION void DEBUGInit(memory_arena* Arena)
     
     State->Arena = Arena;
     
+    DEBUGInitGlobalTable(Arena);
+    
     // NOTE(Dima): Init profiler stuff
     State->CollationFrameIndex = 0;
     State->NewestFrameIndex = 0;
@@ -614,6 +637,7 @@ INTERNAL_FUNCTION void DEBUGInit(memory_arena* Arena)
     State->OldestShouldBeIncremented = false;
     State->IsRecording = DEBUG_DEFAULT_RECORDING;
     State->RecordingChangeRequested = false;
+    State->SkipToNextFrameBarrier = false;
     State->Filter = DEBUG_DEFAULT_FILTER_VALUE;
     
     DEBUGInitMenus(State);

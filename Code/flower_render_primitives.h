@@ -49,6 +49,22 @@ struct mesh
     mesh_offsets Offsets;
 };
 
+enum image_format
+{
+    ImageFormat_RGBA,
+    ImageFormat_RGB,
+    ImageFormat_Grayscale,
+    
+    ImageFormat_Count,
+};
+
+GLOBAL_VARIABLE int ImageFormatPixelSizes[] = 
+{
+    4, 
+    3,
+    1,
+};
+
 struct image
 {
     void* Pixels;
@@ -57,10 +73,12 @@ struct image
     int Height;
     
     float WidthOverHeight;
+    u32 Format;
     
     b32 FilteringIsClosest;
     
     u64 ApiHandle;
+    b32 Invalidated;
 };
 
 struct material
@@ -101,10 +119,37 @@ struct animation
     void* Free;
 };
 
-struct glyph
+enum font_style
+{
+    FontStyle_Regular, 
+    FontStyle_Shadow,
+    FontStyle_Outline,
+    
+    FontStyle_Count,
+};
+
+struct glyph_style
 {
     int ImageIndex;
     f32 WidthOverHeight;
+    
+    v2 MinUV;
+    v2 MaxUV;
+};
+
+inline glyph_style CreateGlyphStyle(int ImageIndex, int Width, int Height)
+{
+    glyph_style Result = {};
+    
+    Result.ImageIndex = ImageIndex;
+    Result.WidthOverHeight = (f32)Width / (f32)Height;
+    
+    return(Result);
+}
+
+struct glyph
+{
+    glyph_style Styles[FontStyle_Count];
     
     u32 Codepoint;
     
@@ -113,9 +158,6 @@ struct glyph
     
     f32 XOffset;
     f32 YOffset;
-    
-    v2 MinUV;
-    v2 MaxUV;
 };
 
 struct font

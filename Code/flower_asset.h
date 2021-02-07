@@ -59,6 +59,8 @@ struct asset_system
     image CoinTail;
     image CoinHead;
     
+    image MultiCore;
+    image Scenery;
     image Mouse;
     image Cheese;
     
@@ -66,9 +68,11 @@ struct asset_system
     image PlaneTexture;
     image Palette; 
     
+#if 0    
     font TimesNewRoman;
     font LifeIsGoofy;
     font Arial;
+#endif
     font BerlinSans;
     font LiberationMono;
     
