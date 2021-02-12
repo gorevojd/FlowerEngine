@@ -90,7 +90,6 @@ INTERNAL_FUNCTION void OpenGLCheckError(char* File, int Line)
     }
 }
 
-
 INTERNAL_FUNCTION GLuint OpenGLLoadProgram(char* VertexFilePath, 
                                            char* FragmentFilePath, 
                                            char* GeometryFilePath = 0) 

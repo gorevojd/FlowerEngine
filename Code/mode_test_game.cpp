@@ -12,8 +12,10 @@ struct testgame_state
     
     u32 Mode;
     
-    v3 PlayerP;
-    v3 BearP;
+    game_object* Bear1;
+    game_object* Bear2;
+    game_object* Fox;
+    game_object* Supra;
 };
 
 SCENE_INIT(TestGame)
@@ -25,6 +27,22 @@ SCENE_INIT(TestGame)
     State->Camera.EulerAngles = QuatToEuler(InitRot);
     
     InitCamera(&State->Camera, Camera_FlyAround);
+    
+    State->Bear1 = CreateModelGameObject(Scene->Game, &Global_Assets->Bear);
+    State->Bear2 = CreateModelGameObject(Scene->Game, &Global_Assets->Bear);
+    State->Fox = CreateModelGameObject(Scene->Game, &Global_Assets->Fox);
+    State->Supra = CreateModelGameObject(Scene->Game, &Global_Assets->Supra);
+    
+    State->Bear1->P = V3(0.0f, 0.0f, 0.0f);
+    State->Bear1->Model_PlayingAnimation = &Global_Assets->BearSuccess;
+    
+    State->Bear2->P = V3(2.0f, 0.0f, 0.0f);
+    State->Bear2->Model_PlayingAnimation = &Global_Assets->BearIdle;
+    
+    State->Fox->P = V3(4.0f, 0.0f, 0.0f);
+    State->Fox->Model_PlayingAnimation = &Global_Assets->FoxTalk;
+    
+    State->Supra->P = V3(6.0f, 0.0f, 0.0f);
 }
 
 SCENE_UPDATE(TestGame)
@@ -46,7 +64,6 @@ SCENE_UPDATE(TestGame)
     UpdateCamera(&State->Camera, SpeedMultiplier);
     
     // NOTE(Dima): Updating game mode
-    
     if(GetKeyDown(Key_M))
     {
         State->Mode = (State->Mode + 1) % TestGame_Count;
@@ -56,28 +73,7 @@ SCENE_UPDATE(TestGame)
     {
         case TestGame_Animals:
         {
-            RenderModel(&Global_Assets->Bear,
-                        V3(1.0f, 0.0f, 0.0f),
-                        Global_Time->Time,
-                        &Global_Assets->BearSuccess);
-            
-#if 1            
-            RenderModel(&Global_Assets->Bear,
-                        V3(-1.0f, 0.0f, 0.0f),
-                        Global_Time->Time,
-                        &Global_Assets->BearIdle);
-#endif
-            
-            RenderModel(&Global_Assets->Fox,
-                        V3(-3.0f, 0.0f, 0.0f),
-                        Global_Time->Time,
-                        &Global_Assets->FoxTalk);
-            
-#if 1    
-            RenderModel(&Global_Assets->Supra,
-                        V3(4.0f, 0.0f, 0.0f),
-                        Global_Time->Time);
-#endif
+            UpdateGameObjects(Scene->Game);
             
             PushMesh(&Global_Assets->Plane,
                      &Global_Assets->GroundMaterial,

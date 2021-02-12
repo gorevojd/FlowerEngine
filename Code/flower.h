@@ -12,6 +12,7 @@
 #include "flower_platform.h"
 #include "flower_mem.h"
 
+#include "flower_jobs.h"
 #include "flower_input.h"
 #include "flower_render_primitives.h"
 #include "flower_asset.h"
@@ -21,34 +22,7 @@
 #include "flower_debug.h"
 
 #include "flower_scene.h"
-
-struct game
-{
-    scene* Scenes;
-    int NumScenes;
-    
-    int CurrentSceneIndex;
-    int NextSceneIndex;
-    
-    memory_arena* Arena;
-    
-    // NOTE(Dima): Subsystems
-    input_system* Input;
-    time* Time;
-    asset_system* Assets;
-    ui_state* UI;
-    render_commands* RenderCommands;
-    platform_api* PlatformAPI;
-    
-#if defined(INTERNAL_BUILD)
-    debug_state* Debug;
-    debug_global_table* DebugTable;
-#endif
-    
-    window_dimensions WindowDimensions;
-    
-    b32 CodeDllWasJustReloaded;
-};
+#include "flower_gameplay.h"
 
 inline void ChangeScene(game* Game, int NewSceneIndex)
 {

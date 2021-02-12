@@ -14,6 +14,7 @@
 #define InvalidCodePath Assert(!"Invalid code path")
 
 #define ArrayCount(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define ARC(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #define GlobalVariable static
 #define InternalFunction static
@@ -141,7 +142,7 @@ DLIST_INSERT_BEFORE_SENTINEL(Result, use_sent_value, next, prev);
 
 // NOTE(Dima): DLIST deallocate function body
 #define DLIST_DEALLOCATE_FUNCTION_BODY(entry_ptr, next, prev, free_sent_value) \
-DLIST_REMOVE_ENTRY(entry_ptr, next, prev);\
+DLIST_REMOVE(entry_ptr, next, prev);\
 DLIST_INSERT_BEFORE_SENTINEL(entry_ptr, free_sent_value, next, prev);
 
 

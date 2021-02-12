@@ -1,54 +1,36 @@
-void KickJob(job_callback* Callback, void* Data, u32 Priority)
+INTERNAL_FUNCTION void KickJob(job_callback* Callback, void* Data, u32 Priority)
 {
+    job_queue* Queue = Global_Jobs->Queues + Priority;
     
+    Queue->Lock->lock();
+    
+    // NOTE(Dima): Checking if we can to insert
+    u32 NewAddIndex = (Queue->AddIndex + 1) % Queue->JobsCount;
+    Assert(NewAddIndex != Queue->DoIndex);
+    
+    // NOTE(Dima): Init Job
+    job* Job = &Queue->Jobs[Queue->AddIndex];
+    Job->Callback = Callback;
+    Job->Data = Data;
+    
+    // NOTE(Dima): Setting new add index
+    Queue->AddIndex = NewAddIndex;
+    
+    Queue->Started++;
+    Queue->Sygnal->notify_all();
+    
+    Queue->Lock->unlock();
 }
 
-// NOTE(Dima): Returns true if no jobs to perform
-b32 PerformJob()
+INTERNAL_FUNCTION void WaitForCompletion(u32 Priority)
 {
-    b32 Result = false;
+    job_queue* Queue = Global_Jobs->Queues + Priority;
     
-    if()
+    while(Queue->Started != Queue->Finished)
     {
-        
-    }`
-        else
-    {
-        Result = true;
+        ShouldSleepAfterPerformJob(Queue);
     }
     
-    return(Result);
-}
-
-void JobWorkerThreadWork()
-{
-    for(;;)
-    {
-        if(PerformJob())
-        {
-            std::unique_lock<std::mutex> UniqueLock(ConditionVariable);
-            ConditionVariable.wait(UniqueLock);
-        }
-    }
-}
-
-void InitJobSystem(memory_arena* Arena)
-{
-    Global_JobSystem = PushStruct(Arena, job_system);
-    
-    job_system* Jobs = Global_JobSystem;
-    
-    // NOTE(Dima): Init jobs arrays
-    job* JobsArray = PushArray(Arena, job, MAX_JOBS_COUNT * JobPriority_Count);
-    
-    for(int Layer = 0;
-        Layer < JobPriority_Count;
-        Layer++)
-    {
-        jobs_layer* Layer = &Jobs->Layers[Layer];
-        
-        Layer->Jobs = JobsArray + Layer * MAX_JOBS_COUNT;
-        Layer->AddIndex = 0;
-        Layer->DoIndex = 0;
-    }
+    Queue->Started = 0;
+    Queue->Finished = 0;
 }

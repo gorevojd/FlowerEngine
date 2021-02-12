@@ -210,9 +210,8 @@ void UpdateAnimation(animation* Animation, f32 Time, m44* NodeMatrices)
     }
 }
 
-INTERNAL_FUNCTION void CalculateToModelTransforms(model* Model)
+INTERNAL_FUNCTION void CalculateToModelTransforms(model* Model, m44* ToModel)
 {
-    m44* ArrayToModel = Model->Node_ToModel;
     m44* ArrayToParent = Model->Node_ToParent;
     
     for(int TranIndex = 0;
@@ -223,16 +222,18 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model* Model)
         
         if(ParentIndex == -1)
         {
-            ArrayToModel[TranIndex] = ArrayToParent[TranIndex];
+            ToModel[TranIndex] = ArrayToParent[TranIndex];
         }
         else
         {
-            ArrayToModel[TranIndex] = ArrayToParent[TranIndex] * ArrayToModel[ParentIndex];
+            ToModel[TranIndex] = ArrayToParent[TranIndex] * ToModel[ParentIndex];
         }
     }
 }
 
-INTERNAL_FUNCTION void CalculateSkinningMatrices(model* Model)
+INTERNAL_FUNCTION void CalculateSkinningMatrices(model* Model, 
+                                                 m44* NodeToModel, 
+                                                 m44* SkinningMatrices)
 {
     for(int BoneIndex = 0;
         BoneIndex < Model->Shared.NumBones;
@@ -241,6 +242,6 @@ INTERNAL_FUNCTION void CalculateSkinningMatrices(model* Model)
         int NodeIndex = Model->Bone_NodeIndex[BoneIndex];
         const m44& InvBindPos = Model->Bone_InvBindPose[BoneIndex];
         
-        Model->Bone_SkinningMatrices[BoneIndex] = InvBindPos * Model->Node_ToModel[NodeIndex];
+        SkinningMatrices[BoneIndex] = InvBindPos * NodeToModel[NodeIndex];
     }
 }

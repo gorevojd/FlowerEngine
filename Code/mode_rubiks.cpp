@@ -13,7 +13,7 @@ SCENE_INIT(RubiksCube)
     
     InitCamera(&State->Camera, Camera_RotateAround);
     
-    State->Cube3 = CreateCube(Scene->Arena, 70, 1.0f, false);
+    State->Cube3 = CreateCube(Scene->Arena, 10, 1.0f, true);
 }
 
 SCENE_UPDATE(RubiksCube)
@@ -38,6 +38,7 @@ SCENE_UPDATE(RubiksCube)
     rubiks_cube* Cube = &State->Cube3;
     
     b32 ShiftIsPressed = GetKey(Key_LeftShift);
+    b32 CtrlIsPressed = GetKey(Key_LeftControl);
     
     if(GetKeyDown(Key_G))
     {
@@ -51,53 +52,95 @@ SCENE_UPDATE(RubiksCube)
     
     if(GetKeyDown(Key_R))
     {
-        AddCommandToCube(Cube, RubiksAxis_X, 0, !ShiftIsPressed);
+        if(CtrlIsPressed)
+        {
+            CommandStandard_RR(Cube, ShiftIsPressed);
+        }
+        else
+        {
+            CommandStandard_R(Cube, ShiftIsPressed);
+        }
     }
     
     if(GetKeyDown(Key_L))
     {
-        AddCommandToCube(Cube, RubiksAxis_X, Cube->Dim - 1, !ShiftIsPressed);
+        if(CtrlIsPressed)
+        {
+            CommandStandard_LL(Cube, ShiftIsPressed);
+        }
+        else
+        {
+            CommandStandard_L(Cube, ShiftIsPressed);
+        }
     }
     
     if(GetKeyDown(Key_D))
     {
-        AddCommandToCube(Cube, RubiksAxis_Y, 0, !ShiftIsPressed);
+        if(CtrlIsPressed)
+        {
+            CommandStandard_DD(Cube, ShiftIsPressed);
+        }
+        else
+        {
+            CommandStandard_D(Cube, ShiftIsPressed);
+        }
     }
     
     if(GetKeyDown(Key_U))
     {
-        AddCommandToCube(Cube, RubiksAxis_Y, Cube->Dim - 1, !ShiftIsPressed);
+        if(CtrlIsPressed)
+        {
+            CommandStandard_UU(Cube, ShiftIsPressed);
+        }
+        else
+        {
+            CommandStandard_U(Cube, ShiftIsPressed);
+        }
     }
     
     if(GetKeyDown(Key_F))
     {
-        AddCommandToCube(Cube, RubiksAxis_Z, 0, !ShiftIsPressed);
+        if(CtrlIsPressed)
+        {
+            CommandStandard_FF(Cube, ShiftIsPressed);
+        }
+        else
+        {
+            CommandStandard_F(Cube, ShiftIsPressed);
+        }
     }
     
     if(GetKeyDown(Key_B))
     {
-        AddCommandToCube(Cube, RubiksAxis_Z, Cube->Dim - 1, !ShiftIsPressed);
+        if(CtrlIsPressed)
+        {
+            CommandStandard_BB(Cube, ShiftIsPressed);
+        }
+        else
+        {
+            CommandStandard_B(Cube, ShiftIsPressed);
+        }
     }
     
     // NOTE(Dima): CenterTests
-    if(GetKeyDown(Key_I) && Cube->Dim >= 3)
+    if(GetKeyDown(Key_M) && Cube->Dim >= 3)
     {
-        AddCommandToCube(Cube, RubiksAxis_X, 1, Cube->Dim - 2, !ShiftIsPressed);
+        CommandStandard_M(Cube, ShiftIsPressed);
     }
     
-    if(GetKeyDown(Key_O) && Cube->Dim >= 3)
+    if(GetKeyDown(Key_E) && Cube->Dim >= 3)
     {
-        AddCommandToCube(Cube, RubiksAxis_Y, 1, Cube->Dim - 2, !ShiftIsPressed);
+        CommandStandard_E(Cube, ShiftIsPressed);
     }
     
-    if(GetKeyDown(Key_P) && Cube->Dim >= 3)
+    if(GetKeyDown(Key_S) && Cube->Dim >= 3)
     {
-        AddCommandToCube(Cube, RubiksAxis_Z, 1, Cube->Dim - 2, !ShiftIsPressed);
+        CommandStandard_S(Cube, ShiftIsPressed);
     }
     
     UpdateCube(&State->Cube3, V3(0.0f), 1.0f);
     //UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
-    
+    ShowSides(&State->Cube3, V2(10), 240);
     
 #if 0    
     ShowLabel3D(&State->Camera, 

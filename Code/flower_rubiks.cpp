@@ -218,12 +218,12 @@ INTERNAL_FUNCTION inline rubiks_is_outer_bool RubiksIsOuterCubie(rubiks_cube* Cu
     
     if(z == 0)
     {
-        Result.Result[RubiksDirection_Back] = true;
+        Result.Result[RubiksDirection_Front] = true;
     }
     
     if(z == (Cube->Dim - 1))
     {
-        Result.Result[RubiksDirection_Front] = true;
+        Result.Result[RubiksDirection_Back] = true;
     }
     
     return(Result);
@@ -473,7 +473,6 @@ INTERNAL_FUNCTION void GenerateStickerMeshes(rubiks_cube* Cube, b32 RoundSticker
         helper_rubiks_mesh* StickerDown = &Cube->HelperStickerDown;
         
         // NOTE(Dima): Generating sticker sides
-        
         Assert(StickerUp->PerimeterPoints.size() == StickerDown->PerimeterPoints.size());
         
         int NumPerimP = StickerUp->PerimeterPoints.size();
@@ -632,7 +631,7 @@ INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceX(rubiks_cube* Cube,
     
     for(int x = FirstX; x <= LastX; x++)
     {
-        for(int z = Cube->Dim - 1; z >= 0; z--)
+        for(int z = 0; z < Cube->Dim; z++)
         {
             for(int y = 0; y < Cube->Dim; y++)
             {
@@ -655,7 +654,7 @@ INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceY(rubiks_cube* Cube,
     
     for(int y = FirstY; y <= LastY; y++)
     {
-        for(int z = 0; z < Cube->Dim; z++)
+        for(int z = Cube->Dim - 1; z >= 0; z--)
         {
             for(int x = 0; x < Cube->Dim; x++)
             {
@@ -680,7 +679,7 @@ INTERNAL_FUNCTION inline rubiks_rotate_face* GetFaceZ(rubiks_cube* Cube,
     {
         for(int y = 0; y < Cube->Dim; y++)
         {
-            for(int x = Cube->Dim - 1; x >= 0; x--)
+            for(int x = 0; x < Cube->Dim; x++)
             {
                 AddCubieToRotatedFace(Cube, Result, x, y, z);
             }
@@ -798,6 +797,73 @@ INTERNAL_FUNCTION void RubiksCalcPrecomputedFace(rubiks_cube* Cube,
     }
 }
 
+INTERNAL_FUNCTION void FillOuterColorsArrays(rubiks_cube* Cube, 
+                                             rubiks_beginned_rotation* Rot, 
+                                             int FaceIndex, 
+                                             b32 SetBack)
+{
+    int AxisIndex = Rot->AxisIndex;
+    
+    int At = 0;
+    for(int OuterSideIndex = 0;
+        OuterSideIndex < 4;
+        OuterSideIndex++)
+    {
+        int OuterSide = RubiksRotOuterSides4Rotation[AxisIndex][OuterSideIndex];
+        b32 ShouldInvert = RubiksShouldInvertOuterGetting[AxisIndex][OuterSideIndex];
+        b32 InvertLineGetting = RubiksShouldInvertLineGetting[AxisIndex][OuterSideIndex];
+        b32 IsRow = RubiksLineIsRow[AxisIndex][OuterSideIndex];
+        
+        u8* Side = Cube->Sides[OuterSide];
+        
+        int LineIndex = FaceIndex;
+        if(InvertLineGetting)
+        {
+            LineIndex = Cube->Dim - 1 - FaceIndex;
+        }
+        
+        for(int i = 0; i < Cube->Dim; i++)
+        {
+            int IndexOnLine = i;
+            if(ShouldInvert)
+            {
+                IndexOnLine = Cube->Dim - 1 - i;
+            }
+            
+            u8 Result;
+            if(!SetBack)
+            {
+                if(IsRow)
+                {
+                    Result = Side[LineIndex * Cube->Dim + IndexOnLine];
+                }
+                else
+                {
+                    Result = Side[IndexOnLine * Cube->Dim + LineIndex];
+                }
+                
+                Cube->RotColors[At] = Result;
+                Cube->RotColorsTemp[At] = Result;
+            }
+            else
+            {
+                Result = Cube->RotColors[At];
+                
+                if(IsRow)
+                {
+                    Side[LineIndex * Cube->Dim + IndexOnLine] = Result;
+                }
+                else
+                {
+                    Side[IndexOnLine * Cube->Dim + LineIndex] = Result;
+                }
+            }
+            
+            At++;
+        }
+    }
+}
+
 INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
 {
     rubiks_beginned_rotation* BeginnedRotation = &Cube->BeginnedRotation;
@@ -810,6 +876,76 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
         FaceIndex++)
     {
         b32 IsOuter = (FaceIndex == 0) || (FaceIndex == Cube->Dim - 1);
+        
+        // NOTE(Dima): Rotating outer colors(colors on 4 sides of the rotated face)
+        FillOuterColorsArrays(Cube, BeginnedRotation, FaceIndex, false);
+        
+        int OuterSize = 4 * Cube->Dim;
+        for(int i = 0; i < OuterSize; i++)
+        {
+            int SrcIndex;
+            if(BeginnedRotation->IsClockwise)
+            {
+                SrcIndex = (i + Cube->Dim) % OuterSize;
+            }
+            else
+            {
+                SrcIndex = (i - Cube->Dim);
+                if(SrcIndex < 0)
+                {
+                    SrcIndex += OuterSize;
+                }
+            }
+            Cube->RotColors[i] = Cube->RotColorsTemp[SrcIndex];
+        }
+        
+        FillOuterColorsArrays(Cube, BeginnedRotation, FaceIndex, true);
+        
+        // NOTE(Dima): Getting side face colors
+        u8* SideFace = 0;
+        if(IsOuter)
+        {
+            int SideIndex = -1;
+            
+            switch(BeginnedRotation->AxisIndex)
+            {
+                case RubiksAxis_X:
+                {
+                    Assert(RubiksDirection_Right == RubiksColor_Red);
+                    Assert(RubiksDirection_Left == RubiksColor_Orange);
+                    SideIndex = (FaceIndex == 0) ? RubiksDirection_Right : RubiksDirection_Left;
+                }break;
+                
+                case RubiksAxis_Y:
+                {
+                    Assert(RubiksDirection_Up == RubiksColor_White);
+                    Assert(RubiksDirection_Down == RubiksColor_Yellow);
+                    SideIndex = (FaceIndex == 0) ? RubiksDirection_Down : RubiksDirection_Up;
+                }break;
+                
+                case RubiksAxis_Z:
+                {
+                    Assert(RubiksDirection_Front == RubiksColor_Green);
+                    Assert(RubiksDirection_Back == RubiksColor_Blue);
+                    SideIndex = (FaceIndex == 0) ? RubiksDirection_Front : RubiksDirection_Back;
+                }break;
+                
+                default: 
+                {
+                    InvalidCodePath;
+                }break;
+            }
+            
+            SideFace = Cube->Sides[SideIndex];
+            
+            // NOTE(Dima): Copying to temp
+            for(int CopyIndex = 0;
+                CopyIndex < Cube->Dim * Cube->Dim;
+                CopyIndex++)
+            {
+                Cube->SideTemp[CopyIndex] = SideFace[CopyIndex];
+            }
+        }
         
         int FaceBase = (FaceIndex - BeginnedRotation->FirstFaceIndex) * Cube->Dim * Cube->Dim;
         
@@ -835,6 +971,30 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
                 i++)
             {
                 Face->Face[FaceBase + ToRotateIndices[i]] = Face->TempFace[FaceBase + RotatedIndices[i]];
+            }
+            
+            // NOTE(Dima): Rotating color
+            if(SideFace != 0)
+            {
+                
+                if(FaceIndex == Cube->Dim - 1)
+                {
+                    if(!BeginnedRotation->IsClockwise)
+                    {
+                        RotatedIndices = PrecompFace->RotatedClockwise[LoopIndex];
+                    }
+                    else
+                    {
+                        RotatedIndices = PrecompFace->RotatedCounterClockwise[LoopIndex];
+                    }
+                }
+                
+                for(int i = 0;
+                    i < ToRotateCount;
+                    i++)
+                {
+                    SideFace[FaceBase + ToRotateIndices[i]] = Cube->SideTemp[FaceBase + RotatedIndices[i]];
+                }
             }
             
             CurrentStart++;
@@ -884,6 +1044,113 @@ INTERNAL_FUNCTION void AddCommandToCube(rubiks_cube* Cube,
                      FaceIndex,
                      FaceIndex,
                      IsClockwise);
+}
+
+// NOTE(Dima): Standard commands like R, L, U, D, F, B
+INTERNAL_FUNCTION inline void CommandStandard_R(rubiks_cube* Cube, 
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_X, 0, CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_L(rubiks_cube* Cube,
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_X, Cube->Dim - 1, !CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_U(rubiks_cube* Cube,
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Y, Cube->Dim - 1, !CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_D(rubiks_cube* Cube, 
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Y, 0, CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_F(rubiks_cube* Cube,
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Z, 0, CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_B(rubiks_cube* Cube,
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Z, Cube->Dim - 1, !CounterClockwise);
+}
+
+// NOTE(Dima): M, E, S
+/*
+
+M - Center on X axis. Rotation same as from L
+E - Center on Y axis. Rotation same as from D
+S - Center on Z axis. Rotation same as from F
+
+*/
+
+INTERNAL_FUNCTION inline void CommandStandard_M(rubiks_cube* Cube, 
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_X, 
+                     1, Cube->Dim - 2,
+                     !CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_E(rubiks_cube* Cube,
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Y, 
+                     1, Cube->Dim - 2, 
+                     CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_S(rubiks_cube* Cube,
+                                                b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Z,
+                     1, Cube->Dim - 2,
+                     CounterClockwise);
+}
+
+// NOTE(Dima): Commands for doubly rotation. Rotation of a side and center
+INTERNAL_FUNCTION inline void CommandStandard_RR(rubiks_cube* Cube, 
+                                                 b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_X, 0, Cube->Dim - 2, CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_LL(rubiks_cube* Cube,
+                                                 b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_X, 1, Cube->Dim - 1, !CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_UU(rubiks_cube* Cube,
+                                                 b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Y, 1, Cube->Dim - 1, !CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_DD(rubiks_cube* Cube, 
+                                                 b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Y, 0, Cube->Dim - 2, CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_FF(rubiks_cube* Cube,
+                                                 b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Z, 0, Cube->Dim - 2, CounterClockwise);
+}
+
+INTERNAL_FUNCTION inline void CommandStandard_BB(rubiks_cube* Cube,
+                                                 b32 CounterClockwise)
+{
+    AddCommandToCube(Cube, RubiksAxis_Z, 1, Cube->Dim - 1, !CounterClockwise);
 }
 
 INTERNAL_FUNCTION void FinishCommandExecution(rubiks_cube* Cube)
@@ -1060,7 +1327,24 @@ INTERNAL_FUNCTION inline void InitToVisibleMapping(rubiks_cube* Cube)
     Assert(UniqueNames.size() == Cube->Visible.Count);
 }
 
-INTERNAL_FUNCTION inline void ResetCubies(rubiks_cube* Cube)
+INTERNAL_FUNCTION void ResetCubeColors(rubiks_cube* Cube)
+{
+    int OnFaceCount = Cube->Dim * Cube->Dim;
+    
+    for(int SideIndex = 0;
+        SideIndex < RubiksColor_Count;
+        SideIndex++)
+    {
+        u8* Face = Cube->Sides[SideIndex];
+        
+        for(int i = 0; i < OnFaceCount; i++)
+        {
+            Face[i] = SideIndex;
+        }
+    }
+}
+
+INTERNAL_FUNCTION void ResetCubies(rubiks_cube* Cube)
 {
     rubiks_visible_cubies* Vis = &Cube->Visible;
     
@@ -1086,6 +1370,8 @@ INTERNAL_FUNCTION inline void ResetCubies(rubiks_cube* Cube)
             }
         }
     }
+    
+    ResetCubeColors(Cube);
 }
 
 inline int GetVisibleCubiesCount(int Dim)
@@ -1119,6 +1405,20 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     Result.Visible.AppliedRotation = PushArray(Arena, m44, CeilAlign(VisibleCount, 4));
     Result.Visible.InitP = PushArray(Arena, v3, CeilAlign(VisibleCount, 4));
     Result.Visible.MeshIndex = PushArray(Arena, int, CeilAlign(VisibleCount, 4));
+    
+    // NOTE(Dima): Init faces colors
+    int OuterColorsCount = 4 * Result.Dim;
+    Result.RotColors = PushArray(Arena, u8, OuterColorsCount);
+    Result.RotColorsTemp = PushArray(Arena, u8, OuterColorsCount);
+    
+    Result.SideTemp = PushArray(Arena, u8, OneFaceCount);
+    for(int SideIndex = 0;
+        SideIndex < RubiksColor_Count;
+        SideIndex++)
+    {
+        Result.Sides[SideIndex] = PushArray(Arena, u8, OneFaceCount);
+    }
+    ResetCubeColors(&Result);
     
     InitToVisibleMapping(&Result);
     
@@ -1297,6 +1597,49 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
     }
 }
 
+INTERNAL_FUNCTION void ShowSides(rubiks_cube* Cube, 
+                                 v2 ScreenP, 
+                                 f32 Height)
+{
+    f32 OneQuadieLen = Height / (f32)Cube->Dim;
+    v2 OneQuadieDim = V2(OneQuadieLen);
+    
+    // NOTE(Dima): Init faces colors
+    v2 At = ScreenP;
+    
+    for(int SideIndex = 0;
+        SideIndex < RubiksColor_Count;
+        SideIndex++)
+    {
+        u8* Face = Cube->Sides[SideIndex];
+        
+        for(int i = 0; i < Cube->Dim * Cube->Dim; i++)
+        {
+            int x = i % Cube->Dim;
+            int y = i / Cube->Dim;
+            
+            v4 Color = RubiksColors[Face[i]];
+            
+            v2 QuadieShowP = At + V2(x, y) * OneQuadieLen;
+            
+            rc2 QuadieRc = RectMinDim(QuadieShowP,
+                                      OneQuadieDim);
+            PushRect(QuadieRc, Color);
+        }
+        
+        f32 CenterX = At.x + Height * 0.5f;
+        f32 TopY = At.y + Height + 10;
+        
+        PrintTextAligned((char*)RubiksDirectionName[SideIndex],
+                         V2(CenterX, TopY),
+                         TextAlign_Center,
+                         TextAlign_Top,
+                         ColorWhite());
+        
+        At.x += (20 + Height);
+    }
+}
+
 INTERNAL_FUNCTION void GenerateScrubmle(rubiks_cube* Cube, int Seed = 123)
 {
     random_generation Random = SeedRandom(Seed);
@@ -1336,4 +1679,9 @@ INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube,
     }
     
     ShowCube(Cube, P, DebugMode);
+    
+    // NOTE(Dima): Helper left cubie
+    PushMesh(&Global_Assets->Cube,
+             0,
+             ScalingMatrix(0.1f) * TranslationMatrix(V3(2.0f, 0.0f, 0.0f)));
 }

@@ -606,24 +606,20 @@ INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
     Help.AddPlace("Meshes", Model->Shared.NumMeshes, sizeof(mesh*));
     Help.AddPlace("Materials", AllocMaterialsCount, sizeof(material*));
     Help.AddPlace("Nodes", Model->Shared.NumNodes, sizeof(model_node));
-    Help.AddPlace("Node_ToModel", Model->Shared.NumNodes, sizeof(m44));
     Help.AddPlace("Node_ToParent", Model->Shared.NumNodes, sizeof(m44));
     Help.AddPlace("Node_ParentIndex", Model->Shared.NumNodes, sizeof(int));
     Help.AddPlace("Bone_InvBindPose", Model->Shared.NumNodes, sizeof(m44));
     Help.AddPlace("Bone_NodeIndex", Model->Shared.NumBones, sizeof(int));
-    Help.AddPlace("Bone_SkinningMatrices", Model->Shared.NumBones, sizeof(m44));
     
     Help.Generate();
     
     Model->Meshes = (mesh**)Help.GetPlace("Meshes");
     Model->Materials = (material**)Help.GetPlace("Materials");
     Model->Nodes = (model_node*)Help.GetPlace("Nodes");
-    Model->Node_ToModel = (m44*)Help.GetPlace("Node_ToModel");
     Model->Node_ToParent = (m44*)Help.GetPlace("Node_ToParent");
     Model->Node_ParentIndex = (int*)Help.GetPlace("Node_ParentIndex");
     Model->Bone_InvBindPose = (m44*)Help.GetPlace("Bone_InvBindPose");
     Model->Bone_NodeIndex = (int*)Help.GetPlace("Bone_NodeIndex");
-    Model->Bone_SkinningMatrices = (m44*)Help.GetPlace("Bone_SkinningMatrices");
     
     Model->Free = Help.Data;
     
@@ -687,7 +683,6 @@ INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
         }
         
         // NOTE(Dima): Copy other arrays
-        Model->Node_ToModel[NodeIndex] = Src->ToModel;
         Model->Node_ToParent[NodeIndex] = Src->ToParent;
         Model->Node_ParentIndex[NodeIndex] = Src->ParentNodeIndex;
     }
@@ -735,7 +730,7 @@ INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
     // NOTE(Dima): Applying additional rotation
     if(Params.Model_FixInvalidRotation)
     {
-        m44 AdditionalRotation = RotationMatrixX(-90.0f * F_DEG2RAD);
+        m44 AdditionalRotation = RotationMatrixX(90.0f * F_DEG2RAD);
         
         InvRootTran = AdditionalRotation * InvRootTran;
     }

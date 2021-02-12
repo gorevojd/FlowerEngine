@@ -2,10 +2,11 @@
 
 platform_api Platform;
 GLOBAL_VARIABLE input_system* Global_Input;
-GLOBAL_VARIABLE time* Global_Time;
+GLOBAL_VARIABLE time_system* Global_Time;
 GLOBAL_VARIABLE asset_system* Global_Assets;
 GLOBAL_VARIABLE ui_state* Global_UI;
 GLOBAL_VARIABLE render_commands* Global_RenderCommands;
+GLOBAL_VARIABLE job_system* Global_Jobs;
 
 #if defined(INTERNAL_BUILD)
 GLOBAL_VARIABLE debug_state* Global_Debug;
@@ -25,6 +26,7 @@ debug_global_table* Global_DebugTable;
 #include "stb_truetype.h"
 
 #include "flower_standard.cpp"
+#include "flower_jobs.cpp"
 #include "flower_random.cpp"
 #include "flower_input.cpp"
 #include "flower_asset.cpp"
@@ -107,6 +109,8 @@ INTERNAL_FUNCTION void SaveGlobalVariables(game* Game)
     Game->UI = Global_UI;
     Game->RenderCommands = Global_RenderCommands;
     
+    // NOTE(Dima): Initially skipped JobSystem here because it is allocated on platform layer
+    
 #if defined(INTERNAL_BUILD)
     Game->Debug = Global_Debug;
     Game->DebugTable = Global_DebugTable;
@@ -122,6 +126,7 @@ INTERNAL_FUNCTION void RestoreGlobalVariables(game* Game)
     Global_Assets = Game->Assets;
     Global_UI = Game->UI;
     Global_RenderCommands = Game->RenderCommands;
+    Global_Jobs = Game->JobSystem;
     
 #if defined(INTERNAL_FUNCTION)
     Global_Debug = Game->Debug;
@@ -152,7 +157,8 @@ extern "C" __declspec(dllexport) GAME_INIT(GameInit)
     Game->PlatformAPI = PlatformAPI;
     Platform = *PlatformAPI;
     
-    Global_Time = PushStruct(Arena, time);
+    Global_Time = PushStruct(Arena, time_system);
+    Global_Jobs = Game->JobSystem;
     InitInput(Arena);
     InitAssetSystem(Arena);
     InitUI(Arena);
@@ -163,8 +169,13 @@ extern "C" __declspec(dllexport) GAME_INIT(GameInit)
     
     InitGameModes(Game);
     
-    //Game->CurrentSceneIndex = FindSceneByName("RubiksCube");
+    InitGameObjectPool(Game, Arena);
+    
+#if 1
+    Game->CurrentSceneIndex = FindSceneByName("RubiksCube");
+#else
     Game->CurrentSceneIndex = FindSceneByName("GraphShow");
+#endif
     Game->NextSceneIndex = Game->CurrentSceneIndex;
 }
 

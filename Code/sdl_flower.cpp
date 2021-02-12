@@ -22,15 +22,17 @@
 #include "flower.h"
 
 #include "flower_standard.cpp"
+#include "flower_jobs_platform.cpp"
 
 platform_api Platform;
+GLOBAL_VARIABLE job_system* Global_Jobs;
 
 #if !defined(PLATFORM_IS_WINDOWS)
 #include "flower.cpp"
 #else
 
 GLOBAL_VARIABLE input_system* Global_Input;
-GLOBAL_VARIABLE time* Global_Time;
+GLOBAL_VARIABLE time_system* Global_Time;
 GLOBAL_VARIABLE debug_global_table* Global_DebugTable;
 
 #include <Windows.h>
@@ -975,6 +977,7 @@ void SetGlobalVariables(game* Game)
     Global_Input = Game->Input;
     Global_Time = Game->Time;
     Global_DebugTable = Game->DebugTable;
+    Global_Jobs = Game->JobSystem;
 }
 
 #if defined(PLATFORM_IS_WINDOWS)
@@ -1037,12 +1040,18 @@ INTERNAL_FUNCTION b32 RealoadIfNeededGameDLL()
     {
         if(CompareFileTime(&LastWriteTime, &LastSaved) > 0)
         {
-            App->LastGameDllWriteTime = LastWriteTime;
+            // TODO(Dima): Here I can place code to finish work before DLL is reloaded
             
+            
+            // NOTE(Dima): Freing current loaded DLL
             BOOL FreeResult = FreeLibrary(App->TempDllHandle);
             Assert(FreeResult);
             
+            // NOTE(Dima): Reloading functions
             LoadGameAndFunctionsFromDll();
+            
+            // NOTE(Dima): Setting new saved DLL last write time
+            App->LastGameDllWriteTime = LastWriteTime;
             
             Result = true;
         }
@@ -1102,8 +1111,16 @@ int main(int ArgsCount, char** Args)
     
     game* Game = PushStruct(&GameArena, game);
     InitGameCodeFromDll();
+    
+    // NOTE(Dima): Init job system
+    int QueuesThreadCounts[] = {2, 10};
+    int QueuesJobCounts[] = {DEFAULT_JOBS_COUNT, DEFAULT_JOBS_COUNT};
+    Game->JobSystem = InitJobSystem(&GameArena, QueuesThreadCounts, QueuesJobCounts);
+    
+    // NOTE(Dima): Init game
     App->GameInit(Game, &GameArena, &Platform);
     
+    // NOTE(Dima): Setting up global variables after game init
     SetGlobalVariables(Game);
     
 #if 0    

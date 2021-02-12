@@ -999,6 +999,222 @@ void GraphThreads()
     }
 }
 
+void GraphFrustumCulling()
+{
+    PushClear(V4(0.1f).rgb);
+    
+    static b32 IsRotating = false;
+    static f32 CurAngle = 0.0f;
+    
+    if(GetKeyDown(Key_Space))
+    {
+        IsRotating = !IsRotating;
+    }
+    
+    if(GetKeyDown(Key_R))
+    {
+        CurAngle = 0.0f;
+    }
+    
+    int Width = 1600;
+    int Height = 900;
+    
+    int SphereSpacing = 100;
+    
+    int Near = 20;
+    int Far = 500;
+    f32 FOV = 45.0f;
+    
+    v2 CameraP = V2(Width, Height) * 0.5f;
+    v2 LookDirection = V2(Cos(CurAngle), Sin(CurAngle));
+    v2 LookPerp = Perp(LookDirection);
+    
+    v2 NearOrigin = CameraP + LookDirection * Near;
+    v2 FarOrigin = CameraP + LookDirection * Far;
+    
+    f32 NearFactor = (f32)Near * Tan(FOV * 0.5f);
+    f32 FarFactor = (f32)Far * Tan(FOV * 0.5f);
+    
+    v2 A = NearOrigin - LookPerp * NearFactor;
+    v2 B = FarOrigin - LookPerp * FarFactor;
+    v2 C = FarOrigin + LookPerp * FarFactor;
+    v2 D = NearOrigin + LookPerp * NearFactor;
+    
+    f32 AlphaFrustum = 0.5f;
+    
+    v3 Planes[4];
+    Planes[0] = LineEquationFrom2Points(B, A);
+    Planes[1] = LineEquationFrom2Points(C, B);
+    Planes[2] = LineEquationFrom2Points(D, C);
+    Planes[3] = LineEquationFrom2Points(A, D);
+    
+    for(int j = SphereSpacing; j < Height; j += SphereSpacing)
+    {
+        for(int i = SphereSpacing; i < Width; i += SphereSpacing)
+        {
+            v2 P = V2(i, j);
+            f32 Radius = (f32)SphereSpacing * 0.4f;
+            v4 Color = ColorGray(0.5f);
+            
+            b32 InFrustum = true;
+            for(int LineIndex = 0;
+                LineIndex < 4;
+                LineIndex++)
+            {
+                v3 Plane = Planes[LineIndex];
+                
+                if(Dot(Plane.xy, P) + Plane.z + Radius > 0.0f)
+                {
+                    
+                }
+                else
+                {
+                    InFrustum = false;
+                    break;
+                }
+            }
+            
+            if(InFrustum)
+            {
+                Color = ColorYellow();
+            }
+            PushCircle2D(P, Radius, Color, 16);
+        }
+    }
+    
+    PushRect(RectCenterDim(CameraP, V2(30)), 
+             ColorOrange());
+    PushQuadrilateral2D(A, B, C, D,
+                        V4(ColorWhite().rgb, AlphaFrustum));
+    
+    if(IsRotating)
+    {
+        CurAngle += Global_Time->DeltaTime;
+    }
+}
+
+
+void GraphOcclusionCulling()
+{
+    PushClear(V4(0.1f).rgb);
+    
+    static f32 CurAngle = 0.0f;
+    
+    int Width = 1600;
+    int Height = 900;
+    
+    int SphereSpacing = 100;
+    f32 SphereStart = 0.25f;
+    
+    int Near = 20;
+    int Far = 1000;
+    f32 FOV = 35.0f;
+    
+    v2 CameraP = UVToScreenPoint(0.1f, 0.5f);
+    v2 LookDirection = V2(Cos(CurAngle), Sin(CurAngle));
+    v2 LookPerp = Perp(LookDirection);
+    
+    v2 NearOrigin = CameraP + LookDirection * Near;
+    v2 FarOrigin = CameraP + LookDirection * Far;
+    
+    f32 NearFactor = (f32)Near * Tan(FOV * F_DEG2RAD * 0.5f);
+    f32 FarFactor = (f32)Far * Tan(FOV * F_DEG2RAD * 0.5f);
+    
+    v2 A = NearOrigin - LookPerp * NearFactor;
+    v2 B = FarOrigin - LookPerp * FarFactor;
+    v2 C = FarOrigin + LookPerp * FarFactor;
+    v2 D = NearOrigin + LookPerp * NearFactor;
+    
+    f32 AlphaFrustum = 0.2f;
+    
+    v3 Planes[4];
+    Planes[0] = LineEquationFrom2Points(B, A);
+    Planes[1] = LineEquationFrom2Points(C, B);
+    Planes[2] = LineEquationFrom2Points(D, C);
+    Planes[3] = LineEquationFrom2Points(A, D);
+    
+    b32 IsFirst = true;
+    for(int i = UVToScreenPoint(SphereStart, 0.0f).x; i < Width; i += SphereSpacing)
+    {
+        v2 P = V2(i, UVToScreenPoint(0.0f, 0.5f).y);
+        f32 Radius = (f32)SphereSpacing * 0.4f;
+        v4 Color = ColorGray(0.5f);
+        
+        if(!IsFirst)
+        {
+            Color = ColorGray(0.2f);
+        }
+        
+        PushCircle2D(P, Radius, Color, 16);
+        
+        IsFirst = false;
+    }
+    
+    PushRect(RectCenterDim(CameraP, V2(30)), 
+             ColorOrange());
+    PushQuadrilateral2D(A, B, C, D,
+                        V4(ColorWhite().rgb, AlphaFrustum));
+}
+
+void GraphTextureSwitches()
+{
+    static int CurrentCodepoint = 'A';
+    
+    f32 Delay = 0.25f;
+    static f32 NextGlyphTime = NextGlyphTime;
+    
+    if(Global_Time->Time > NextGlyphTime)
+    {
+        CurrentCodepoint = 'A' + (CurrentCodepoint - 'A' + 1) % ('Z' - 'A' + 1);
+        
+        NextGlyphTime = Global_Time->Time + Delay;
+    }
+    
+    f32 GlyphScale = 5.0f;
+    
+    font* Font = Global_UI->Params.Font;
+    glyph* Glyph = &Font->Glyphs[CurrentCodepoint - ' '];
+    glyph_style* GlyphStyle = &Glyph->Styles[FontStyle_Outline];
+    image* Image = &Font->GlyphImages[GlyphStyle->ImageIndex];
+    
+    v2 Center = UVToScreenPoint(0.5f, 0.5f);
+    
+    PushCenteredImage(Image, Center, Image->Height * GlyphScale);
+}
+
+void GraphFontAtlas()
+{
+    image* Image = &Global_Assets->FontsAtlas;
+    
+    PushCenteredImage(Image, UVToScreenPoint(0.5f, 0.9f), 1400);
+    
+    static int CurrentCodepoint = 'A';
+    
+    f32 Delay = 1.0f;
+    static f32 NextGlyphTime = NextGlyphTime;
+    
+    if(Global_Time->Time > NextGlyphTime)
+    {
+        CurrentCodepoint = 'A' + (CurrentCodepoint - 'A' + 1) % ('Z' - 'A' + 1);
+        
+        NextGlyphTime = Global_Time->Time + Delay;
+    }
+    
+    UIPushFont(&Global_Assets->BerlinSans);
+    f32 GlyphScale = 2.0f;
+    
+    font* Font = Global_UI->Params.Font;
+    glyph* Glyph = &Font->Glyphs[CurrentCodepoint - ' '];
+    glyph_style* GlyphStyle = &Glyph->Styles[FontStyle_Outline];
+    image* GlyphImage = &Font->GlyphImages[GlyphStyle->ImageIndex];
+    
+    v2 Center = UVToScreenPoint(0.5f, 0.6f);
+    
+    PushCenteredImage(GlyphImage, Center, GlyphImage->Height * GlyphScale);
+    
+    UIPopFont();
+}
+
 SCENE_UPDATE(GraphShow)
 {
     ui_graphs_state* State = GetSceneState(ui_graphs_state);
@@ -1021,9 +1237,15 @@ SCENE_UPDATE(GraphShow)
     ShowOptimizeTechniquesGraph();
     
     GraphThreadPool();
-#endif
     
     GraphThreads();
+    
+    GraphFrustumCulling();
+    GraphOcclusionCulling();
+#endif
+    
+    //GraphTextureSwitches();
+    GraphFontAtlas();
     
 #if 0
     if(GetKeyDown(Key_I))

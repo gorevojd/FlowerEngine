@@ -1,28 +1,3 @@
-enum camera_state
-{
-    Camera_FlyAround,
-    Camera_RotateAround,
-    Camera_ShowcaseRotateZ,
-};
-
-struct game_camera
-{
-    v3 P;
-    v3 EulerAngles;
-    
-    m33 Transform;
-    
-    // NOTE(Dima): Staff for rotating around
-    f32 ViewRadius;
-    f32 ViewTargetRadius;
-    f32 ViewRadiusMin;
-    f32 ViewRadiusMax;
-    v3 ViewCenterP;
-    f32 ShowcaseRotateTime;
-    
-    u32 State;
-};
-
 inline void InitCamera(game_camera* Cam, u32 State)
 {
     Cam->State = State;
@@ -177,26 +152,212 @@ INTERNAL_FUNCTION void SetMatrices(m44 ViewMatrix)
         Global_RenderCommands->Projection;
 }
 
-void RenderModel(model* Model,
-                 v3 P,
-                 f32 Time,
-                 animation* Animation = 0)
+// NOTE(Dima): Object pool stuff
+inline game_object* AllocateGameObject(game* Game)
+{
+    game_object_pool* Pool = &Game->GameObjectPool;
+    
+    if(DLIST_FREE_IS_EMPTY(Pool->FreeSentinel, NextAlloc))
+    {
+        int CountNewObjects = 512;
+        
+        game_object* NewObjects = PushArray(Game->Arena, game_object, CountNewObjects);
+        
+        for(int ObjectIndex = 0;
+            ObjectIndex < CountNewObjects;
+            ObjectIndex++)
+        {
+            game_object* CurrentObj = NewObjects + ObjectIndex;
+            
+            CurrentObj->CreationIndex = Pool->CreatedObjectsCount + ObjectIndex;
+            
+            DLIST_INSERT_BEFORE_SENTINEL(CurrentObj, Pool->FreeSentinel, 
+                                         NextAlloc, PrevAlloc);
+        }
+    }
+    
+    game_object* Result = Pool->FreeSentinel.NextAlloc;
+    
+    // NOTE(Dima): Removing from Free & inserting to Use list
+    DLIST_REMOVE(Result, NextAlloc, PrevAlloc);
+    DLIST_INSERT_BEFORE_SENTINEL(Result, Pool->UseSentinel,
+                                 NextAlloc, PrevAlloc);
+    
+    return(Result);
+}
+
+inline void DeallocateGameObject(game* Game, game_object* Object)
+{
+    game_object_pool* Pool = &Game->GameObjectPool;
+    
+    // NOTE(Dima): Removing from Use & inserting to Free list
+    DLIST_REMOVE(Object, NextAlloc, PrevAlloc);
+    DLIST_INSERT_BEFORE_SENTINEL(Object, Pool->FreeSentinel,
+                                 NextAlloc, PrevAlloc);
+}
+
+game_object* CreateGameObject(game* Game, u32 Type, 
+                              char* Name = 0, 
+                              game_object* Parent = 0,
+                              b32 IsActive = true)
+{
+    game_object_pool* Pool = &Game->GameObjectPool;
+    
+    // NOTE(Dima): Allocating
+    game_object* Result = AllocateGameObject(Game);
+    Result->Type = Type;
+    
+    // NOTE(Dima): Init object parent
+    Result->IsActive = IsActive;
+    Result->Parent = Pool->Root;
+    if(Parent)
+    {
+        Result->Parent = Parent;
+    }
+    
+    // NOTE(Dima): Init ptrs
+    if(Type == GameObject_Sentinel ||
+       Type == GameObject_Root)
+    {
+        DLIST_REFLECT_POINTER_PTRS(Result, Next, Prev);
+    }
+    else
+    {
+        DLIST_INSERT_BEFORE(Result, Result->Parent->ChildSentinel, Next, Prev);
+    }
+    
+    // NOTE(Dima): Init Child sentinels
+    if(Type == GameObject_Sentinel)
+    {
+        Result->ChildSentinel = 0;
+    }
+    else
+    {
+        // NOTE(Dima): Creating child sentinel
+        Result->ChildSentinel = CreateGameObject(Game, 
+                                                 GameObject_Sentinel,
+                                                 "Sentinel",
+                                                 Result, 
+                                                 false);
+    }
+    
+    // NOTE(Dima): Init object name
+    if(!Name)
+    {
+        stbsp_sprintf(Result->Name, "Object %d", Result->CreationIndex);
+    }
+    else
+    {
+        CopyStringsSafe(Result->Name, 
+                        ARC(Result->Name),
+                        Name);
+    }
+    
+    // NOTE(Dima): Init transforms
+    Result->P = V3_Zero();
+    Result->R = IdentityQuaternion();
+    Result->S = V3_One();
+    
+    return(Result);
+}
+
+void DeleteGameObjectRec(game* Game, game_object* Obj)
+{
+    if(Obj->ChildSentinel)
+    {
+        game_object* At = Obj->ChildSentinel->Next;
+        while(At != Obj->ChildSentinel)
+        {
+            DeleteGameObjectRec(Game, At);
+            
+            At = At->Next;
+        }
+        
+        DLIST_REMOVE(Obj->ChildSentinel, Next, Prev);
+        DeallocateGameObject(Game, Obj->ChildSentinel);
+    }
+    
+    // TODO(Dima): If needed - we can call destructors on object's components here
+    // ....
+    
+    // NOTE(Dima): Deleting this object
+    DLIST_REMOVE(Obj, Next, Prev);
+    DeallocateGameObject(Game, Obj);
+}
+
+void DeleteGameObject(game* Game, game_object* Obj)
+{
+    DeleteGameObjectRec(Game, Obj);
+}
+
+void InitGameObjectPool(game* Game,
+                        memory_arena* Arena)
+{
+    game_object_pool* Pool = &Game->GameObjectPool;
+    
+    DLIST_REFLECT_PTRS(Pool->UseSentinel, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Pool->FreeSentinel, NextAlloc, PrevAlloc);
+    
+    Pool->CreatedObjectsCount = 0;
+    
+    // NOTE(Dima): Init root object and it's sentinel
+    Pool->Root = CreateGameObject(Game, GameObject_Root, "Root");
+}
+
+game_object* CreateModelGameObject(game* Game,
+                                   model* Model,
+                                   char* Name = 0)
+{
+    game_object* Result = CreateGameObject(Game, GameObject_Model, Name);
+    
+    Result->Model_Model = Model;
+    
+    if(Model->Shared.NumNodes)
+    {
+        Result->Model_NodeToModel = PushArray(Game->Arena, m44, Model->Shared.NumNodes);
+    }
+    
+    if(Model->Shared.NumBones)
+    {
+        Result->Model_SkinningMatrices = PushArray(Game->Arena, m44, Model->Shared.NumBones);
+    }
+    
+    return(Result);
+}
+
+void UpdateModelGameObject(game_object* Object)
 {
     m44* SkinningMatrices = 0;
     int SkinningMatricesCount = 0;
+    model* Model = Object->Model_Model;
+    animation* Animation = Object->Model_PlayingAnimation;
     
     if(Animation != 0)
     {
-        UpdateAnimation(Animation, Time, Model->Node_ToParent);
+        UpdateAnimation(Animation, Global_Time->Time, Model->Node_ToParent);
         
-        SkinningMatrices = Model->Bone_SkinningMatrices;
+        SkinningMatrices = Object->Model_SkinningMatrices;
         SkinningMatricesCount = Model->Shared.NumBones;
         
-        CalculateToModelTransforms(Model);
-        CalculateSkinningMatrices(Model);
+        CalculateToModelTransforms(Model, Object->Model_NodeToModel);
+        // NOTE(Dima): Setting this to false so next time they should be recomputed again
+        Object->Model_ToModelIsComputed = false;
+        
+        CalculateSkinningMatrices(Model,
+                                  Object->Model_NodeToModel,
+                                  Object->Model_SkinningMatrices);
+    }
+    else
+    {
+        if(!Object->Model_ToModelIsComputed)
+        {
+            CalculateToModelTransforms(Model, Object->Model_NodeToModel);
+            // NOTE(Dima): 
+            Object->Model_ToModelIsComputed = true;
+        }
     }
     
-    m44 ModelToWorld = TranslationMatrix(P);
+    m44 ModelToWorld = TranslationMatrix(Object->P);
     
     for(int NodeIndex = 0;
         NodeIndex < Model->Shared.NumNodes;
@@ -204,7 +365,7 @@ void RenderModel(model* Model,
     {
         model_node* Node = &Model->Nodes[NodeIndex];
         
-        m44 NodeTran = Model->Node_ToModel[NodeIndex] * ModelToWorld;
+        m44 NodeTran = Object->Model_NodeToModel[NodeIndex] * ModelToWorld;
         
         for(int MeshIndex = 0;
             MeshIndex < Node->NumMeshIndices;
@@ -222,15 +383,6 @@ void RenderModel(model* Model,
                     MeshTran = ModelToWorld;
                 }
                 
-#if 0                
-                PushInstanceMesh(1000, 
-                                 Mesh,
-                                 Model->Materials[Mesh->MaterialIndexInModel],
-                                 MeshTran,
-                                 V3(1.0f),
-                                 SkinningMatrices,
-                                 SkinningMatricesCount);
-#endif
                 material* Material = Model->Materials[Mesh->MaterialIndexInModel];
                 
                 if(Mesh->IsSkinned)
@@ -247,4 +399,43 @@ void RenderModel(model* Model,
             }
         }
     }
+}
+
+void UpdateGameObjectRec(game* Game, game_object* Obj)
+{
+    Assert(Obj->ChildSentinel);
+    
+    if(Obj->IsActive)
+    {
+        // NOTE(Dima): Iterating over children and update them recursively
+        if(Obj->ChildSentinel)
+        {
+            game_object* At = Obj->ChildSentinel->Next;
+            
+            while(At != Obj->ChildSentinel)
+            {
+                UpdateGameObjectRec(Game, At);
+                
+                At = At->Next;
+            }
+        }
+        
+        switch(Obj->Type)
+        {
+            case GameObject_Model:
+            {
+                UpdateModelGameObject(Obj);
+            }break;
+            
+            default:
+            {
+                // NOTE(Dima): Nothing to do!
+            }break;
+        }
+    }
+}
+
+void UpdateGameObjects(game* Game)
+{
+    UpdateGameObjectRec(Game, Game->GameObjectPool.Root);
 }

@@ -32,6 +32,39 @@ enum rubiks_cube_directions
     RubiksDirection_Count,
 };
 
+GLOBAL_VARIABLE int RubiksRotOuterSides4Rotation[3][4] = 
+{
+    // NOTE(Dima): Right-Left look
+    {RubiksDirection_Up, RubiksDirection_Back, RubiksDirection_Down, RubiksDirection_Front},
+    
+    // NOTE(Dima): Bottom-Top look
+    {RubiksDirection_Front, RubiksDirection_Right, RubiksDirection_Back, RubiksDirection_Left},
+    
+    // NOTE(Dima): Front-Back look
+    {RubiksDirection_Up, RubiksDirection_Right, RubiksDirection_Down, RubiksDirection_Left},
+};
+
+GLOBAL_VARIABLE b32 RubiksShouldInvertOuterGetting[3][4] = 
+{
+    {true, false, true, true},
+    {false, false, false, false},
+    {false, false, true, true},
+};
+
+GLOBAL_VARIABLE b32 RubiksShouldInvertLineGetting[3][4] = 
+{
+    {true, false, true, true},
+    {true, true, true, true},
+    {true, false, false, true},
+};
+
+GLOBAL_VARIABLE b32 RubiksLineIsRow[3][4] = 
+{
+    {false, false, false, false},
+    {true, true, true, true},
+    {true, false, true, false},
+};
+
 GLOBAL_VARIABLE const char* RubiksDirectionName[] = 
 {
     "Up",
@@ -39,7 +72,7 @@ GLOBAL_VARIABLE const char* RubiksDirectionName[] =
     "Left",
     "Right",
     "Front",
-    "Back"
+    "Back",
 };
 
 GLOBAL_VARIABLE v3 RubiksDirection[] = 
@@ -48,43 +81,31 @@ GLOBAL_VARIABLE v3 RubiksDirection[] =
     V3_Down(),
     V3_Left(),
     V3_Right(),
-    V3_Forward(),
     V3_Back(),
+    V3_Forward(),
 };
 
-#if 0
-GLOBAL_VARIABLE v4 RubiksColors[] = 
+enum rubiks_cube_colors
 {
-    ColorWhite(),
-    ColorYellow(),
-    ColorOrange(),
-    ColorRed(),
-    ColorBlue(),
-    ColorGreen(),
+    RubiksColor_White,
+    RubiksColor_Yellow,
+    RubiksColor_Orange,
+    RubiksColor_Red,
+    RubiksColor_Green,
+    RubiksColor_Blue,
+    
+    RubiksColor_Count,
 };
-#else
+
 GLOBAL_VARIABLE v4 RubiksColors[] = 
 {
     ColorFromHex("#FFFFFF"),
     ColorFromHex("#FFD500"),
     ColorFromHex("#FF5800"),
     ColorFromHex("#B71234"),
-    ColorFromHex("#0046ad"),
     ColorFromHex("#009b48"),
+    ColorFromHex("#0046ad"),
 };
-#endif
-
-#if 0
-struct rubiks_cubie
-{
-    // TODO(Dima): Maybe store those as pointers because a lot of cubes will not be visible
-    m44 Transform;
-    m44 AppliedRotation;
-    v3 InitP;
-    
-    int MeshIndex;
-};
-#endif
 
 struct rubiks_visible_cubies
 {
@@ -191,6 +212,12 @@ struct rubiks_cube
     // NOTE(Dima): This array stores indices to cubies, which represent current state of cube.
     // NOTE(Dima): Size of this array is Dim * Dim * Dim
     int* Current;
+    
+    // NOTE(Dima): Side faces colors. Each side stores colors indices Left-Right Top-Bottom when looking
+    u8* Sides[RubiksColor_Count];
+    u8* SideTemp;
+    u8* RotColors;
+    u8* RotColorsTemp;
     
     int Dim;
     

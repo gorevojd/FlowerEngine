@@ -15,39 +15,55 @@
 // NOTE(Dima): Structures
 union v2 {
 	struct {
-		float x;
-		float y;
+		f32 x;
+		f32 y;
 	};
     
     struct 
     {
-        float Min;
-        float Max;
+        f32 Min;
+        f32 Max;
     };
     
-    float e[2];
+    f32 e[2];
 };
 
 union v3
 {
     struct
     {
-        float x, y, z;
+        union
+        {
+            v2 xy;
+            
+            struct 
+            {
+                
+                f32 x, y;
+            };
+        };
+        
+        f32 z;
     };
     
     struct 
     {
-        float r, g, b;
+        f32 r, g, b;
     };
     
     struct
     {
-        float Pitch;
-        float Yaw;
-        float Roll;
+        f32 A, B, C;
     };
     
-    float e[3];
+    struct
+    {
+        f32 Pitch;
+        f32 Yaw;
+        f32 Roll;
+    };
+    
+    f32 e[3];
 };
 
 union v4
@@ -57,13 +73,13 @@ union v4
         {
             struct
             {
-                float x, y, z;
+                f32 x, y, z;
             };
             
             v3 xyz;
         };
         
-        float w;
+        f32 w;
     };
     
     struct {
@@ -71,24 +87,24 @@ union v4
         {
             struct
             {
-                float r, g, b;
+                f32 r, g, b;
             };
             
             v3 rgb;
         };
         
-        float a;
+        f32 a;
     };
     
-    float e[4];
+    f32 e[4];
 };
 
 struct m33
 {
     union
     {
-        float e[9];
-        float e2[3][3];
+        f32 e[9];
+        f32 e2[3][3];
         
         v3 Rows[3];
     };
@@ -98,7 +114,7 @@ struct m44
 {
     union
     {
-        float e[16];
+        f32 e[16];
         
         v4 Rows[4];
         
@@ -118,11 +134,11 @@ struct quat
         
         struct
         {
-            float x, y, z;
+            f32 x, y, z;
         };
     };
     
-    float w;
+    f32 w;
 };
 
 struct rc2
@@ -134,14 +150,14 @@ struct rc2
 #include "flower_intrinsics.h"
 #include "flower_simd.h"
 
-inline float PingPong(float Value, float MaxValue)
+inline f32 PingPong(f32 Value, f32 MaxValue)
 {
-    float ModRes = fmod(Value, MaxValue);
+    f32 ModRes = fmod(Value, MaxValue);
     
-    float DivRes = Value / MaxValue;
+    f32 DivRes = Value / MaxValue;
     int DivResInt = (int)DivRes;
     
-    float Result = ModRes;
+    f32 Result = ModRes;
     if(DivResInt & 1)
     {
         Result = MaxValue - ModRes;
@@ -150,7 +166,7 @@ inline float PingPong(float Value, float MaxValue)
     return(Result);
 }
 
-inline float Clamp01(float Val) {
+inline f32 Clamp01(f32 Val) {
 	if (Val < 0.0f) {
 		Val = 0.0f;
 	}
@@ -162,7 +178,7 @@ inline float Clamp01(float Val) {
 	return(Val);
 }
 
-inline float Clamp(float Val, float Min, float Max) {
+inline f32 Clamp(f32 Val, f32 Min, f32 Max) {
 	if (Val < Min) {
 		Val = Min;
 	}
@@ -188,7 +204,7 @@ inline int Clamp(int Val, int Min, int Max) {
 
 
 // NOTE(Dima): Constructors
-inline v2 V2(float Value)
+inline v2 V2(f32 Value)
 {
 	v2 Res;
     
@@ -198,7 +214,7 @@ inline v2 V2(float Value)
 	return(Res);
 }
 
-inline v2 V2(float x, float y) 
+inline v2 V2(f32 x, f32 y) 
 {
 	v2 Res;
     
@@ -208,7 +224,7 @@ inline v2 V2(float x, float y)
 	return(Res);
 }
 
-inline v3 V3(v2 xy, float z) 
+inline v3 V3(v2 xy, f32 z) 
 {
 	v3 Res;
     
@@ -219,7 +235,7 @@ inline v3 V3(v2 xy, float z)
 	return(Res);
 }
 
-inline v3 V3(float x, float y, float z) 
+inline v3 V3(f32 x, f32 y, f32 z) 
 {
 	v3 Res;
     
@@ -230,7 +246,7 @@ inline v3 V3(float x, float y, float z)
 	return(Res);
 }
 
-inline v3 V3(float Value)
+inline v3 V3(f32 Value)
 {
     v3 Res;
     
@@ -307,7 +323,7 @@ inline v3 V3_Back()
     return(Result);
 }
 
-inline v4 V4(float Value) 
+inline v4 V4(f32 Value) 
 {
     v4 Res;
     
@@ -319,7 +335,7 @@ inline v4 V4(float Value)
     return(Res);
 }
 
-inline v4 V4(float x, float y, float z, float w) 
+inline v4 V4(f32 x, f32 y, f32 z, f32 w) 
 {
     v4 Res;
     
@@ -331,7 +347,7 @@ inline v4 V4(float x, float y, float z, float w)
     return(Res);
 }
 
-inline v4 V4(v3 InitVector, float w) 
+inline v4 V4(v3 InitVector, f32 w) 
 {
     v4 Res;
     Res.x = InitVector.x;
@@ -353,7 +369,7 @@ inline quat IdentityQuaternion()
     return(res);
 }
 
-inline quat Quaternion(float x, float y, float z, float w)
+inline quat Quaternion(f32 x, f32 y, f32 z, f32 w)
 {
     quat Result;
     
@@ -365,13 +381,13 @@ inline quat Quaternion(float x, float y, float z, float w)
     return(Result);
 }
 
-inline quat AxisAngle(v3 Axis, float Angle)
+inline quat AxisAngle(v3 Axis, f32 Angle)
 {
     quat res;
     
-    float HalfAngle = Angle * 0.5f;
+    f32 HalfAngle = Angle * 0.5f;
     
-    float S = Sin(HalfAngle);
+    f32 S = Sin(HalfAngle);
     res.x = Axis.x * S;
     res.y = Axis.y * S;
     res.z = Axis.z * S;
@@ -380,7 +396,7 @@ inline quat AxisAngle(v3 Axis, float Angle)
     return(res);
 }
 
-inline quat AngleAxis(float Angle, v3 Axis)
+inline quat AngleAxis(f32 Angle, v3 Axis)
 {
     quat Result = AxisAngle(Axis, Angle);
     
@@ -442,28 +458,28 @@ inline m44 IdentityMatrix4()
 }
 
 /*Dot operations*/
-inline float Dot(v2 A, v2 B) 
+inline f32 Dot(v2 A, v2 B) 
 {
     return A.x * B.x + A.y * B.y;
 }
 
-inline float Dot(v3 A, v3 B) 
+inline f32 Dot(v3 A, v3 B) 
 {
     return A.x * B.x + A.y * B.y + A.z * B.z;
 }
 
-inline float Dot(v4 A, v4 B) 
+inline f32 Dot(v4 A, v4 B) 
 {
     return A.x * B.x + A.y * B.y + A.z * B.z + A.w * B.w;
 }
 
-inline float Dot(quat A, quat B)
+inline f32 Dot(quat A, quat B)
 {
     return A.x * B.x + A.y * B.y + A.z * B.z + A.w * B.w;
 }
 
 /*Cross product*/
-inline float Cross(v2 A, v2 B) 
+inline f32 Cross(v2 A, v2 B) 
 { 
     return A.x * B.y - B.x * A.y; 
 }
@@ -555,7 +571,7 @@ inline quat Sub(quat A, quat B)
 }
 
 /*Multiply operations*/
-inline v2 Mul(v2 A, float S) 
+inline v2 Mul(v2 A, f32 S) 
 {
     A.x *= S;
     A.y *= S;
@@ -563,7 +579,7 @@ inline v2 Mul(v2 A, float S)
     return(A);
 }
 
-inline v3 Mul(v3 A, float S) 
+inline v3 Mul(v3 A, f32 S) 
 {
     A.x *= S;
     A.y *= S;
@@ -572,7 +588,7 @@ inline v3 Mul(v3 A, float S)
     return(A);
 }
 
-inline v4 Mul(v4 A, float S) 
+inline v4 Mul(v4 A, f32 S) 
 {
     A.x *= S;
     A.y *= S;
@@ -594,7 +610,7 @@ inline quat Mul(quat A, quat B)
     return(R);
 }
 
-inline quat Mul(quat A, float S)
+inline quat Mul(quat A, f32 S)
 {
     A.x *= S;
     A.y *= S;
@@ -715,9 +731,9 @@ inline v3 Mul(v3 A, const m33& B)
 }
 
 /*Divide operations*/
-inline v2 Div(v2 A, float S) 
+inline v2 Div(v2 A, f32 S) 
 {
-    float OneOverS = 1.0f / S;
+    f32 OneOverS = 1.0f / S;
     
     A.x *= OneOverS;
     A.y *= OneOverS;
@@ -725,9 +741,9 @@ inline v2 Div(v2 A, float S)
     return(A);
 }
 
-inline v3 Div(v3 A, float S) 
+inline v3 Div(v3 A, f32 S) 
 {
-    float OneOverS = 1.0f / S;
+    f32 OneOverS = 1.0f / S;
     
     A.x *= OneOverS;
     A.y *= OneOverS;
@@ -736,9 +752,9 @@ inline v3 Div(v3 A, float S)
     return(A);
 }
 
-inline v4 Div(v4 A, float S) 
+inline v4 Div(v4 A, f32 S) 
 {
-    float OneOverS = 1.0f / S;
+    f32 OneOverS = 1.0f / S;
     
     A.x *= OneOverS;
     A.y *= OneOverS;
@@ -748,9 +764,9 @@ inline v4 Div(v4 A, float S)
     return(A);
 }
 
-inline quat Div(quat A, float S) 
+inline quat Div(quat A, f32 S) 
 {
-    float OneOverS = 1.0f / S;
+    f32 OneOverS = 1.0f / S;
     
     A.x *= OneOverS;
     A.y *= OneOverS;
@@ -766,26 +782,26 @@ inline v3 Hadamard(v3 A, v3 B) { return (V3(A.x * B.x, A.y * B.y, A.z * B.z)); }
 inline v4 Hadamard(v4 A, v4 B) { return (V4(A.x * B.x, A.y * B.y, A.z * B.z, A.w * B.w)); }
 
 /*Magnitude of the vector*/
-inline float Magnitude(v2 A) { return(Sqrt(Dot(A, A))); }
-inline float Magnitude(v3 A) { return(Sqrt(Dot(A, A))); }
-inline float Magnitude(v4 A) { return(Sqrt(Dot(A, A))); }
-inline float Magnitude(quat A) { return(Sqrt(Dot(A, A))); }
+inline f32 Magnitude(v2 A) { return(Sqrt(Dot(A, A))); }
+inline f32 Magnitude(v3 A) { return(Sqrt(Dot(A, A))); }
+inline f32 Magnitude(v4 A) { return(Sqrt(Dot(A, A))); }
+inline f32 Magnitude(quat A) { return(Sqrt(Dot(A, A))); }
 
-inline float Length(v2 A) { return(Sqrt(Dot(A, A))); }
-inline float Length(v3 A) { return(Sqrt(Dot(A, A))); }
-inline float Length(v4 A) { return(Sqrt(Dot(A, A))); }
-inline float Length(quat A) { return(Sqrt(Dot(A, A))); }
+inline f32 Length(v2 A) { return(Sqrt(Dot(A, A))); }
+inline f32 Length(v3 A) { return(Sqrt(Dot(A, A))); }
+inline f32 Length(v4 A) { return(Sqrt(Dot(A, A))); }
+inline f32 Length(quat A) { return(Sqrt(Dot(A, A))); }
 
 /*Squared magnitude*/
-inline float SqMagnitude(v2 A) { return(Dot(A, A)); }
-inline float SqMagnitude(v3 A) { return(Dot(A, A)); }
-inline float SqMagnitude(v4 A) { return(Dot(A, A)); }
-inline float SqMagnitude(quat A) { return(Dot(A, A)); }
+inline f32 SqMagnitude(v2 A) { return(Dot(A, A)); }
+inline f32 SqMagnitude(v3 A) { return(Dot(A, A)); }
+inline f32 SqMagnitude(v4 A) { return(Dot(A, A)); }
+inline f32 SqMagnitude(quat A) { return(Dot(A, A)); }
 
-inline float LengthSq(v2 A) { return(Sqrt(Dot(A, A))); }
-inline float LengthSq(v3 A) { return(Sqrt(Dot(A, A))); }
-inline float LengthSq(v4 A) { return(Sqrt(Dot(A, A))); }
-inline float LengthSq(quat A) { return(Sqrt(Dot(A, A))); }
+inline f32 LengthSq(v2 A) { return(Sqrt(Dot(A, A))); }
+inline f32 LengthSq(v3 A) { return(Sqrt(Dot(A, A))); }
+inline f32 LengthSq(v4 A) { return(Sqrt(Dot(A, A))); }
+inline f32 LengthSq(quat A) { return(Sqrt(Dot(A, A))); }
 
 /*v2 operator overloading*/
 inline v2 operator+(v2 A) { return(A); }
@@ -794,17 +810,17 @@ inline v2 operator-(v2 A) { v2 R = { -A.x, -A.y }; return(R); }
 inline v2 operator+(v2 A, v2 b) { return Add(A, b); }
 inline v2 operator-(v2 A, v2 b) { return Sub(A, b); }
 
-inline v2 operator*(v2 A, float S) { return Mul(A, S); }
-inline v2 operator*(float S, v2 A) { return Mul(A, S); }
-inline v2 operator/(v2 A, float S) { return Div(A, S); }
+inline v2 operator*(v2 A, f32 S) { return Mul(A, S); }
+inline v2 operator*(f32 S, v2 A) { return Mul(A, S); }
+inline v2 operator/(v2 A, f32 S) { return Div(A, S); }
 
 inline v2 operator*(v2 A, v2 b) { v2 R = { A.x * b.x, A.y * b.y }; return(R); }
 inline v2 operator/(v2 A, v2 b) { v2 R = { A.x / b.x, A.y / b.y }; return(R); }
 
 inline v2 &operator+=(v2& A, v2 b) { return(A = A + b); }
 inline v2 &operator-=(v2& A, v2 b) { return(A = A - b); }
-inline v2 &operator*=(v2& A, float S) { return(A = A * S); }
-inline v2 &operator/=(v2& A, float S) { return(A = A / S); }
+inline v2 &operator*=(v2& A, f32 S) { return(A = A * S); }
+inline v2 &operator/=(v2& A, f32 S) { return(A = A / S); }
 
 /*v3 operator overloading*/
 inline v3 operator+(v3 A) { return(A); }
@@ -813,17 +829,17 @@ inline v3 operator-(v3 A) { v3 R = { -A.x, -A.y, -A.z }; return(R); }
 inline v3 operator+(v3 A, v3 b) { return Add(A, b); }
 inline v3 operator-(v3 A, v3 b) { return Sub(A, b); }
 
-inline v3 operator*(v3 A, float S) { return Mul(A, S); }
-inline v3 operator*(float S, v3 A) { return Mul(A, S); }
-inline v3 operator/(v3 A, float S) { return Div(A, S); }
+inline v3 operator*(v3 A, f32 S) { return Mul(A, S); }
+inline v3 operator*(f32 S, v3 A) { return Mul(A, S); }
+inline v3 operator/(v3 A, f32 S) { return Div(A, S); }
 
 inline v3 operator*(v3 A, v3 b) { v3 R = { A.x * b.x, A.y * b.y, A.z * b.z }; return(R); }
 inline v3 operator/(v3 A, v3 b) { v3 R = { A.x / b.x, A.y / b.y, A.z / b.z }; return(R); }
 
 inline v3 &operator+=(v3& A, v3 b) { return(A = A + b); }
 inline v3 &operator-=(v3& A, v3 b) { return(A = A - b); }
-inline v3 &operator*=(v3& A, float S) { return(A = A * S); }
-inline v3 &operator/=(v3& A, float S) { return(A = A / S); }
+inline v3 &operator*=(v3& A, f32 S) { return(A = A * S); }
+inline v3 &operator/=(v3& A, f32 S) { return(A = A / S); }
 
 /*v4 operator overloading*/
 inline v4 operator+(v4 A) { return(A); }
@@ -832,17 +848,17 @@ inline v4 operator-(v4 A) { v4 R = { -A.x, -A.y, -A.z, -A.w }; return(R); }
 inline v4 operator+(v4 A, v4 B) { return Add(A, B); }
 inline v4 operator-(v4 A, v4 B) { return Sub(A, B); }
 
-inline v4 operator*(v4 A, float S) { return Mul(A, S); }
-inline v4 operator*(float S, v4 A) { return Mul(A, S); }
-inline v4 operator/(v4 A, float S) { return Div(A, S); }
+inline v4 operator*(v4 A, f32 S) { return Mul(A, S); }
+inline v4 operator*(f32 S, v4 A) { return Mul(A, S); }
+inline v4 operator/(v4 A, f32 S) { return Div(A, S); }
 
 inline v4 operator*(v4 A, v4 B) { v4 R = { A.x * B.x, A.y * B.y, A.z * B.z, A.w * B.w }; return(R); }
 inline v4 operator/(v4 A, v4 B) { v4 R = { A.x / B.x, A.y / B.y, A.z / B.z, A.w / B.w }; return(R); }
 
 inline v4 &operator+=(v4& A, v4 B) { return(A = A + B); }
 inline v4 &operator-=(v4& A, v4 B) { return(A = A - B); }
-inline v4 &operator*=(v4& A, float S) { return(A = A * S); }
-inline v4 &operator/=(v4& A, float S) { return(A = A / S); }
+inline v4 &operator*=(v4& A, f32 S) { return(A = A * S); }
+inline v4 &operator/=(v4& A, f32 S) { return(A = A / S); }
 
 /*quat operator overloading*/
 inline quat operator+(quat A) { return(A); }
@@ -851,16 +867,16 @@ inline quat operator-(quat A) { return(A); }
 inline quat operator+(quat A, quat B) { return Add(A, B); }
 inline quat operator-(quat A, quat B) { return Sub(A, B); }
 
-inline quat operator*(quat A, float S) { return Mul(A, S); }
-inline quat operator*(float S, quat A) { return Mul(A, S); }
-inline quat operator/(quat A, float S) { return Div(A, S); }
+inline quat operator*(quat A, f32 S) { return Mul(A, S); }
+inline quat operator*(f32 S, quat A) { return Mul(A, S); }
+inline quat operator/(quat A, f32 S) { return Div(A, S); }
 
 inline quat operator*(quat A, quat B) { return(Mul(A, B)); }
 
 inline quat &operator+=(quat& A, quat B) { return(A = A + B); }
 inline quat &operator-=(quat& A, quat B) { return(A = A - B); }
-inline quat &operator*=(quat& A, float S) { return(A = A * S); }
-inline quat &operator/=(quat& A, float S) { return(A = A / S); }
+inline quat &operator*=(quat& A, f32 S) { return(A = A * S); }
+inline quat &operator/=(quat& A, f32 S) { return(A = A / S); }
 
 inline v3 operator*(v3 A, m33 B){
     v3 Result = Mul(A, B);
@@ -887,14 +903,14 @@ inline v4 Normalize(v4 A) { return(Mul(A, RSqrt(Dot(A, A)))); }
 inline quat Normalize(quat A) { return(Mul(A, RSqrt(Dot(A, A)))); }
 
 /*Safe normalization operations*/
-inline v2 NOZ(v2 A) { float SqMag = Dot(A, A); return((SqMag) < 0.0000001f ? V2(0.0f, 0.0f) : A * RSqrt(SqMag)); }
-inline v3 NOZ(v3 A) { float SqMag = Dot(A, A); return((SqMag) < 0.0000001f ? V3(0.0f, 0.0f, 0.0f) : A * RSqrt(SqMag)); }
-inline v4 NOZ(v4 A) { float SqMag = Dot(A, A); return((SqMag) < 0.0000001f ? V4(0.0f, 0.0f, 0.0f, 0.0f) : A * RSqrt(SqMag)); }
+inline v2 NOZ(v2 A) { f32 SqMag = Dot(A, A); return((SqMag) < 0.0000001f ? V2(0.0f, 0.0f) : A * RSqrt(SqMag)); }
+inline v3 NOZ(v3 A) { f32 SqMag = Dot(A, A); return((SqMag) < 0.0000001f ? V3(0.0f, 0.0f, 0.0f) : A * RSqrt(SqMag)); }
+inline v4 NOZ(v4 A) { f32 SqMag = Dot(A, A); return((SqMag) < 0.0000001f ? V4(0.0f, 0.0f, 0.0f, 0.0f) : A * RSqrt(SqMag)); }
 
 /*Lerp operations*/
-inline v2 Lerp(v2 A, v2 B, float t) { return((1.0f - t) * A + B * t); }
-inline v3 Lerp(v3 A, v3 B, float t) { return((1.0f - t) * A + B * t); }
-inline v4 Lerp(v4 A, v4 B, float t) { return((1.0f - t) * A + B * t); }
+inline v2 Lerp(v2 A, v2 B, f32 t) { return((1.0f - t) * A + B * t); }
+inline v3 Lerp(v3 A, v3 B, f32 t) { return((1.0f - t) * A + B * t); }
+inline v4 Lerp(v4 A, v4 B, f32 t) { return((1.0f - t) * A + B * t); }
 
 /*Quaternion operations*/
 inline quat Conjugate(quat Q){
@@ -919,10 +935,10 @@ inline quat RotationDifference(quat A, quat B){
     return(Result);
 }
 
-inline quat Lerp(quat A, quat B, float t) {
+inline quat Lerp(quat A, quat B, f32 t) {
     quat Result;
     
-    float OneMinusT = 1.0f - t;
+    f32 OneMinusT = 1.0f - t;
     
     if(Dot(A, B) < 0.0f)
     {
@@ -944,16 +960,16 @@ inline quat Lerp(quat A, quat B, float t) {
     return(Result);
 }
 
-inline quat Slerp(quat A, quat B, float t){
+inline quat Slerp(quat A, quat B, f32 t){
     A = Normalize(A);
     B = Normalize(B);
     
-    float CosTheta = Dot(A, B);
-    float Theta = ACos(CosTheta);
+    f32 CosTheta = Dot(A, B);
+    f32 Theta = ACos(CosTheta);
     
-    float OneOverSinTheta = 1.0f / Sin(Theta);
-    float cA = OneOverSinTheta * Sin((1.0f - t) * Theta);
-    float cB = OneOverSinTheta * Sin(t * Theta);
+    f32 OneOverSinTheta = 1.0f / Sin(Theta);
+    f32 cA = OneOverSinTheta * Sin((1.0f - t) * Theta);
+    f32 cB = OneOverSinTheta * Sin(t * Theta);
     
     quat Result;
     
@@ -1023,53 +1039,53 @@ inline m44 ScalingMatrix(v3 Scale)
     return(Result);
 }
 
-inline m44 ScalingMatrix(float Scale)
+inline m44 ScalingMatrix(f32 Scale)
 {
     m44 Result = ScalingMatrix(V3(Scale, Scale, Scale));
     
     return(Result);
 }
 
-inline m44 RotationMatrixX(float Angle)
+inline m44 RotationMatrixX(f32 Angle)
 {
     m44 Result = IdentityMatrix4();
     
-    float s = Sin(Angle);
-    float c = Cos(Angle);
+    f32 s = Sin(Angle);
+    f32 c = Cos(Angle);
     
     Result.e[5] = c;
-    Result.e[6] = s;
-    Result.e[9] = -s;
+    Result.e[6] = -s;
+    Result.e[9] = s;
     Result.e[10] = c;
     
     return(Result);
 }
 
-inline m44 RotationMatrixY(float Angle)
+inline m44 RotationMatrixY(f32 Angle)
 {
     m44 Result = IdentityMatrix4();
     
-    float s = Sin(Angle);
-    float c = Cos(Angle);
+    f32 s = Sin(Angle);
+    f32 c = Cos(Angle);
     
     Result.e[0] = c;
-    Result.e[2] = -s;
-    Result.e[8] = s;
+    Result.e[2] = s;
+    Result.e[8] = -s;
     Result.e[10] = c;
     
     return(Result);
 }
 
-inline m44 RotationMatrixZ(float Angle)
+inline m44 RotationMatrixZ(f32 Angle)
 {
     m44 Result = IdentityMatrix4();
     
-    float s = Sin(Angle);
-    float c = Cos(Angle);
+    f32 s = Sin(Angle);
+    f32 c = Cos(Angle);
     
     Result.e[0] = c;
-    Result.e[1] = s;
-    Result.e[4] = -s;
+    Result.e[1] = -s;
+    Result.e[4] = s;
     Result.e[5] = c;
     
     return(Result);
@@ -1095,7 +1111,7 @@ inline m44 InverseScalingMatrix(v3 Scaling)
     return(Result);
 }
 
-inline m44 InverseScalingMatrix(float Scaling)
+inline m44 InverseScalingMatrix(f32 Scaling)
 {
     m44 Result = ScalingMatrix(1.0f / Scaling);
     
@@ -1138,9 +1154,9 @@ inline m44 InverseTransformMatrix(const m44& Transformation)
     v3& RowY = Temp.Rows[1].xyz;
     v3& RowZ = Temp.Rows[2].xyz;
     
-    float ScaleX = Length(RowX);
-    float ScaleY = Length(RowY);
-    float ScaleZ = Length(RowZ);
+    f32 ScaleX = Length(RowX);
+    f32 ScaleY = Length(RowY);
+    f32 ScaleZ = Length(RowZ);
     
     // NOTE(Dima): Rows normalization to get rotation only components
     RowX = RowX / ScaleX;
@@ -1158,17 +1174,17 @@ inline m44 InverseTransformMatrix(const m44& Transformation)
 }
 
 inline m44 PerspectiveProjection(int Width, int Height, 
-                                 float Far, float Near, 
-                                 float FOVDegrees = 45.0f)
+                                 f32 Far, f32 Near, 
+                                 f32 FOVDegrees = 45.0f)
 {
     m44 Result = {};
     
-    float AspectRatio = (float)Width / (float)Height;
+    f32 AspectRatio = (f32)Width / (f32)Height;
     
-    float S = 1.0f / Tan(FOVDegrees * 0.5f * F_DEG2RAD);
-    float A = -S / AspectRatio;
-    float B = S;
-    float OneOverFarMinusNear = 1.0f / (Far - Near);
+    f32 S = 1.0f / Tan(FOVDegrees * 0.5f * F_DEG2RAD);
+    f32 A = -S / AspectRatio;
+    f32 B = S;
+    f32 OneOverFarMinusNear = 1.0f / (Far - Near);
     Result.e[0] = A;
     Result.e[5] = B;
     
@@ -1181,10 +1197,10 @@ inline m44 PerspectiveProjection(int Width, int Height,
 
 inline m44 OrthographicProjection(int Width, int Height)
 {
-    float a = 2.0f / (float)Width;
-    float b = -1.0f;
-    float c = -2.0f / (float)Height;
-    float d = 1.0f;
+    f32 a = 2.0f / (f32)Width;
+    f32 b = -1.0f;
+    f32 c = -2.0f / (f32)Height;
+    f32 d = 1.0f;
     
     m44 Result = {};
     
@@ -1223,16 +1239,16 @@ inline m33 Matrix4ToMatrix3(const m44& Matrix)
 inline m33 QuaternionToMatrix3(quat Q){
     m33 Result = {};
     
-    float x2 = Q.x * Q.x;
-    float y2 = Q.y * Q.y;
-    float z2 = Q.z * Q.z;
+    f32 x2 = Q.x * Q.x;
+    f32 y2 = Q.y * Q.y;
+    f32 z2 = Q.z * Q.z;
     
-    float xy = Q.x * Q.y;
-    float zw = Q.z * Q.w;
-    float xz = Q.x * Q.z;
-    float yw = Q.y * Q.w;
-    float yz = Q.y * Q.z;
-    float xw = Q.x * Q.w;
+    f32 xy = Q.x * Q.y;
+    f32 zw = Q.z * Q.w;
+    f32 xz = Q.x * Q.z;
+    f32 yw = Q.y * Q.w;
+    f32 yz = Q.y * Q.z;
+    f32 xw = Q.x * Q.w;
     
     Result.e[0] = 1.0f - 2.0f * (y2 + z2);
     Result.e[1] = 2.0f * (xy + zw);
@@ -1292,31 +1308,31 @@ inline v3 GetQuatFront(quat Q)
     return(Result);
 }
 
-inline quat QuatFrom2DArray(float A[3][3]){
+inline quat QuatFrom2DArray(f32 A[3][3]){
     quat Result;
     
-    float Trace = A[0][0] + A[1][1] + A[2][2]; // I removed + 1.0f; see discussion with Ethan
+    f32 Trace = A[0][0] + A[1][1] + A[2][2]; // I removed + 1.0f; see discussion with Ethan
     if( Trace > 0 ) {// I changed M_EPSILON to 0
-        float S = 0.5f / sqrtf(Trace + 1.0f);
+        f32 S = 0.5f / sqrtf(Trace + 1.0f);
         Result.w = 0.25f / S;
         Result.x = ( A[1][2] - A[2][1] ) * S;
         Result.y = ( A[2][0] - A[0][2] ) * S;
         Result.z = ( A[0][1] - A[1][0] ) * S;
     } else {
         if ( A[0][0] > A[1][1] && A[0][0] > A[2][2] ) {
-            float S = 2.0f * sqrtf( 1.0f + A[0][0] - A[1][1] - A[2][2]);
+            f32 S = 2.0f * sqrtf( 1.0f + A[0][0] - A[1][1] - A[2][2]);
             Result.w = (A[1][2] - A[2][1] ) / S;
             Result.x = 0.25f * S;
             Result.y = (A[1][0] + A[0][1] ) / S;
             Result.z = (A[2][0] + A[0][2] ) / S;
         } else if (A[1][1] > A[2][2]) {
-            float S = 2.0f * sqrtf( 1.0f + A[1][1] - A[0][0] - A[2][2]);
+            f32 S = 2.0f * sqrtf( 1.0f + A[1][1] - A[0][0] - A[2][2]);
             Result.w = (A[2][0] - A[0][2] ) / S;
             Result.x = (A[1][0] + A[0][1] ) / S;
             Result.y = 0.25f * S;
             Result.z = (A[2][1] + A[1][2] ) / S;
         } else {
-            float S = 2.0f * sqrtf( 1.0f + A[2][2] - A[0][0] - A[1][1] );
+            f32 S = 2.0f * sqrtf( 1.0f + A[2][2] - A[0][0] - A[1][1] );
             Result.w = (A[0][1] - A[1][0] ) / S;
             Result.x = (A[2][0] + A[0][2] ) / S;
             Result.y = (A[2][1] + A[1][2] ) / S;
@@ -1351,15 +1367,15 @@ inline v3 QuatToEuler(quat q)
     v3 Result = {};
     
     // roll (x-axis rotation)
-    float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
-    float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+    f32 sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
+    f32 cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
     Result.Roll = ATan2(sinr_cosp, cosr_cosp);
     
     // pitch (y-axis rotation)
-    float sinp = 2.0f * (q.w * q.y - q.z * q.x);
+    f32 sinp = 2.0f * (q.w * q.y - q.z * q.x);
     if (abs(sinp) >= 1.0f){
         
-        float sinpSign = -1.0f;
+        f32 sinpSign = -1.0f;
         if(sinp > 0.0f)
         {
             sinpSign = 1.0f;
@@ -1372,8 +1388,8 @@ inline v3 QuatToEuler(quat q)
     }
     
     // yaw (z-axis rotation)
-    float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
-    float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
+    f32 siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
+    f32 cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
     Result.Yaw = ATan2(siny_cosp, cosy_cosp);
     
     return(Result);
@@ -1384,12 +1400,12 @@ inline quat EulerToQuat(v3 EulerAngles)
     quat Result = {};
     
     // Abbreviations for the various angular functions
-    float cy = cosf(EulerAngles.Yaw * 0.5f);
-    float sy = sinf(EulerAngles.Yaw * 0.5f);
-    float cp = cosf(EulerAngles.Pitch * 0.5f);
-    float sp = sinf(EulerAngles.Pitch * 0.5f);
-    float cr = cosf(EulerAngles.Roll * 0.5f);
-    float sr = sinf(EulerAngles.Roll * 0.5f);
+    f32 cy = cosf(EulerAngles.Yaw * 0.5f);
+    f32 sy = sinf(EulerAngles.Yaw * 0.5f);
+    f32 cp = cosf(EulerAngles.Pitch * 0.5f);
+    f32 sp = sinf(EulerAngles.Pitch * 0.5f);
+    f32 cr = cosf(EulerAngles.Roll * 0.5f);
+    f32 sr = sinf(EulerAngles.Roll * 0.5f);
     
     Result.w = cy * cp * cr + sy * sp * sr;
     Result.x = cy * cp * sr - sy * sp * cr;
@@ -1400,40 +1416,40 @@ inline quat EulerToQuat(v3 EulerAngles)
 }
 
 /* Smoothstep lerp */
-inline float Smoothstep(float Value)
+inline f32 Smoothstep(f32 Value)
 {
-    float x = Clamp01(Value);
+    f32 x = Clamp01(Value);
     
-    float Result = x * x * (3.0f - 2.0f * x);
+    f32 Result = x * x * (3.0f - 2.0f * x);
     
     return(Result);
 }
 
-/* Cosine lerp. Takes float as input that will be clamped to [0, 1] inside */
-inline float CosLerp01(float t){
-    float result = Cos(Clamp01(t) * F_PI * 0.5f);
+/* Cosine lerp. Takes f32 as input that will be clamped to [0, 1] inside */
+inline f32 CosLerp01(f32 t){
+    f32 result = Cos(Clamp01(t) * F_PI * 0.5f);
     
     return(result);
 }
 
-inline v2 CosLerp(v2 a, v2 b, float t){
-    float factor = CosLerp01(t);
+inline v2 CosLerp(v2 a, v2 b, f32 t){
+    f32 factor = CosLerp01(t);
     
     v2 Result = Lerp(a, b, t);
     
     return(Result);
 }
 
-inline v3 CosLerp(v3 a, v3 b, float t){
-    float factor = CosLerp01(t);
+inline v3 CosLerp(v3 a, v3 b, f32 t){
+    f32 factor = CosLerp01(t);
     
     v3 Result = Lerp(a, b, t);
     
     return(Result);
 }
 
-inline v4 CosLerp(v4 a, v4 b, float t){
-    float factor = CosLerp01(t);
+inline v4 CosLerp(v4 a, v4 b, f32 t){
+    f32 factor = CosLerp01(t);
     
     v4 Result = Lerp(a, b, t);
     
@@ -1527,7 +1543,7 @@ inline v4 ColorCyan()
 }
 
 inline v4 ColorFrom255(int R, int G, int B) {
-	float OneOver255 = 1.0f / 255.0f;
+	f32 OneOver255 = 1.0f / 255.0f;
 	v4 Res = V4(R, G, B, 1.0f);
 	Res.r *= OneOver255;
 	Res.g *= OneOver255;
@@ -1559,7 +1575,7 @@ inline int IntFromHexCharForColors(char C) {
 }
 
 inline v4 ColorFromHex(char* str) {
-	float OneOver255 = 1.0f / 255.0f;
+	f32 OneOver255 = 1.0f / 255.0f;
     
 	v4 Res;
     
@@ -1613,10 +1629,10 @@ inline v4 UnpackRGBA(uint32_t Color)
 {
     v4 Res;
     
-    Res.r = (float)(Color & 0xFF) * F_ONE_OVER_255;
-    Res.g = (float)((Color >> 8) & 0xFF) * F_ONE_OVER_255;
-    Res.b = (float)((Color >> 16) & 0xFF) * F_ONE_OVER_255;
-    Res.a = (float)((Color >> 24) & 0xFF) * F_ONE_OVER_255;
+    Res.r = (f32)(Color & 0xFF) * F_ONE_OVER_255;
+    Res.g = (f32)((Color >> 8) & 0xFF) * F_ONE_OVER_255;
+    Res.b = (f32)((Color >> 16) & 0xFF) * F_ONE_OVER_255;
+    Res.a = (f32)((Color >> 24) & 0xFF) * F_ONE_OVER_255;
     
     return(Res);
 }
@@ -1635,14 +1651,14 @@ inline v4 UnpackGrayscale(uint8_t Value)
     Result.r = 1.0f;
     Result.g = 1.0f;
     Result.b = 1.0f;
-    Result.a = (float)(Value & 0xFF) * F_ONE_OVER_255;
+    Result.a = (f32)(Value & 0xFF) * F_ONE_OVER_255;
     
     return(Result);
 }
 
 inline v4 UnpackGrayscalePremultiplied(uint8_t Value)
 {
-    f32 ResultValue = (float)(Value & 0xFF) * F_ONE_OVER_255;
+    f32 ResultValue = (f32)(Value & 0xFF) * F_ONE_OVER_255;
     
     v4 Result;
     Result.r = ResultValue;
@@ -1680,9 +1696,9 @@ inline v3 UnpackRGB_565(uint16_t Color)
 {
     v3 Result;
     
-    Result.r = (float)(Color & 31) / 31.0f;
-    Result.g = (float)((Color >> 5) & 63) / 63.0f;
-    Result.b = (float)((Color >> 11) & 31) / 31.0f;
+    Result.r = (f32)(Color & 31) / 31.0f;
+    Result.g = (f32)((Color >> 5) & 63) / 63.0f;
+    Result.b = (f32)((Color >> 11) & 31) / 31.0f;
     
     return(Result);
 }
@@ -1812,6 +1828,30 @@ inline v2 ClampInRect(v2 Point, rc2 Rect)
                    Clamp(Point.y, Rect.Min.y, Rect.Max.y));
     
     return(Result);
+}
+
+// NOTE(Dima): Lines
+inline v2 Perp(v2 Direction)
+{
+    v2 Result = V2(-Direction.y, Direction.x);
+    
+    return(Result);
+}
+
+inline v3 LineEquationFrom2Points(v2 P1, v2 P2) 
+{
+	v3 Result;
+    
+	Result.A = P2.y - P1.y;
+	Result.B = P1.x - P2.x;
+	Result.C = P1.y * P2.x - P1.x * P2.y;
+    
+	//NOTE(dima): Normalizing line equation
+	f32 PlaneNormalSq = Result.A * Result.A + Result.B * Result.B;
+    
+	Result *= RSqrt(PlaneNormalSq);
+    
+	return(Result);
 }
 
 #endif

@@ -286,7 +286,7 @@ struct input_system
     f32 DeltaTime;
 };
 
-struct time
+struct time_system
 {
     // NOTE(Dima): Last frame time
     f32 DeltaTime;

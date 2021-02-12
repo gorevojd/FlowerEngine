@@ -195,14 +195,12 @@ struct model
     
     // NOTE(Dima): Nodes
     model_node* Nodes;
-    m44* Node_ToModel;
     m44* Node_ToParent;
     int* Node_ParentIndex;
     
     // NOTE(Dima): Bones
     m44* Bone_InvBindPose;
     int* Bone_NodeIndex;
-    m44* Bone_SkinningMatrices;
     
     asset_model_shared Shared;
     
