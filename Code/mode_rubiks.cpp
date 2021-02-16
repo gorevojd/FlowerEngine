@@ -13,7 +13,7 @@ SCENE_INIT(RubiksCube)
     
     InitCamera(&State->Camera, Camera_RotateAround);
     
-    State->Cube3 = CreateCube(Scene->Arena, 10, 1.0f, true);
+    State->Cube3 = CreateCube(Scene->Arena, 5, 1.0f, true);
 }
 
 SCENE_UPDATE(RubiksCube)
@@ -42,7 +42,8 @@ SCENE_UPDATE(RubiksCube)
     
     if(GetKeyDown(Key_G))
     {
-        GenerateScrubmle(Cube, Global_Time->Time * 1000.0f);
+        GenerateScrubmle(Cube, Global_Time->Time * 100000.0f);
+        Cube->SolvingState = RubState_Disassembled;
     }
     
     if(GetKeyDown(Key_Q))
@@ -50,15 +51,33 @@ SCENE_UPDATE(RubiksCube)
         ResetCubies(Cube);
     }
     
+    if(CtrlIsPressed)
+    {
+        if(GetKeyDown(Key_X))
+        {
+            RubCom_X(Cube, ShiftIsPressed);
+        }
+        
+        if(GetKeyDown(Key_Y))
+        {
+            RubCom_Y(Cube, ShiftIsPressed);
+        }
+        
+        if(GetKeyDown(Key_Z))
+        {
+            RubCom_Z(Cube, ShiftIsPressed);
+        }
+    }
+    
     if(GetKeyDown(Key_R))
     {
         if(CtrlIsPressed)
         {
-            CommandStandard_RR(Cube, ShiftIsPressed);
+            RubCom_RR(Cube, ShiftIsPressed);
         }
         else
         {
-            CommandStandard_R(Cube, ShiftIsPressed);
+            RubCom_R(Cube, ShiftIsPressed);
         }
     }
     
@@ -66,11 +85,11 @@ SCENE_UPDATE(RubiksCube)
     {
         if(CtrlIsPressed)
         {
-            CommandStandard_LL(Cube, ShiftIsPressed);
+            RubCom_LL(Cube, ShiftIsPressed);
         }
         else
         {
-            CommandStandard_L(Cube, ShiftIsPressed);
+            RubCom_L(Cube, ShiftIsPressed);
         }
     }
     
@@ -78,11 +97,11 @@ SCENE_UPDATE(RubiksCube)
     {
         if(CtrlIsPressed)
         {
-            CommandStandard_DD(Cube, ShiftIsPressed);
+            RubCom_DD(Cube, ShiftIsPressed);
         }
         else
         {
-            CommandStandard_D(Cube, ShiftIsPressed);
+            RubCom_D(Cube, ShiftIsPressed);
         }
     }
     
@@ -90,11 +109,11 @@ SCENE_UPDATE(RubiksCube)
     {
         if(CtrlIsPressed)
         {
-            CommandStandard_UU(Cube, ShiftIsPressed);
+            RubCom_UU(Cube, ShiftIsPressed);
         }
         else
         {
-            CommandStandard_U(Cube, ShiftIsPressed);
+            RubCom_U(Cube, ShiftIsPressed);
         }
     }
     
@@ -102,11 +121,11 @@ SCENE_UPDATE(RubiksCube)
     {
         if(CtrlIsPressed)
         {
-            CommandStandard_FF(Cube, ShiftIsPressed);
+            RubCom_FF(Cube, ShiftIsPressed);
         }
         else
         {
-            CommandStandard_F(Cube, ShiftIsPressed);
+            RubCom_F(Cube, ShiftIsPressed);
         }
     }
     
@@ -114,33 +133,55 @@ SCENE_UPDATE(RubiksCube)
     {
         if(CtrlIsPressed)
         {
-            CommandStandard_BB(Cube, ShiftIsPressed);
+            RubCom_BB(Cube, ShiftIsPressed);
         }
         else
         {
-            CommandStandard_B(Cube, ShiftIsPressed);
+            RubCom_B(Cube, ShiftIsPressed);
         }
     }
     
     // NOTE(Dima): CenterTests
     if(GetKeyDown(Key_M) && Cube->Dim >= 3)
     {
-        CommandStandard_M(Cube, ShiftIsPressed);
+        RubCom_M(Cube, ShiftIsPressed);
     }
     
     if(GetKeyDown(Key_E) && Cube->Dim >= 3)
     {
-        CommandStandard_E(Cube, ShiftIsPressed);
+        RubCom_E(Cube, ShiftIsPressed);
     }
     
     if(GetKeyDown(Key_S) && Cube->Dim >= 3)
     {
-        CommandStandard_S(Cube, ShiftIsPressed);
+        RubCom_S(Cube, ShiftIsPressed);
     }
     
-    UpdateCube(&State->Cube3, V3(0.0f), 1.0f);
+    // NOTE(Dima): StartSolve
+    if(GetKeyDown(Key_Return))
+    {
+        if(!CubeIsSolved(Cube))
+        {
+            Cube->SolvingState = RubState_SolvingCenters;
+        }
+    }
+    
+    static b32 DebugMode = false;
+    if(GetKeyDown(Key_Space))
+    {
+        DebugMode = !DebugMode;
+    }
+    UpdateCube(&State->Cube3, V3(0.0f), 1.0f, DebugMode);
     //UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
+    
+    
+#if 0    
     ShowSides(&State->Cube3, V2(10), 240);
+    // NOTE(Dima): Helper left cubie
+    PushMesh(&Global_Assets->Cube,
+             0,
+             ScalingMatrix(0.1f) * TranslationMatrix(V3(2.0f, 0.0f, 0.0f)));
+#endif
     
 #if 0    
     ShowLabel3D(&State->Camera, 

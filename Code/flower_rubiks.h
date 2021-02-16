@@ -32,6 +32,18 @@ enum rubiks_cube_directions
     RubiksDirection_Count,
 };
 
+enum rubiks_cube_sides
+{
+    RubSide_Up,
+    RubSide_Down,
+    RubSide_Left,
+    RubSide_Right,
+    RubSide_Front, 
+    RubSide_Back,
+    
+    RubSide_Count,
+};
+
 GLOBAL_VARIABLE int RubiksRotOuterSides4Rotation[3][4] = 
 {
     // NOTE(Dima): Right-Left look
@@ -63,6 +75,129 @@ GLOBAL_VARIABLE b32 RubiksLineIsRow[3][4] =
     {false, false, false, false},
     {true, true, true, true},
     {true, false, true, false},
+};
+
+enum rubiks_side_edge_get
+{
+    RubSideEdge_Top,
+    RubSideEdge_Right,
+    RubSideEdge_Bottom,
+    RubSideEdge_Left,
+};
+
+enum rubiks_side_corner_get
+{
+    RubSideGetCorn_TopLeft,
+    RubSideGetCorn_TopRight,
+    RubSideGetCorn_BotLeft,
+    RubSideGetCorn_BotRight,
+};
+
+// NOTE(Dima): Here I store all edges centers info. And how to get it from Sides arrays
+// NOTE(Dima): 12 edges. Each edge consists from 2 colors
+GLOBAL_VARIABLE int RubiksEdgesSides[12][4] = 
+{
+    {RubSide_Up, RubSide_Front, RubSideEdge_Bottom, RubSideEdge_Top},
+    {RubSide_Up, RubSide_Right, RubSideEdge_Right, RubSideEdge_Top},
+    {RubSide_Up, RubSide_Back, RubSideEdge_Top, RubSideEdge_Top},
+    {RubSide_Up, RubSide_Left, RubSideEdge_Left, RubSideEdge_Top},
+    
+    {RubSide_Down, RubSide_Front, RubSideEdge_Top, RubSideEdge_Bottom},
+    {RubSide_Down, RubSide_Right, RubSideEdge_Right, RubSideEdge_Bottom},
+    {RubSide_Down, RubSide_Back, RubSideEdge_Bottom, RubSideEdge_Bottom},
+    {RubSide_Down, RubSide_Left, RubSideEdge_Left, RubSideEdge_Bottom},
+    
+    {RubSide_Front, RubSide_Right, RubSideEdge_Right, RubSideEdge_Left},
+    {RubSide_Right, RubSide_Back, RubSideEdge_Right, RubSideEdge_Left},
+    {RubSide_Back, RubSide_Left, RubSideEdge_Right, RubSideEdge_Left},
+    {RubSide_Left, RubSide_Front, RubSideEdge_Right, RubSideEdge_Left},
+};
+
+GLOBAL_VARIABLE int RubiksCornersPrep[8][6] = 
+{
+    // NOTE(Dima): TopCorners
+    {
+        // NOTE(Dima): UpFrontRight
+        RubSide_Up, RubSide_Front, RubSide_Right, 
+        RubSideGetCorn_BotRight, RubSideGetCorn_TopRight, RubSideGetCorn_TopLeft,
+    },
+    {
+        // NOTE(Dima): UpRightBack
+        RubSide_Up, RubSide_Right, RubSide_Back,
+        RubSideGetCorn_TopRight, RubSideGetCorn_TopRight, RubSideGetCorn_TopLeft
+    },
+    {
+        // NOTE(Dima): UpBackLeft
+        RubSide_Up, RubSide_Back, RubSide_Left,
+        RubSideGetCorn_TopLeft, RubSideGetCorn_TopRight, RubSideGetCorn_TopLeft,
+    },
+    {
+        // NOTE(Dima): UpLeftFront
+        RubSide_Up, RubSide_Left, RubSide_Front,
+        RubSideGetCorn_BotLeft, RubSideGetCorn_TopRight, RubSideGetCorn_TopLeft,
+    },
+    
+    // NOTE(Dima): Bottom corners
+    {
+        // NOTE(Dima): DownRightFront
+        RubSide_Down, RubSide_Right, RubSide_Front,
+        RubSideGetCorn_TopRight, RubSideGetCorn_BotLeft, RubSideGetCorn_BotRight, 
+    },
+    {
+        // NOTE(Dima): DownBackRight
+        RubSide_Down, RubSide_Back, RubSide_Right,
+        RubSideGetCorn_BotRight, RubSideGetCorn_BotLeft, RubSideGetCorn_BotRight, 
+    },
+    {
+        // NOTE(Dima): DownLeftBack
+        RubSide_Down, RubSide_Left, RubSide_Back, 
+        RubSideGetCorn_BotLeft, RubSideGetCorn_BotLeft, RubSideGetCorn_BotRight, 
+    },
+    {
+        // NOTE(Dima): DownFrontLeft
+        RubSide_Down, RubSide_Front, RubSide_Left,
+        RubSideGetCorn_TopLeft, RubSideGetCorn_BotLeft, RubSideGetCorn_BotRight, 
+    },
+};
+
+enum rubiks_corner_rotation
+{
+    RubCornRot_Correct,
+    RubCornRot_SecondAtFirst, // NOTE(Dima): Second color takes place of first color
+    RubCornRot_ThirdAtFirst // NOTE(Dima): Third color takes place of first color
+};
+
+enum rubiks_cube_corners
+{
+    RubCorn_UpFrontRight,
+    RubCorn_UpRightBack,
+    RubCorn_UpBackLeft,
+    RubCorn_UpLeftFront,
+    
+    RubCorn_DownRightFront,
+    RubCorn_DownBackRight,
+    RubCorn_DownLeftBack,
+    RubCorn_DownFrontLeft,
+};
+
+enum rubiks_cube_edges
+{
+    RubEdge_UpFront,
+    RubEdge_UpRight,
+    RubEdge_UpBack,
+    RubEdge_UpLeft,
+    
+    RubEdge_DownFront,
+    RubEdge_DownRight,
+    RubEdge_DownBack,
+    RubEdge_DownLeft,
+    
+    RubEdge_FrontRight,
+    RubEdge_RightBack,
+    RubEdge_BackLeft,
+    RubEdge_LeftFront,
+    
+    RubEdge_Count,
 };
 
 GLOBAL_VARIABLE const char* RubiksDirectionName[] = 
@@ -114,6 +249,7 @@ struct rubiks_visible_cubies
     m44* AppliedRotation;
     v3* InitP;
     int* MeshIndex;
+    int* InitIndices;
     
     int Count;
 };
@@ -190,16 +326,21 @@ struct rubiks_beginned_rotation
     int AxisIndex;
 };
 
+enum rubiks_command_type
+{
+    RubiksCommand_Rotation,
+    RubiksCommand_ChangeState,
+};
+
 struct rubiks_command
 {
     int Axis;
-    int FirstFaceIndex;
-    int LastFaceIndex;
-    b32 IsClockwise;
+    u16 FirstFaceIndex;
+    u16 LastFaceIndex;
+    u8 IsClockwise;
+    u8 Type;
+    u8 FinalState; //rubiks_cube_solving_state
 };
-
-//#define RUBIKS_TIME_FOR_ROTATION 10.0f
-#define RUBIKS_TIME_FOR_ROTATION 0.1f
 
 struct rubiks_cube
 {
@@ -247,10 +388,6 @@ struct rubiks_cube
     rubiks_rotate_face RotateFace;
     rubiks_precomp_face PrecompFace;
     
-    // NOTE(Dima): These for rotating internal structure of cube
-    int* ToRotateIndices;
-    int* RotatedIndices;
-    
     // NOTE(Dima): Commands
     int CommandsCount;
     rubiks_command* Commands;
@@ -258,6 +395,70 @@ struct rubiks_cube
     int AddIndex;
     
     b32 IsRotatingNow;
+    u32 SolvingState;
+    b32 ExecutingSolvingNow;
 };
+
+enum rubiks_cube_solving_state
+{
+    RubState_Disassembled,
+    RubState_Solved,
+    
+    RubState_SolvingCenters,
+    // NOTE(Dima): Center White
+    RubState_SolvingCenters_SolveWhite,
+    RubState_SolvingCenters_SolveWhite_ToUp,
+    RubState_SolvingCenters_SolveWhite_GreenToFront,
+    RubState_SolvingCenters_SolveWhite_Func,
+    
+    // NOTE(Dima): Center Yellow
+    RubState_SolvingCenters_SolveYellow,
+    RubState_SolvingCenters_SolveYellow_ToUp,
+    RubState_SolvingCenters_SolveYellow_GreenToFront,
+    RubState_SolvingCenters_SolveYellow_Func,
+    
+    // NOTE(Dima): Center Green
+    RubState_SolvingCenters_SolveGreen,
+    RubState_SolvingCenters_SolveGreen_ToUp,
+    RubState_SolvingCenters_SolveGreen_OrangeToFront,
+    RubState_SolvingCenters_SolveGreen_Func,
+    
+    // NOTE(Dima): Center Orange
+    RubState_SolvingCenters_SolveOrange,
+    RubState_SolvingCenters_SolveOrange_ToUp,
+    RubState_SolvingCenters_SolveOrange_BlueToFront,
+    RubState_SolvingCenters_SolveOrange_Func,
+    
+    // NOTE(Dima): Center Blue & Red at a time
+    RubState_SolvingCenters_SolveBlue,
+    RubState_SolvingCenters_SolveBlue_ToUp,
+    RubState_SolvingCenters_SolveBlue_RedToFront,
+    RubState_SolvingCenters_SolveBlue_Func,
+    
+    RubState_SolvingEdgesCenters,
+    RubState_SolvingEdgesCenters_Func,
+    
+    RubState_MoveCenters_Green,
+    RubState_MoveCenters_White,
+    RubState_MakeWhiteCross,
+    
+    RubState_FlipToYellowAfterCross,
+    RubState_SolveFirstLayer,
+    RubState_SolveSecondLayer,
+    RubState_SolveYellowCross,
+    
+    RubState_SolveYellowEdges_Match,
+    RubState_SolveYellowEdges_PrepareAndExecute,
+    RubState_SolveYellowEdges,
+    
+    RubState_PlaceYellowCorners,
+    
+    RubState_OrientYellowCorners_Prepare,
+    RubState_OrientYellowCorners,
+    RubState_OrientYellowCorners_MatchInTheEnd,
+};
+
+//#define RUBIKS_TIME_FOR_ROTATION 10.0f
+#define RUBIKS_TIME_FOR_ROTATION 0.1f
 
 #endif //FLOWER_RUBIKS_H

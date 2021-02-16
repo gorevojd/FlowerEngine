@@ -64,7 +64,7 @@ INTERNAL_FUNCTION inline u32 GetMeshHash(mesh* Mesh)
     return(Result);
 }
 
-INTERNAL_FUNCTION render_mesh_instance* FindMeshInstanceInTable(mesh* Mesh)
+INTERNAL_FUNCTION inline render_mesh_instance* FindMeshInstanceInTable(mesh* Mesh)
 {
     u32 Hash = GetMeshHash(Mesh);
     

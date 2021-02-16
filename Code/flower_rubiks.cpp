@@ -1,5 +1,7 @@
 #include "flower_rubiks.h"
 
+#include "flower_rubiks_solving.cpp"
+
 inline int GetCubieIndex(rubiks_cube* Cube, int x, int y, int z)
 {
     int ResultIndex = z * Cube->Dim * Cube->Dim + y * Cube->Dim + x;
@@ -947,6 +949,7 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
             }
         }
         
+        // NOTE(Dima): Rotating face
         int FaceBase = (FaceIndex - BeginnedRotation->FirstFaceIndex) * Cube->Dim * Cube->Dim;
         
         int LoopIndex = 0;
@@ -976,7 +979,6 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
             // NOTE(Dima): Rotating color
             if(SideFace != 0)
             {
-                
                 if(FaceIndex == Cube->Dim - 1)
                 {
                     if(!BeginnedRotation->IsClockwise)
@@ -993,7 +995,7 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
                     i < ToRotateCount;
                     i++)
                 {
-                    SideFace[FaceBase + ToRotateIndices[i]] = Cube->SideTemp[FaceBase + RotatedIndices[i]];
+                    SideFace[ToRotateIndices[i]] = Cube->SideTemp[RotatedIndices[i]];
                 }
             }
             
@@ -1009,160 +1011,11 @@ INTERNAL_FUNCTION void RotateInternalStructure(rubiks_cube* Cube)
     }
     
     
-    // NOTE(Dima): Copying rotated indices to Current
+    // NOTE(Dima): Setting current cube with faces that we've just rotated
     for(int i = 0; i < Face->Count; i++)
     {
         Cube->Current[Face->IndicesInCurrent[i]] = Face->Face[i];
     }
-}
-
-INTERNAL_FUNCTION void AddCommandToCube(rubiks_cube* Cube,
-                                        int Axis,
-                                        int FirstFaceIndex,
-                                        int LastFaceIndex,
-                                        int IsClockwise)
-{
-    rubiks_command* NewCommand = &Cube->Commands[Cube->AddIndex];
-    
-    NewCommand->Axis = Axis;
-    NewCommand->FirstFaceIndex = FirstFaceIndex;
-    NewCommand->LastFaceIndex = LastFaceIndex;
-    NewCommand->IsClockwise = IsClockwise;
-    
-    Cube->AddIndex = (Cube->AddIndex + 1) % Cube->CommandsCount;
-    
-    Assert(Cube->AddIndex != Cube->DoIndex);
-}
-
-INTERNAL_FUNCTION void AddCommandToCube(rubiks_cube* Cube,
-                                        int Axis,
-                                        int FaceIndex,
-                                        int IsClockwise)
-{
-    AddCommandToCube(Cube,
-                     Axis,
-                     FaceIndex,
-                     FaceIndex,
-                     IsClockwise);
-}
-
-// NOTE(Dima): Standard commands like R, L, U, D, F, B
-INTERNAL_FUNCTION inline void CommandStandard_R(rubiks_cube* Cube, 
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_X, 0, CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_L(rubiks_cube* Cube,
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_X, Cube->Dim - 1, !CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_U(rubiks_cube* Cube,
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Y, Cube->Dim - 1, !CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_D(rubiks_cube* Cube, 
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Y, 0, CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_F(rubiks_cube* Cube,
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Z, 0, CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_B(rubiks_cube* Cube,
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Z, Cube->Dim - 1, !CounterClockwise);
-}
-
-// NOTE(Dima): M, E, S
-/*
-
-M - Center on X axis. Rotation same as from L
-E - Center on Y axis. Rotation same as from D
-S - Center on Z axis. Rotation same as from F
-
-*/
-
-INTERNAL_FUNCTION inline void CommandStandard_M(rubiks_cube* Cube, 
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_X, 
-                     1, Cube->Dim - 2,
-                     !CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_E(rubiks_cube* Cube,
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Y, 
-                     1, Cube->Dim - 2, 
-                     CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_S(rubiks_cube* Cube,
-                                                b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Z,
-                     1, Cube->Dim - 2,
-                     CounterClockwise);
-}
-
-// NOTE(Dima): Commands for doubly rotation. Rotation of a side and center
-INTERNAL_FUNCTION inline void CommandStandard_RR(rubiks_cube* Cube, 
-                                                 b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_X, 0, Cube->Dim - 2, CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_LL(rubiks_cube* Cube,
-                                                 b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_X, 1, Cube->Dim - 1, !CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_UU(rubiks_cube* Cube,
-                                                 b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Y, 1, Cube->Dim - 1, !CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_DD(rubiks_cube* Cube, 
-                                                 b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Y, 0, Cube->Dim - 2, CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_FF(rubiks_cube* Cube,
-                                                 b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Z, 0, Cube->Dim - 2, CounterClockwise);
-}
-
-INTERNAL_FUNCTION inline void CommandStandard_BB(rubiks_cube* Cube,
-                                                 b32 CounterClockwise)
-{
-    AddCommandToCube(Cube, RubiksAxis_Z, 1, Cube->Dim - 1, !CounterClockwise);
-}
-
-INTERNAL_FUNCTION void FinishCommandExecution(rubiks_cube* Cube)
-{
-    Cube->DoIndex = (Cube->DoIndex + 1) % Cube->CommandsCount;
-}
-
-INTERNAL_FUNCTION b32 CanExecuteCommand(rubiks_cube* Cube)
-{
-    b32 Result = (Cube->AddIndex != Cube->DoIndex) && !Cube->IsRotatingNow;
-    
-    return(Result);
 }
 
 INTERNAL_FUNCTION void FinishCubeRotation(rubiks_cube* Cube)
@@ -1191,6 +1044,13 @@ INTERNAL_FUNCTION void FinishCubeRotation(rubiks_cube* Cube)
     
     Beginned->AppliedRotation = IdentityMatrix4();
     Cube->IsRotatingNow = false;
+    
+    // NOTE(Dima): Change cubes solve state  
+    b32 IsSolved = CubeIsSolved(Cube);
+    if(IsSolved)
+    {
+        ChangeSolvingState(Cube, RubState_Solved);
+    }
     
     FinishCommandExecution(Cube);
 }
@@ -1342,6 +1202,8 @@ INTERNAL_FUNCTION void ResetCubeColors(rubiks_cube* Cube)
             Face[i] = SideIndex;
         }
     }
+    
+    Cube->SolvingState = RubState_Solved;
 }
 
 INTERNAL_FUNCTION void ResetCubies(rubiks_cube* Cube)
@@ -1366,6 +1228,7 @@ INTERNAL_FUNCTION void ResetCubies(rubiks_cube* Cube)
                     Vis->Transform[VisibleCubie] = TranslationMatrix(CubieP);
                     Vis->AppliedRotation[VisibleCubie] = IdentityMatrix4();
                     Vis->InitP[VisibleCubie] = CubieP;
+                    Vis->InitIndices[VisibleCubie] = CubieIndex;
                 }
             }
         }
@@ -1405,6 +1268,7 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     Result.Visible.AppliedRotation = PushArray(Arena, m44, CeilAlign(VisibleCount, 4));
     Result.Visible.InitP = PushArray(Arena, v3, CeilAlign(VisibleCount, 4));
     Result.Visible.MeshIndex = PushArray(Arena, int, CeilAlign(VisibleCount, 4));
+    Result.Visible.InitIndices = PushArray(Arena, int, CeilAlign(VisibleCount, 4));
     
     // NOTE(Dima): Init faces colors
     int OuterColorsCount = 4 * Result.Dim;
@@ -1430,9 +1294,6 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     Result.RotateFace.TempFace = PushArray(Arena, int, Result.CubiesCount);
     Result.RotateFace.IndicesInCurrent = PushArray(Arena, int, Result.CubiesCount);
     Result.RotateFace.Count = 0;
-    
-    Result.ToRotateIndices = PushArray(Arena, int, 4 * (CubeDim - 1));
-    Result.RotatedIndices = PushArray(Arena, int, 4 * (CubeDim - 1));
     
     Result.OneCubieLen = Result.SideLen / (f32)Result.Dim;
     Result.HalfSideLen = Result.SideLen * 0.5f;
@@ -1553,19 +1414,20 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
                 {
                     if(RubiksIsOuter(Cube, x, y, z))
                     {
-                        int CubieCurrentIndex = GetCurrentIndex(Cube, x, y, z);
-                        int VisibleCubie = Cube->CubiesToVisible[CubieCurrentIndex];
+                        int CubieIndex = GetCubieIndex(Cube, x, y, z);
+                        int CubieCurrentIndex = Cube->Current[CubieIndex];
+                        
+                        int VisibleCubie = Cube->CubiesToVisible[CubieIndex];
                         
                         char Buf[16];
                         IntegerToString(CubieCurrentIndex, Buf);
                         
-                        v3 NumP = Vis->InitP[VisibleCubie];
+                        v3 NumP = P + Vis->InitP[VisibleCubie];
                         
-                        PrintText3D(Buf,
-                                    P + NumP,
-                                    V3_Left(), V3_Up(),
-                                    0.3f, 
-                                    ColorRed());
+                        PrintTextCentered3D(Buf,
+                                            P + NumP,
+                                            V3_Back(),
+                                            0.25 / (f32)(Cube->Dim));
                     }
                 }
             }
@@ -1590,8 +1452,14 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
                              Mesh, 0,
                              Vis->FinalTransform[VisibleIndex]);
 #else
+            char Buf[16];
+            stbsp_sprintf(Buf, "%d", Vis->InitIndices[VisibleIndex]);
             
-            PushMesh(Mesh, 0, Vis->FinalTransform[VisibleIndex]);
+            PrintTextCentered3D(Buf, 
+                                Vis->FinalTransform[VisibleIndex].Rows[3].xyz,
+                                V3_Back(),
+                                0.1f,
+                                ColorWhite());
 #endif
         }
     }
@@ -1666,22 +1534,46 @@ INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube,
     
     UpdateBeginnedRotation(Cube);
     
+    while(CanExecuteCommand(Cube))
+    {
+        rubiks_command* Command = &Cube->Commands[Cube->DoIndex];
+        
+        // NOTE(Dima): Setting final state when solving state is finished
+        if(Command->Type == RubiksCommand_ChangeState)
+        {
+            // NOTE(Dima): Preventing from solving further if cube is solved here as well.
+            if(Cube->SolvingState != RubState_Solved)
+            {
+                ChangeSolvingState(Cube, Command->FinalState);
+            }
+            
+            FinishCommandExecution(Cube);
+            Cube->ExecutingSolvingNow = false;
+        }
+        else
+        {
+            break;
+        }
+    }
+    
+    SolveCube(Cube);
+    
     if(CanExecuteCommand(Cube))
     {
         rubiks_command* Command = &Cube->Commands[Cube->DoIndex];
         
-        BeginRotateFace(Cube, 
-                        Command->Axis,
-                        Command->FirstFaceIndex,
-                        Command->LastFaceIndex,
-                        Speed,
-                        Command->IsClockwise);
+        if(Command->Type == RubiksCommand_Rotation)
+        {
+            
+            BeginRotateFace(Cube, 
+                            Command->Axis,
+                            Command->FirstFaceIndex,
+                            Command->LastFaceIndex,
+                            Speed,
+                            Command->IsClockwise);
+        }
     }
     
     ShowCube(Cube, P, DebugMode);
     
-    // NOTE(Dima): Helper left cubie
-    PushMesh(&Global_Assets->Cube,
-             0,
-             ScalingMatrix(0.1f) * TranslationMatrix(V3(2.0f, 0.0f, 0.0f)));
 }
