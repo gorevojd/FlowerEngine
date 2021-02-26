@@ -117,6 +117,11 @@ INTERNAL_FUNCTION inline  PLATFORM_GET_THREAD_ID(SDLGetThreadID)
     return(ThreadID);
 }
 
+INTERNAL_FUNCTION inline PLATFORM_OUTPUT_LOG(SDLOutputLog)
+{
+    SDL_Log(Text);
+}
+
 // NOTE(Dima): Performance counters functions
 INTERNAL_FUNCTION inline PLATFORM_GET_PERFORMANCE_COUNTER(SDLGetPerfCounter)
 {
@@ -1105,6 +1110,7 @@ int main(int ArgsCount, char** Args)
     Platform.GetElapsedTime = SDLGetElapsedTime;
     Platform.PerfFrequency = SDL_GetPerformanceFrequency();
     Platform.OneOverPerfFrequency = 1.0 / (f64)SDL_GetPerformanceFrequency();
+    Platform.Log = SDLOutputLog;
     
     memory_arena GameArena = {};
     App = PushStruct(&GameArena, app_state);
@@ -1123,9 +1129,9 @@ int main(int ArgsCount, char** Args)
     // NOTE(Dima): Setting up global variables after game init
     SetGlobalVariables(Game);
     
-#if 0    
-    App->WndDims.InitWindowWidth = 1920;
-    App->WndDims.InitWindowHeight = 1080;
+#if 1    
+    App->WndDims.InitWidth = 1920;
+    App->WndDims.InitHeight = 1080;
 #else
     App->WndDims.InitWidth = 1600;
     App->WndDims.InitHeight = 900;
@@ -1141,7 +1147,7 @@ int main(int ArgsCount, char** Args)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16);
     
     App->Window = SDL_CreateWindow("Flower",
                                    SDL_WINDOWPOS_UNDEFINED,

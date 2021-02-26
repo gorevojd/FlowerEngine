@@ -1,6 +1,6 @@
-#include "flower_rubiks.h"
+#include "prj_rubiks.h"
 
-#include "flower_rubiks_solving.cpp"
+#include "prj_rubiks_solving.cpp"
 
 inline int GetCubieIndex(rubiks_cube* Cube, int x, int y, int z)
 {
@@ -410,15 +410,28 @@ INTERNAL_FUNCTION mesh GenerateCubieMesh(rubiks_cube* Cube,
     return(Result);
 }
 
-inline v3 RubiksPlaneTo3DPoint(rubiks_cube* Cube, v2 PlaneP, u32 Direction, b32 IsUpper)
+inline v3 RubiksPlaneTo3DPoint(rubiks_cube* Cube, 
+                               v2 PlaneP, 
+                               u32 Direction, 
+                               b32 IsUpper,
+                               b32 HaveWalls)
 {
     
     v3 Normal = RubiksDirection[Direction];
     f32 Offset = Cube->OneCubieLen * 0.5f;
     
+    f32 StickerHeight = Cube->OneCubieLen * 0.018f;
+    
     if(IsUpper)
     {
-        Offset += Cube->StickerHeight;
+        if(HaveWalls)
+        {
+            Offset += StickerHeight;
+        }
+        else
+        {
+            Offset += Cube->OneCubieLen * 0.001f;
+        }
     }
     
     v3 Result = Normal * Offset;
@@ -450,7 +463,9 @@ inline v3 RubiksPlaneTo3DPoint(rubiks_cube* Cube, v2 PlaneP, u32 Direction, b32 
     return(Result);
 }
 
-INTERNAL_FUNCTION void GenerateStickerMeshes(rubiks_cube* Cube, b32 RoundStickers)
+INTERNAL_FUNCTION void GenerateStickerMeshes(rubiks_cube* Cube, 
+                                             b32 RoundStickers, 
+                                             b32 StickersHaveWalls)
 {
     // NOTE(Dima): Generating sticker helper meshes
     Cube->HelperStickerUp = GetStickerMeshInternal(Cube->OneCubieLen,
@@ -477,30 +492,38 @@ INTERNAL_FUNCTION void GenerateStickerMeshes(rubiks_cube* Cube, b32 RoundSticker
         // NOTE(Dima): Generating sticker sides
         Assert(StickerUp->PerimeterPoints.size() == StickerDown->PerimeterPoints.size());
         
-        int NumPerimP = StickerUp->PerimeterPoints.size();
-        for(int PIndex = 0; 
-            PIndex < NumPerimP; 
-            PIndex++)
+        if(StickersHaveWalls)
         {
-            v3 CurTop = RubiksPlaneTo3DPoint(Cube, 
-                                             StickerUp->PerimeterPoints[PIndex], 
-                                             DirectionIndex, true);
-            v3 NextTop = RubiksPlaneTo3DPoint(Cube, 
-                                              StickerUp->PerimeterPoints[(PIndex + 1) % NumPerimP], 
-                                              DirectionIndex, true);
-            v3 CurBot = RubiksPlaneTo3DPoint(Cube, 
-                                             StickerDown->PerimeterPoints[PIndex], 
-                                             DirectionIndex, false);
-            v3 NextBot = RubiksPlaneTo3DPoint(Cube, 
-                                              StickerDown->PerimeterPoints[(PIndex + 1) % NumPerimP], 
-                                              DirectionIndex, false);
             
-            v3 Normal = NOZ(Cross(NextBot - CurTop, NextTop - CurTop));
-            
-            PushFlatPolygon(HelperMesh, 
-                            CurTop, NextTop,
-                            NextBot, CurBot,
-                            Normal, StickerColor);
+            int NumPerimP = StickerUp->PerimeterPoints.size();
+            for(int PIndex = 0; 
+                PIndex < NumPerimP; 
+                PIndex++)
+            {
+                v3 CurTop = RubiksPlaneTo3DPoint(Cube, 
+                                                 StickerUp->PerimeterPoints[PIndex], 
+                                                 DirectionIndex, true, 
+                                                 StickersHaveWalls);
+                v3 NextTop = RubiksPlaneTo3DPoint(Cube, 
+                                                  StickerUp->PerimeterPoints[(PIndex + 1) % NumPerimP], 
+                                                  DirectionIndex, true,
+                                                  StickersHaveWalls);
+                v3 CurBot = RubiksPlaneTo3DPoint(Cube, 
+                                                 StickerDown->PerimeterPoints[PIndex], 
+                                                 DirectionIndex, false,
+                                                 StickersHaveWalls);
+                v3 NextBot = RubiksPlaneTo3DPoint(Cube, 
+                                                  StickerDown->PerimeterPoints[(PIndex + 1) % NumPerimP], 
+                                                  DirectionIndex, false,
+                                                  StickersHaveWalls);
+                
+                v3 Normal = NOZ(Cross(NextBot - CurTop, NextTop - CurTop));
+                
+                PushFlatPolygon(HelperMesh, 
+                                CurTop, NextTop,
+                                NextBot, CurBot,
+                                Normal, StickerColor);
+            }
         }
         
         // NOTE(Dima): Generating sticker top
@@ -516,7 +539,8 @@ INTERNAL_FUNCTION void GenerateStickerMeshes(rubiks_cube* Cube, b32 RoundSticker
         {
             v3 CurP = RubiksPlaneTo3DPoint(Cube, 
                                            StickerUp->P[PIndex], 
-                                           DirectionIndex, true);
+                                           DirectionIndex, true,
+                                           StickersHaveWalls);
             
             StickerUpperMesh.Vertices.push_back(CurP);
             StickerUpperMesh.Normals.push_back(RubiksDirection[DirectionIndex]);
@@ -1061,7 +1085,8 @@ INTERNAL_FUNCTION b32 BeginRotateFace(rubiks_cube* Cube,
                                       int FirstFaceIndex,
                                       int LastFaceIndex,
                                       f32 Speed,
-                                      b32 IsClockwise)
+                                      b32 IsClockwise,
+                                      b32 SmoothSpeed)
 {
     rubiks_beginned_rotation* BeginnedRotation = &Cube->BeginnedRotation;
     
@@ -1070,7 +1095,14 @@ INTERNAL_FUNCTION b32 BeginRotateFace(rubiks_cube* Cube,
     if(!Cube->IsRotatingNow)
     {
         BeginnedRotation->InRotationTime = 0.0f;
-        BeginnedRotation->TimeForRotation = RUBIKS_TIME_FOR_ROTATION / Speed;
+        if(SmoothSpeed)
+        {
+            BeginnedRotation->TimeForRotation = RUBIKS_TIME_FOR_ROTATION / (Cube->CurrentSpeed * Speed);
+        }
+        else
+        {
+            BeginnedRotation->TimeForRotation = RUBIKS_TIME_FOR_ROTATION / (RUBIKS_SPEED_DEFAULT * Speed);
+        }
         
         switch(Axis)
         {
@@ -1126,7 +1158,25 @@ INTERNAL_FUNCTION void UpdateBeginnedRotation(rubiks_cube* Cube)
         }
         
         // NOTE(Dima): Applying cubies rotation
-        m44 AppliedRotation = BeginnedRotation->RotationMatrix(Angle);
+        m44 AppliedRotation = {};
+        switch(BeginnedRotation->AxisIndex)
+        {
+            case RubiksAxis_X:
+            {
+                AppliedRotation = RotationMatrixX(Angle);
+            }break;
+            
+            case RubiksAxis_Y:
+            {
+                AppliedRotation = RotationMatrixY(Angle);
+            }break;
+            
+            case RubiksAxis_Z:
+            {
+                AppliedRotation = RotationMatrixZ(Angle);
+            }break;
+        }
+        
         rubiks_rotate_face* RotateFace = BeginnedRotation->RotateFace;
         
         BeginnedRotation->AxisIndex = RotateFace->AxisIndex;
@@ -1206,9 +1256,26 @@ INTERNAL_FUNCTION void ResetCubeColors(rubiks_cube* Cube)
     Cube->SolvingState = RubState_Solved;
 }
 
+INTERNAL_FUNCTION inline void ChangeCubeSpeed(rubiks_cube* Cube,
+                                              f32 Speed,
+                                              b32 Instant = true)
+{
+    Cube->TargetSpeed = Speed;
+    Cube->BeginLerpSpeed = Cube->CurrentSpeed;
+    Cube->LastSpeedChangeTime = Global_Time->Time;
+    
+    if(Instant)
+    {
+        Cube->CurrentSpeed = Speed;
+        Cube->BeginLerpSpeed = Speed;
+    }
+}
+
 INTERNAL_FUNCTION void ResetCubies(rubiks_cube* Cube)
 {
     rubiks_visible_cubies* Vis = &Cube->Visible;
+    
+    ChangeCubeSpeed(Cube, RUBIKS_SPEED_SLOW);
     
     // NOTE(Dima): Initializing cubies
     for(int x = 0; x < Cube->Dim; x++)
@@ -1250,7 +1317,7 @@ inline int GetVisibleCubiesCount(int Dim)
 inline rubiks_cube CreateCube(memory_arena* Arena, 
                               int CubeDim, 
                               f32 SideLen, 
-                              b32 RoundStickers = true)
+                              u32 Flags = RubCreateCube_Default)
 {
     rubiks_cube Result = {};
     
@@ -1298,14 +1365,16 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     Result.OneCubieLen = Result.SideLen / (f32)Result.Dim;
     Result.HalfSideLen = Result.SideLen * 0.5f;
     Result.CubieOffset = Result.OneCubieLen * 0.5f - Result.HalfSideLen;
-    Result.StickerHeight = Result.OneCubieLen * 0.018f;
     Result.IsRotatingNow = false;
     
     // NOTE(Dima): Precomputing face indices
     RubiksCalcPrecomputedFace(&Result, &Result.PrecompFace, Arena);
     
+    b32 StickersHaveWalls = BoolFlag(Flags, RubCreateCube_StickerHaveWalls);
+    b32 RoundStickers = BoolFlag(Flags, RubCreateCube_RoundStickers);
+    
     // NOTE(Dima): Generating sticker meshes
-    GenerateStickerMeshes(&Result, RoundStickers);
+    GenerateStickerMeshes(&Result, RoundStickers, StickersHaveWalls);
     
     // NOTE(Dima): Initializing cubies
     
@@ -1318,6 +1387,8 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     Result.AddIndex = 0;
     Result.CommandsCount = CubeDim * CubeDim * 4 + 100;
     Result.Commands = PushArray(Arena, rubiks_command, Result.CommandsCount);
+    
+    ChangeCubeSpeed(&Result, RUBIKS_SPEED_SLOW);
     
     return(Result);
 }
@@ -1357,23 +1428,10 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
         }
     }
     
-#if 0  
-    {
-        BLOCK_TIMING("Cube Transforms Calculation");
-        
-        // NOTE(Dima): Transformations calculation
-        for(int VisibleIndex = 0;
-            VisibleIndex < Vis->Count;
-            VisibleIndex++)
-        {
-            Vis->FinalTransform[VisibleIndex] = Vis->Transform[VisibleIndex] * Vis->AppliedRotation[VisibleIndex] * OffsetMatrix;
-        }
-    }
-#else
-    m44_4x OffsetMatrix4x = M44_4X(OffsetMatrix);
-    
     {
         BLOCK_TIMING("Cube Transforms Calculation SIMD");
+        
+        m44_4x OffsetMatrix4x = M44_4X(OffsetMatrix);
         
         // NOTE(Dima): Transformations calculation
         for(int VisibleIndex = 0;
@@ -1392,7 +1450,6 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             
             m44_4x FinalTransform = Transform * AppliedRotation * OffsetMatrix4x;
             
-            
             M44_4X_Store(FinalTransform, 
                          Vis->FinalTransform[VisibleIndex],
                          Vis->FinalTransform[VisibleIndex + 1],
@@ -1401,7 +1458,6 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             
         }
     }
-#endif
     
     // NOTE(Dima): For DEBUG mode
     if(DebugMode)
@@ -1514,6 +1570,22 @@ INTERNAL_FUNCTION void GenerateScrubmle(rubiks_cube* Cube, int Seed = 123)
     
     int ScrumbleCount = RandomBetweenU32(&Random, Cube->Dim * 8, Cube->Dim * 10);
     
+    f32 MinDim = RUBIKS_MIN_DIM_HELP;
+    f32 MaxDim = RUBIKS_MAX_DIM_HELP;
+    f32 ClampDim = Clamp((f32)Cube->Dim, MinDim, MaxDim);
+    f32 Factor = (ClampDim - MinDim) / (MaxDim - MinDim);
+    
+    f32 TimeToScrumbleMin = 8.0f;
+    f32 TimeToScrumbleMax = 15.0f;
+    
+    f32 MinSpeed = (MinDim * 10.0f) / TimeToScrumbleMin;
+    f32 MaxSpeed = (MaxDim * 10.0f) / TimeToScrumbleMax;
+    
+    f32 TargetSpeed = Lerp(MinSpeed, MaxSpeed, Factor);
+    
+    ChangeCubeSpeed(Cube, RUBIKS_SPEED_SLOW);
+    ChangeCubeSpeed(Cube, TargetSpeed, false);
+    
     for(int ScrumbleIndex = 0;
         ScrumbleIndex < ScrumbleCount;
         ScrumbleIndex++)
@@ -1528,9 +1600,26 @@ INTERNAL_FUNCTION void GenerateScrubmle(rubiks_cube* Cube, int Seed = 123)
 INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube,
                                   v3 P, 
                                   f32 Speed = 1.0f, 
-                                  b32 DebugMode = false)
+                                  b32 DebugMode = false,
+                                  b32 Smooth = true)
 {
     FUNCTION_TIMING();
+    
+    // NOTE(Dima): Updating cube speed
+    f32 MinDim = RUBIKS_MIN_DIM_HELP;
+    f32 MaxDim = RUBIKS_MAX_DIM_HELP;
+    f32 ClampDim = Clamp((f32)Cube->Dim, MinDim, MaxDim);
+    f32 Factor2 = (ClampDim - MinDim) / (MaxDim - MinDim);
+    
+    f64 TimeToAccelerate = Lerp(RUBIKS_TIME_TO_ACCELERATE_MIN,
+                                RUBIKS_TIME_TO_ACCELERATE_MAX,
+                                Factor2);
+    
+    f64 TimeSinceSpeedChange = Global_Time->Time - Cube->LastSpeedChangeTime;
+    f64 Factor = Clamp01Float(TimeSinceSpeedChange / TimeToAccelerate);
+    Cube->CurrentSpeed = Lerp(Cube->BeginLerpSpeed,
+                              Cube->TargetSpeed,
+                              Factor);
     
     UpdateBeginnedRotation(Cube);
     
@@ -1549,6 +1638,35 @@ INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube,
             
             FinishCommandExecution(Cube);
             Cube->ExecutingSolvingNow = false;
+        }
+        else if(Command->Type == RubiksCommand_ResetSpeed)
+        {
+            // NOTE(Dima): Processing change speed command
+            ChangeCubeSpeed(Cube, RUBIKS_SPEED_SLOW);
+            if(Command->IsDynamicSpeedChange)
+            {
+                f32 MinDim = RUBIKS_MIN_DIM_HELP;
+                f32 MaxDim = RUBIKS_MAX_DIM_HELP;
+                f32 ClampDim = Clamp((f32)Cube->Dim, MinDim, MaxDim);
+                f32 Factor = (ClampDim - MinDim) / (MaxDim - MinDim);
+                
+#if 0                
+                f32 TargetSpeed = Lerp(RUBIKS_SPEED_SLOW * 2.0f,
+                                       RUBIKS_SPEED_SUPER_FAST,
+                                       Factor);
+#else
+                // NOTE(Dima): Approximate lerp between RUBIKS_SPEED_SLOW and super fast 
+                f32 TargetSpeed = (Cube->Dim * Cube->Dim) * 0.25f + 3.0f;
+#endif
+                
+                ChangeCubeSpeed(Cube, TargetSpeed, false);
+            }
+            else
+            {
+                ChangeCubeSpeed(Cube, Command->TargetSpeed, false);
+            }
+            
+            FinishCommandExecution(Cube);
         }
         else
         {
@@ -1570,10 +1688,10 @@ INTERNAL_FUNCTION void UpdateCube(rubiks_cube* Cube,
                             Command->FirstFaceIndex,
                             Command->LastFaceIndex,
                             Speed,
-                            Command->IsClockwise);
+                            Command->IsClockwise,
+                            Smooth);
         }
     }
     
     ShowCube(Cube, P, DebugMode);
-    
 }

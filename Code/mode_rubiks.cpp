@@ -4,7 +4,9 @@ struct rubiks_state
 {
     game_camera Camera;
     
-    rubiks_cube Cube3;
+    int NumCubes;
+    rubiks_cube* Cubes;
+    v3* CubesP;
 };
 
 SCENE_INIT(RubiksCube)
@@ -12,37 +14,61 @@ SCENE_INIT(RubiksCube)
     rubiks_state* State = GetSceneState(rubiks_state);
     
     InitCamera(&State->Camera, Camera_RotateAround);
+    State->Camera.ShowcaseRotateTime = 20.0f;
     
-    State->Cube3 = CreateCube(Scene->Arena, 5, 1.0f, true);
+    f32 CubeWidth = 3.0f;
+    int CubeDim = 111;
+    int CountOfCubes = 1;
+    
+    State->Cubes = PushArray(Scene->Arena, rubiks_cube, CountOfCubes);
+    State->CubesP = PushArray(Scene->Arena, v3, CountOfCubes);
+    State->NumCubes = CountOfCubes;
+    
+#if 1    
+    for(int i = 0;
+        i < CountOfCubes;
+        i++)
+    {
+        State->Cubes[i] = CreateCube(Scene->Arena, CubeDim, CubeWidth, 0);
+        State->CubesP[i] = V3(i, 0.0f, 0.0f) * CubeWidth * 1.1f;
+    }
+#else
+    State->Cubes[0] = CreateCube(Scene->Arena, 3, 3.0f);
+    State->Cubes[1] = CreateCube(Scene->Arena, 7, 3.0f);
+    
+    State->CubesP[0] = V3(-3, 0.0f, 0.0f);
+    State->CubesP[1] = V3(3, 0.0f, 0.0f);
+#endif
+    
 }
 
-SCENE_UPDATE(RubiksCube)
+void ApplyTempFormulas(rubiks_cube* Cube)
 {
-    rubiks_state* State = GetSceneState(rubiks_state);
+    RubCom_R(Cube);
+    RubCom_U(Cube);
+    RubCom_R(Cube, true);
+    RubCom_U(Cube, true);
     
-    u32 CameraStates[2] = 
-    {
-        Camera_RotateAround,
-        Camera_ShowcaseRotateZ,
-    };
+    RubCom_L(Cube, true);
+    RubCom_F(Cube, true);
+    RubCom_L(Cube);
+    RubCom_B(Cube);
     
-    LOCAL_PERSIST b32 CameraBehaviourIndex = 0;
-    if(GetKeyDown(Key_V))
-    {
-        CameraBehaviourIndex = !CameraBehaviourIndex;
-    }
-    State->Camera.State = CameraStates[CameraBehaviourIndex];
-    
-    UpdateCamera(&State->Camera);
-    
-    rubiks_cube* Cube = &State->Cube3;
+    RubCom_D(Cube);
+    RubCom_D(Cube);
+}
+
+void ModeUpdateCube(rubiks_state* State, int CubeIndex)
+{
+    rubiks_cube* Cube = &State->Cubes[CubeIndex];
+    v3 P = State->CubesP[CubeIndex];
     
     b32 ShiftIsPressed = GetKey(Key_LeftShift);
     b32 CtrlIsPressed = GetKey(Key_LeftControl);
     
     if(GetKeyDown(Key_G))
     {
-        GenerateScrubmle(Cube, Global_Time->Time * 100000.0f);
+        GenerateScrubmle(Cube, Global_Time->Time * 100000.0f + CubeIndex);
         Cube->SolvingState = RubState_Disassembled;
     }
     
@@ -67,6 +93,11 @@ SCENE_UPDATE(RubiksCube)
         {
             RubCom_Z(Cube, ShiftIsPressed);
         }
+    }
+    
+    if(GetKeyDown(Key_A))
+    {
+        ApplyTempFormulas(Cube);
     }
     
     if(GetKeyDown(Key_R))
@@ -171,27 +202,46 @@ SCENE_UPDATE(RubiksCube)
     {
         DebugMode = !DebugMode;
     }
-    UpdateCube(&State->Cube3, V3(0.0f), 1.0f, DebugMode);
-    //UpdateCube(&State->Cube3, V3(4.0f, 0.0f, 0.0f), 1.0f, true);
+    b32 Smooth = true;
+    UpdateCube(Cube, P, 1.0f, DebugMode, Smooth);
+}
+
+SCENE_UPDATE(RubiksCube)
+{
+    rubiks_state* State = GetSceneState(rubiks_state);
     
+    PushClear(V3(0.96f, 0.9f, 0.8f));
+    
+    u32 CameraStates[2] = 
+    {
+        Camera_RotateAround,
+        Camera_ShowcaseRotateZ,
+    };
+    
+    LOCAL_PERSIST b32 CameraBehaviourIndex = 0;
+    if(GetKeyDown(Key_V))
+    {
+        CameraBehaviourIndex = !CameraBehaviourIndex;
+    }
+    State->Camera.State = CameraStates[CameraBehaviourIndex];
+    
+    UpdateCamera(&State->Camera);
+    
+    for(int i = 0;
+        i < State->NumCubes;
+        i++)
+    {
+        ModeUpdateCube(State, i);
+    }
     
 #if 0    
-    ShowSides(&State->Cube3, V2(10), 240);
-    // NOTE(Dima): Helper left cubie
-    PushMesh(&Global_Assets->Cube,
-             0,
-             ScalingMatrix(0.1f) * TranslationMatrix(V3(2.0f, 0.0f, 0.0f)));
-#endif
+    ShowSides(&State->Cubes[0], V2(10), 240);
     
-#if 0    
     ShowLabel3D(&State->Camera, 
                 "Hello world this is the cube",
                 V3_Up() * 1.5f,
                 0.25f,
                 ColorRed());
-#endif
-    
-#if 0    
     PushImage(&Global_Assets->FontsAtlas, V2(0.0f), 1300);
 #endif
     

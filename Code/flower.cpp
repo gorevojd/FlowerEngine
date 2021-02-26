@@ -25,6 +25,18 @@ debug_global_table* Global_DebugTable;
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+inline void OutputLog(const char* Format, ...)
+{
+    char Buf[256];
+    
+    va_list va;
+    va_start(va, Format);
+    stbsp_vsnprintf(Buf, ARC(Buf), Format, va);
+    va_end(va);
+    
+    Platform.Log(Buf);
+}
+
 #include "flower_standard.cpp"
 #include "flower_jobs.cpp"
 #include "flower_random.cpp"

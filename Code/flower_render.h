@@ -158,6 +158,10 @@ struct render_commands
     // NOTE(Dima): Instance table
 #define RENDER_INSTANCE_TABLE_SIZE 256
     render_mesh_instance* InstanceTable[RENDER_INSTANCE_TABLE_SIZE];
+    
+    // NOTE(Dima): Settings
+    b32 BackfaceCulling;
+    b32 BackfaceCullingChanged;
 };
 
 inline void* GetRenderCommand_(render_commands* Commands, int CommandIndex)

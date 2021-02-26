@@ -354,16 +354,6 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Cube = MakeUnitCube();
     A->Plane = MakePlane();
     
-    loading_params CoinParams = DefaultLoadingParams();
-    CoinParams.Image_FlipVertically = false;
-    A->CoinTail = LoadImageFile("E:/Media/Photos/Internet/Images/CoinTail.png", CoinParams);
-    A->CoinHead = LoadImageFile("E:/Media/Photos/Internet/Images/CoinHead.png", CoinParams);
-    
-    A->Mouse = LoadImageFile("E:/Media/Photos/Internet/Images/Mouse.png");
-    A->Cheese = LoadImageFile("E:/Media/Photos/Internet/Images/Cheese.png");
-    A->Scenery = LoadImageFile("E:/Media/Photos/Internet/lake_mountains.jpg", CoinParams);
-    A->MultiCore = LoadImageFile("E:/Development/Other/Recording/Tutorials/LetsMakeEngine/EP13_Optimization/Materials/MultiThread/MT_6.png");
-    
     A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");
     A->PlaneTexture = LoadImageFile("E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png");
     loading_params PaletteParams = DefaultLoadingParams();

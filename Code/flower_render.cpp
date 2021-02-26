@@ -808,7 +808,16 @@ INTERNAL_FUNCTION void EndRender()
     ResetRectBuffer(&Commands->Rects3D);
 }
 
+INTERNAL_FUNCTION inline void SetBackfaceCulling(b32 Value)
+{
+    Global_RenderCommands->BackfaceCullingChanged = (Value != Global_RenderCommands->BackfaceCulling);
+    Global_RenderCommands->BackfaceCulling = Value;
+}
+
 INTERNAL_FUNCTION void InitRender(memory_arena* Arena)
 {
     Global_RenderCommands = PushStruct(Arena, render_commands);
+    
+    // NOTE(Dima): Init some settings
+    SetBackfaceCulling(false);
 }

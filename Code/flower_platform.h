@@ -58,6 +58,9 @@ typedef PLATFORM_GET_PERFORMANCE_COUNTER(platform_get_performance_counter);
 #define PLATFORM_GET_ELAPSED_TIME(name) f64 name(u64 ClocksBegin, u64 ClocksEnd)
 typedef PLATFORM_GET_ELAPSED_TIME(platform_get_elapsed_time);
 
+#define PLATFORM_OUTPUT_LOG(name) void name(char* Text)
+typedef PLATFORM_OUTPUT_LOG(platform_output_log);
+
 struct platform_api
 {
     platform_allocate_block* AllocateBlock;
@@ -81,6 +84,7 @@ struct platform_api
     f64 OneOverPerfFrequency;
     
     platform_get_thread_id* GetThreadID;
+    platform_output_log* Log;
 };
 
 extern platform_api Platform;

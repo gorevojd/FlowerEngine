@@ -113,6 +113,24 @@ GLOBAL_VARIABLE int RubiksEdgesSides[12][4] =
     {RubSide_Left, RubSide_Front, RubSideEdge_Right, RubSideEdge_Left},
 };
 
+GLOBAL_VARIABLE b32 RubiksInvertEdgesGet[12][2] = 
+{
+    false, false,
+    true, false,
+    true, false,
+    false, false,
+    
+    false, false,
+    false, false,
+    true, false,
+    true, false,
+    
+    false, false,
+    false, false,
+    false, false,
+    false, false,
+};
+
 GLOBAL_VARIABLE int RubiksCornersPrep[8][6] = 
 {
     // NOTE(Dima): TopCorners
@@ -330,16 +348,37 @@ enum rubiks_command_type
 {
     RubiksCommand_Rotation,
     RubiksCommand_ChangeState,
+    
+    RubiksCommand_ResetSpeed,
+    RubiksCommand_ResetSpeedDynamic,
 };
 
 struct rubiks_command
 {
     int Axis;
-    u16 FirstFaceIndex;
-    u16 LastFaceIndex;
-    u8 IsClockwise;
+    
+    union
+    {
+        struct
+        {
+            u16 FirstFaceIndex;
+            u16 LastFaceIndex;
+            u8 IsClockwise;
+        };
+        
+        struct 
+        {
+            u8 FinalState; //rubiks_cube_solving_state
+        };
+        
+        struct
+        {
+            u8 IsDynamicSpeedChange;
+            f32 TargetSpeed;
+        };
+    };
+    
     u8 Type;
-    u8 FinalState; //rubiks_cube_solving_state
 };
 
 struct rubiks_cube
@@ -366,6 +405,11 @@ struct rubiks_cube
     f32 OneCubieLen;
     f32 HalfSideLen;
     f32 CubieOffset;
+    
+    f32 CurrentSpeed;
+    f32 TargetSpeed;
+    f32 BeginLerpSpeed;
+    f32 LastSpeedChangeTime;
     
     helper_rubiks_mesh HelperStickerUp;
     helper_rubiks_mesh HelperStickerDown;
@@ -436,7 +480,11 @@ enum rubiks_cube_solving_state
     RubState_SolvingCenters_SolveBlue_Func,
     
     RubState_SolvingEdgesCenters,
-    RubState_SolvingEdgesCenters_Func,
+    RubState_SolvingEdgesCenters_FindMoveSrc,
+    RubState_SolvingEdgesCenters_Solve,
+    
+    RubState_SolvingParityErrors,
+    RubState_SolvingParityErrors_Solve,
     
     RubState_MoveCenters_Green,
     RubState_MoveCenters_White,
@@ -459,6 +507,31 @@ enum rubiks_cube_solving_state
 };
 
 //#define RUBIKS_TIME_FOR_ROTATION 10.0f
-#define RUBIKS_TIME_FOR_ROTATION 0.1f
+#define RUBIKS_TIME_TO_ACCELERATE_MIN 10.0f
+#define RUBIKS_TIME_TO_ACCELERATE_MAX 16.0f
+#define RUBIKS_TIME_FOR_ROTATION 1.0f
+
+#define RUBIKS_MIN_DIM_HELP 3.0f
+#define RUBIKS_MAX_DIM_HELP 50.0f
+
+#define RUBIKS_SPEED_DEFAULT 50.0f
+//#define RUBIKS_SPEED_DEFAULT 35.0f
+//#define RUBIKS_SPEED_DEFAULT 1.0f
+
+#define RUBIKS_SPEED_SLOW 1.0f
+#define RUBIKS_SPEED_AVG 10.0f
+#define RUBIKS_SPEED_FAST 100.0f
+#define RUBIKS_SPEED_SUPER_FAST 1000.0f
+
+
+enum rubiks_create_cube_flags
+{
+    RubCreateCube_RoundStickers = 1,
+    RubCreateCube_StickerHaveWalls = 2,
+    
+    RubCreateCube_Default = (RubCreateCube_RoundStickers | 
+                             RubCreateCube_StickerHaveWalls),
+};
+
 
 #endif //FLOWER_RUBIKS_H

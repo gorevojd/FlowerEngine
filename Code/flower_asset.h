@@ -56,14 +56,6 @@ struct asset_system
     mesh Cube;
     mesh Plane;
     
-    image CoinTail;
-    image CoinHead;
-    
-    image MultiCore;
-    image Scenery;
-    image Mouse;
-    image Cheese;
-    
     image BoxTexture;
     image PlaneTexture;
     image Palette; 

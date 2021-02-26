@@ -976,6 +976,23 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
                Commands->WindowDimensions.Width,
                Commands->WindowDimensions.Height);
     
+    // NOTE(Dima): Culling
+    if(Commands->BackfaceCulling && Commands->BackfaceCullingChanged)
+    {
+        Commands->BackfaceCullingChanged = false;
+        
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CW);
+    }
+    
+    if(!Commands->BackfaceCulling && Commands->BackfaceCullingChanged)
+    {
+        Commands->BackfaceCullingChanged = false;
+        
+        glDisable(GL_CULL_FACE);
+    }
+    
     OpenGLRenderCommands(Commands);
     
     OpenGLRenderRectBuffer(Commands, &Commands->Rects3D, true, true);
