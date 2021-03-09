@@ -3,16 +3,77 @@
 
 #include "flower_asset_types_shared.h"
 
-struct mesh_handles
+enum renderer_handle_type
 {
-    u64 ArrayObject;
-    u64 BufferObject;
-    u64 ElementBufferObject;
+    RendererHandle_Invalid,
     
-    b32 Initialized;
+    RendererHandle_Image,
+    RendererHandle_Mesh,
+    RendererHandle_TextureBuffer,
 };
 
-struct mesh_offsets
+struct renderer_handle
+{
+    b32 Initialized;
+    b32 Invalidated;
+    u32 Type;
+    
+    union
+    {
+        struct
+        {
+            u32 TextureObject;
+        } Image;
+        
+        struct 
+        {
+            u32 BufferObject;
+            u32 TextureObject;
+        } TextureBuffer;
+        
+        struct 
+        {
+            u64 ArrayObject;
+            u64 BufferObject;
+            u64 ElementBufferObject;
+        } Mesh;
+    };
+};
+
+inline void InitRendererHandle(renderer_handle* Handle, u32 Type)
+{
+    Handle->Initialized = true;
+    Handle->Invalidated = false;
+    Handle->Type = Type;
+}
+
+inline renderer_handle CreateRendererHandle(u32 Type)
+{
+    renderer_handle Result = {};
+    
+    InitRendererHandle(&Result, Type);
+    
+    return(Result);
+}
+
+inline b32 ShouldDeleteHandleStorage(renderer_handle* Handle)
+{
+    b32 Result = false;
+    
+    if(Handle->Invalidated && Handle->Initialized)
+    {
+        Result = true;
+    }
+    
+    return(Result);
+}
+
+inline void InvalidateHandle(renderer_handle* Handle)
+{
+    Handle->Invalidated = true;
+}
+
+struct render_mesh_offsets
 {
     u32 OffsetP;
     u32 OffsetUV;
@@ -41,12 +102,25 @@ struct mesh
     u32* Indices;
     int IndexCount;
     
-    b32 PremultipliedTransform;
     b32 IsSkinned;
     int MaterialIndexInModel;
     
-    mesh_handles ApiHandles;
-    mesh_offsets Offsets;
+    renderer_handle Handle;
+    render_mesh_offsets Offsets;
+};
+
+struct voxel_mesh
+{
+    u32* Vertices;
+    u32* PerFaceData;
+    
+    int VerticesCount;
+    int FaceCount;
+    
+    void* Free;
+    
+    renderer_handle Handle;
+    renderer_handle PerFaceBufHandle;
 };
 
 enum image_format
@@ -77,8 +151,7 @@ struct image
     
     b32 FilteringIsClosest;
     
-    u64 ApiHandle;
-    b32 Invalidated;
+    renderer_handle Handle;
 };
 
 struct material

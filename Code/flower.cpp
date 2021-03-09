@@ -184,7 +184,9 @@ extern "C" __declspec(dllexport) GAME_INIT(GameInit)
     InitGameObjectPool(Game, Arena);
     
 #if 1
-    Game->CurrentSceneIndex = FindSceneByName("RubiksCube");
+    //Game->CurrentSceneIndex = FindSceneByName("RubiksCube");
+    //Game->CurrentSceneIndex = FindSceneByName("TestGame");
+    Game->CurrentSceneIndex = FindSceneByName("Minecraft");
 #else
     Game->CurrentSceneIndex = FindSceneByName("GraphShow");
 #endif
@@ -284,6 +286,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     // NOTE(Dima): Render everything
     window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
     Global_RenderCommands->FontAtlas = &Global_Assets->FontsAtlas;
+    Global_RenderCommands->VoxelAtlas = &Global_Assets->VoxelAtlas;
     Global_RenderCommands->ScreenOrthoProjection = OrthographicProjection(WndDims->Width, 
                                                                           WndDims->Height);
     

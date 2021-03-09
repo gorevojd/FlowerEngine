@@ -28,11 +28,11 @@ struct job_queue
     job* Jobs;
     int JobsCount;
     
-    u32 AddIndex;
-    u32 DoIndex;
+    std::atomic_uint AddIndex;
+    std::atomic_uint DoIndex;
     
-    u64 Started;
-    u64 Finished;
+    std::atomic_uint Started;
+    std::atomic_uint Finished;
     
     std::mutex* Lock;
     std::mutex* SygnalLock;
@@ -46,24 +46,57 @@ struct job_system
     job_queue Queues[JobPriority_Count];
 };
 
+struct task_memory
+{
+    task_memory* Next;
+    task_memory* Prev;
+    
+    void* Memory;
+    size_t MemorySize;
+    
+    memory_arena Arena;
+};
+
+enum task_memory_pool_type
+{
+    TaskMemoryPool_Static,
+    TaskMemoryPool_Dynamic,
+};
+
+struct task_memory_pool
+{
+    memory_arena* Arena;
+    
+    u32 Type;
+    
+    task_memory Use;
+    task_memory Free;
+    
+    int UseCount;
+    int FreeCount;
+    
+    std::mutex* Lock;
+};
+
 // NOTE(Dima): Returns true if no jobs to perform
 inline b32 ShouldSleepAfterPerformJob(job_queue* Queue)
 {
     b32 Result = false;
     
-    if(Queue->AddIndex != Queue->DoIndex)
+    std::uint32_t DoIndex = Queue->DoIndex;
+    
+    if(Queue->AddIndex != DoIndex)
     {
-        Queue->Lock->lock();
+        std::uint32_t NewDoIndex = (DoIndex + 1) % Queue->JobsCount;
         
-        // NOTE(Dima): Calling job's callback
-        job* Job = &Queue->Jobs[Queue->DoIndex];
-        Job->Callback(Job->Data);
-        
-        Queue->Finished++;
-        
-        Queue->DoIndex = (Queue->DoIndex + 1) % Queue->JobsCount;
-        
-        Queue->Lock->unlock();
+        if(Queue->DoIndex.compare_exchange_weak(DoIndex, NewDoIndex))
+        {
+            // NOTE(Dima): Calling job's callback
+            job* Job = &Queue->Jobs[DoIndex];
+            Job->Callback(Job->Data);
+            
+            Queue->Finished.fetch_add(1);
+        }
     }
     else
     {
@@ -72,6 +105,7 @@ inline b32 ShouldSleepAfterPerformJob(job_queue* Queue)
     
     return(Result);
 }
+
 
 
 #endif //FLOWER_JOBS_H

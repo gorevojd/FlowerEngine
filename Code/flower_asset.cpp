@@ -326,6 +326,10 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     
 #if 1
+    loading_params VoxelAtlasParams = DefaultLoadingParams();
+    VoxelAtlasParams.Image_FilteringIsClosest = true;
+    A->VoxelAtlas = LoadImageFile("../Data/Textures/minc_atlas2.png", VoxelAtlasParams);
+    //A->VoxelAtlas = LoadImageFile("../Data/Textures/minc_atlas1.jpg", VoxelAtlasParams);
     
 #if 0
     // NOTE(Dima): Loading fonts

@@ -38,18 +38,18 @@ INTERNAL_FUNCTION void LoadAsset(atool_source* Source, memory_arena* Arena)
     {
         case Asset_Image:
         {
-            Source->Data.Image = malloc(sizeof(image));
-            *Source->Data.Image = LoadImageFile(FilePath, Params);
+            //Source->Data.Image = malloc(sizeof(image));
+            //*Source->Data.Image = LoadImageFile(FilePath, Params);
         }break;
         
         case Asset_Model:
         {
-            Source->Data.Model = LoadModel(FilePath, Params);
+            //Source->Data.Model = LoadModel(FilePath, Params);
         }break;
         
         case Asset_Animation:
         {
-            Source->Data.Animation = LoadSkeletalAnimation();
+            //Source->Data.Animation = LoadSkeletalAnimation();
         }break;
     }
 }

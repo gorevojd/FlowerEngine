@@ -12,6 +12,7 @@
 #define META_SCENES_H
 
 #include "mode_graph_show.cpp"
+#include "mode_minecraft.cpp"
 #include "mode_rubiks.cpp"
 #include "mode_test_game.cpp"
 
@@ -20,6 +21,7 @@ GLOBAL_VARIABLE const char* MetaScene_Names[] =
 	"TestGame",
 	"GraphShow",
 	"RubiksCube",
+	"Minecraft",
 };
 
 GLOBAL_VARIABLE scene_init* MetaScene_InitFunctions[] = 
@@ -27,6 +29,7 @@ GLOBAL_VARIABLE scene_init* MetaScene_InitFunctions[] =
 	TestGame_Init,
 	GraphShow_Init,
 	RubiksCube_Init,
+	Minecraft_Init,
 };
 
 GLOBAL_VARIABLE scene_update* MetaScene_UpdateFunctions[] = 
@@ -34,11 +37,13 @@ GLOBAL_VARIABLE scene_update* MetaScene_UpdateFunctions[] =
 	TestGame_Update,
 	GraphShow_Update,
 	RubiksCube_Update,
+	Minecraft_Update,
 };
 
 GLOBAL_VARIABLE scene_ongui* MetaScene_OnGUIFunctions[] = 
 {
 	TestGame_OnGUI,
+	0,
 	0,
 	0,
 };

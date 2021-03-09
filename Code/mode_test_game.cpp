@@ -33,14 +33,18 @@ SCENE_INIT(TestGame)
     State->Fox = CreateModelGameObject(Scene->Game, &Global_Assets->Fox);
     State->Supra = CreateModelGameObject(Scene->Game, &Global_Assets->Supra);
     
+    AddComponent(State->Bear1, Component_component_animator);
+    AddComponent(State->Bear2, Component_component_animator);
+    AddComponent(State->Fox, Component_component_animator);
+    
     State->Bear1->P = V3(0.0f, 0.0f, 0.0f);
-    State->Bear1->Model_PlayingAnimation = &Global_Assets->BearSuccess;
+    GetComp(State->Bear1, component_animator)->PlayingAnimation = &Global_Assets->BearSuccess;
     
     State->Bear2->P = V3(2.0f, 0.0f, 0.0f);
-    State->Bear2->Model_PlayingAnimation = &Global_Assets->BearIdle;
+    GetComp(State->Bear2, component_animator)->PlayingAnimation = &Global_Assets->BearIdle;
     
     State->Fox->P = V3(4.0f, 0.0f, 0.0f);
-    State->Fox->Model_PlayingAnimation = &Global_Assets->FoxTalk;
+    GetComp(State->Fox, component_animator)->PlayingAnimation = &Global_Assets->FoxTalk;
     
     State->Supra->P = V3(6.0f, 0.0f, 0.0f);
 }
@@ -73,7 +77,7 @@ SCENE_UPDATE(TestGame)
     {
         case TestGame_Animals:
         {
-            UpdateGameObjects(Scene->Game);
+            
             
             PushMesh(&Global_Assets->Plane,
                      &Global_Assets->GroundMaterial,
@@ -124,7 +128,9 @@ SCENE_UPDATE(TestGame)
         }break;
     }
     
-    SetMatrices(GetViewMatrix(&State->Camera));
+    UpdateGameObjects(Scene->Game);
+    
+    SetMatrices(&State->Camera);
 }
 
 

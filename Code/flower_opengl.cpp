@@ -205,6 +205,11 @@ INTERNAL_FUNCTION opengl_shader OpenGLLoadShader(char* ShaderName,
     OPENGL_LOAD_ATTRIB(Weights);
     OPENGL_LOAD_ATTRIB(BoneIDs);
     
+    OPENGL_LOAD_ATTRIB(InstanceModelTran1);
+    OPENGL_LOAD_ATTRIB(InstanceModelTran2);
+    OPENGL_LOAD_ATTRIB(InstanceModelTran3);
+    OPENGL_LOAD_ATTRIB(InstanceModelTran4);
+    
     // NOTE(Dima): Loading uniforms
     OPENGL_LOAD_UNIFORM(ViewProjection);
     OPENGL_LOAD_UNIFORM(Projection);
@@ -213,14 +218,17 @@ INTERNAL_FUNCTION opengl_shader OpenGLLoadShader(char* ShaderName,
     OPENGL_LOAD_UNIFORM(SkinningMatrices);
     OPENGL_LOAD_UNIFORM(SkinningMatricesCount);
     OPENGL_LOAD_UNIFORM(MeshIsSkinned);
-    OPENGL_LOAD_UNIFORM(InstanceModelMatrices);
     OPENGL_LOAD_UNIFORM(UseInstancing);
-    OPENGL_LOAD_UNIFORM(PremultipliedTransform);
     
     OPENGL_LOAD_UNIFORM(MultColor);
     OPENGL_LOAD_UNIFORM(TexDiffuse);
     OPENGL_LOAD_UNIFORM(HasDiffuse);
     OPENGL_LOAD_UNIFORM(MaterialMissing);
+    
+    // NOTE(Dima): Uniforms for voxel shader
+    OPENGL_LOAD_UNIFORM(TextureAtlas);
+    OPENGL_LOAD_UNIFORM(ChunkAt);
+    OPENGL_LOAD_UNIFORM(PerFaceData);
     
     OPENGL_LOAD_UNIFORM(IsImage);
     OPENGL_LOAD_UNIFORM(Image);
@@ -253,26 +261,70 @@ INTERNAL_FUNCTION inline b32 ArrayIsValid(GLint Arr){
     return(Result);
 }
 
-INTERNAL_FUNCTION inline b32 OpenGLShouldInitImage(image* Image)
+INTERNAL_FUNCTION void OpenGLDeleteHandle(renderer_handle* Handle)
 {
-    b32 Result = !Image->ApiHandle;
+    if(Handle->Initialized)
+    {
+        switch(Handle->Type)
+        {
+            case RendererHandle_Invalid:
+            {
+                InvalidCodePath;
+            }break;
+            
+            case RendererHandle_Image:
+            {
+                glDeleteTextures(1, (const GLuint*)&Handle->Image.TextureObject);
+                
+                Handle->Image.TextureObject = 0;
+            }break;
+            
+            case RendererHandle_Mesh:
+            {
+                glDeleteVertexArrays(1, (const GLuint*)&Handle->Mesh.ArrayObject);
+                glDeleteBuffers(1, (const GLuint*)&Handle->Mesh.BufferObject);
+                glDeleteBuffers(1, (const GLuint*)&Handle->Mesh.ElementBufferObject);
+                
+                Handle->Mesh.ArrayObject = 0;
+                Handle->Mesh.BufferObject = 0;
+                Handle->Mesh.ElementBufferObject = 0;
+            }break;
+            
+            case RendererHandle_TextureBuffer:
+            {
+                glDeleteBuffers(1, &Handle->TextureBuffer.BufferObject);
+                glDeleteTextures(1, &Handle->TextureBuffer.TextureObject);
+                
+                Handle->TextureBuffer.BufferObject = 0;
+                Handle->TextureBuffer.TextureObject = 0;
+            }break;
+        }
+        
+        Handle->Initialized = false;
+    }
+}
+
+INTERNAL_FUNCTION b32 OpenGLProcessHandleInvalidation(renderer_handle* Handle)
+{
+    b32 WasDeleted = ShouldDeleteHandleStorage(Handle);
     
-    return(Result);
+    if(WasDeleted)
+    {
+        OpenGLDeleteHandle(Handle);
+        
+        Handle->Invalidated = false;
+    }
+    
+    return(WasDeleted);
 }
 
 INTERNAL_FUNCTION GLuint OpenGLInitImage(image* Image)
 {
     GLuint TexOpenGL = 0;
     
-    b32 ImageDeleted = false;
-    if(Image->Invalidated && (Image->ApiHandle != 0))
-    {
-        glDeleteTextures(1, (const GLuint*)&Image->ApiHandle);
-        
-        ImageDeleted = true;
-    }
+    b32 ImageWasDeleted = OpenGLProcessHandleInvalidation(&Image->Handle);
     
-    if(OpenGLShouldInitImage(Image) || ImageDeleted)
+    if(!Image->Handle.Initialized || ImageWasDeleted)
     {
         glGenTextures(1, &TexOpenGL);
         glBindTexture(GL_TEXTURE_2D, TexOpenGL);
@@ -301,7 +353,13 @@ INTERNAL_FUNCTION GLuint OpenGLInitImage(image* Image)
         
         glBindTexture(GL_TEXTURE_2D, 0);
         
-        Image->ApiHandle = TexOpenGL;
+        Image->Handle = CreateRendererHandle(RendererHandle_Image);
+        Image->Handle.Image.TextureObject = TexOpenGL;
+        Image->Handle.Initialized = true;
+    }
+    else
+    {
+        TexOpenGL = Image->Handle.Image.TextureObject;
     }
     
     return(TexOpenGL);
@@ -323,34 +381,73 @@ INTERNAL_FUNCTION void InitAttribFloat(GLint AttrLoc,
     }
 }
 
-INTERNAL_FUNCTION void OpenGLCreateAndBindTextureBuffer(GLuint* Buffer,
-                                                        GLuint* TBO,
+INTERNAL_FUNCTION void InitAttribInt(GLint AttrLoc,
+                                     int ComponentCount,
+                                     size_t Stride,
+                                     size_t Offset)
+{
+    if(ArrayIsValid(AttrLoc)){
+        glEnableVertexAttribArray(AttrLoc);
+        glVertexAttribIPointer(AttrLoc,
+                               ComponentCount, 
+                               GL_UNSIGNED_INT, 
+                               Stride, 
+                               (GLvoid*)(Offset));
+    }
+}
+
+INTERNAL_FUNCTION void OpenGLCreateTextureBuffer(renderer_handle* Handle,
+                                                 mi Size,
+                                                 void* Data,
+                                                 int TextureUnitIndex,
+                                                 GLuint DataFormat,
+                                                 b32 UsageIsStatic = false)
+{
+    InitRendererHandle(Handle, RendererHandle_TextureBuffer);
+    
+    glGenBuffers(1, &Handle->TextureBuffer.BufferObject);
+    glGenTextures(1, &Handle->TextureBuffer.TextureObject);
+    
+    GLuint Usage = GL_STREAM_DRAW;
+    if(UsageIsStatic)
+    {
+        Usage = GL_STATIC_DRAW;
+    }
+    
+    glBindBuffer(GL_TEXTURE_BUFFER, Handle->TextureBuffer.BufferObject);
+    glBufferData(GL_TEXTURE_BUFFER, Size, Data, Usage);
+    
+    glActiveTexture(GL_TEXTURE0 + TextureUnitIndex);
+    glBindTexture(GL_TEXTURE_BUFFER, Handle->TextureBuffer.TextureObject);
+    glTexBuffer(GL_TEXTURE_BUFFER, DataFormat, Handle->TextureBuffer.BufferObject);
+    
+    Handle->Initialized = true;
+}
+
+INTERNAL_FUNCTION void OpenGLBindTextureBuffer(renderer_handle* Handle,
+                                               int TextureUnitIndex,
+                                               int UniformLoc)
+{
+    
+    glActiveTexture(GL_TEXTURE0 + TextureUnitIndex);
+    glBindTexture(GL_TEXTURE_BUFFER, Handle->TextureBuffer.TextureObject);
+    glUniform1i(UniformLoc, TextureUnitIndex);
+}
+
+INTERNAL_FUNCTION void OpenGLCreateAndBindTextureBuffer(renderer_handle* Handle,
                                                         mi Size,
                                                         void* Data,
                                                         GLuint DataFormat,
                                                         int TextureUnitIndex,
-                                                        GLuint UniformLoc)
+                                                        int UniformLoc)
 {
-    glGenBuffers(1, Buffer);
-    glGenTextures(1, TBO);
+    OpenGLCreateTextureBuffer(Handle, Size, Data,
+                              TextureUnitIndex,
+                              DataFormat);
     
-    glBindBuffer(GL_TEXTURE_BUFFER, *Buffer);
-    glBufferData(GL_TEXTURE_BUFFER, 
-                 Size, Data,
-                 GL_STREAM_DRAW);
-    
-    glActiveTexture(GL_TEXTURE0 + TextureUnitIndex);
-    glBindTexture(GL_TEXTURE_BUFFER, *TBO);
-    glTexBuffer(GL_TEXTURE_BUFFER, DataFormat, *Buffer);
-    
-    glUniform1i(UniformLoc, TextureUnitIndex);
-}
-
-INTERNAL_FUNCTION void OpenGLFreeTextureBuffer(GLuint* Buffer,
-                                               GLuint* TBO)
-{
-    glDeleteBuffers(1, Buffer);
-    glDeleteTextures(1, TBO);
+    OpenGLBindTextureBuffer(Handle, 
+                            TextureUnitIndex,
+                            UniformLoc);
 }
 
 INTERNAL_FUNCTION void OpenGLInit()
@@ -374,6 +471,9 @@ INTERNAL_FUNCTION void OpenGLInit()
                                            "../Data/Shaders/ui_rect.vs",
                                            "../Data/Shaders/ui_rect.fs");
     
+    OpenGL.VoxelShader = OpenGLLoadShader("Voxel",
+                                          "../Data/Shaders/voxel.vs",
+                                          "../Data/Shaders/voxel.fs");
 }
 
 INTERNAL_FUNCTION void OpenGLFree()
@@ -381,125 +481,88 @@ INTERNAL_FUNCTION void OpenGLFree()
     OpenGLDeleteShader(&OpenGL.StdShader);
 }
 
-INTERNAL_FUNCTION mesh_handles OpenGLAllocateMesh(mesh* Mesh, opengl_shader* Shader)
+INTERNAL_FUNCTION void OpenGLInitMeshAttribs(mesh* Mesh, opengl_shader* Shader)
 {
-    GLuint VAO = 0;
-    GLuint VBO = 0;
-    GLuint EBO = 0;
-    
-    // NOTE(Dima): Init VAO and VBO
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-    
-    glBindVertexArray(VAO);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, 
-                 Mesh->FreeSize, 
-                 Mesh->Free, 
-                 GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-                 sizeof(u32) * Mesh->IndexCount, 
-                 Mesh->Indices, 
-                 GL_STATIC_DRAW);
-    
     // NOTE(Dima): Position
-    if(OpenGLAttribIsValid(Shader->PositionAttr))
-    {
-        glEnableVertexAttribArray(Shader->PositionAttr);
-        glVertexAttribPointer(Shader->PositionAttr,
-                              3, 
-                              GL_FLOAT, 
-                              GL_FALSE,
-                              3* sizeof(float), 
-                              (void*)(mi)Mesh->Offsets.OffsetP);
-    }
+    InitAttribFloat(Shader->PositionAttr,
+                    3, 3 * sizeof(float),
+                    Mesh->Offsets.OffsetP);
     
     // NOTE(Dima): TexCoords
-    if(OpenGLAttribIsValid(Shader->TexCoordsAttr))
-    {
-        glEnableVertexAttribArray(Shader->TexCoordsAttr);
-        glVertexAttribPointer(Shader->TexCoordsAttr,
-                              2, 
-                              GL_FLOAT, 
-                              GL_FALSE,
-                              2* sizeof(float), 
-                              (void*)(mi)Mesh->Offsets.OffsetUV);
-    }
+    InitAttribFloat(Shader->TexCoordsAttr,
+                    2, 2 * sizeof(float),
+                    Mesh->Offsets.OffsetUV);
     
     // NOTE(Dima): Normal
-    if(OpenGLAttribIsValid(Shader->NormalAttr))
-    {
-        glEnableVertexAttribArray(Shader->NormalAttr);
-        glVertexAttribPointer(Shader->NormalAttr,
-                              3, 
-                              GL_FLOAT, 
-                              GL_FALSE,
-                              3* sizeof(float), 
-                              (void*)(mi)Mesh->Offsets.OffsetN);
-    }
+    InitAttribFloat(Shader->NormalAttr,
+                    3, 3 * sizeof(float),
+                    Mesh->Offsets.OffsetN);
     
     // NOTE(Dima): Color
-    if(OpenGLAttribIsValid(Shader->ColorAttr))
-    {
-        glEnableVertexAttribArray(Shader->ColorAttr);
-        glVertexAttribIPointer(Shader->ColorAttr,
-                               1, 
-                               GL_UNSIGNED_INT, 
-                               sizeof(u32), 
-                               (void*)(mi)Mesh->Offsets.OffsetC);
-    }
+    InitAttribInt(Shader->ColorAttr,
+                  1, sizeof(u32),
+                  Mesh->Offsets.OffsetC);
+    
     
     // NOTE(Dima): Setting skinning info
     if(Mesh->IsSkinned)
     {
         // NOTE(Dima): Bone weights
-        if(OpenGLAttribIsValid(Shader->WeightsAttr))
-        {
-            glEnableVertexAttribArray(Shader->WeightsAttr);
-            glVertexAttribPointer(Shader->WeightsAttr,
-                                  4, 
-                                  GL_FLOAT, 
-                                  GL_FALSE,
-                                  4 * sizeof(float), 
-                                  (void*)(mi)Mesh->Offsets.OffsetBoneWeights);
-        }
+        InitAttribFloat(Shader->WeightsAttr,
+                        4, 4 * sizeof(float),
+                        Mesh->Offsets.OffsetBoneWeights);
         
         // NOTE(Dima): Bone indices
-        if(OpenGLAttribIsValid(Shader->BoneIDsAttr))
-        {
-            glEnableVertexAttribArray(Shader->BoneIDsAttr);
-            glVertexAttribIPointer(Shader->BoneIDsAttr,
-                                   1, 
-                                   GL_UNSIGNED_INT,
-                                   sizeof(u32), 
-                                   (void*)(mi)Mesh->Offsets.OffsetBoneIndices);
-        }
+        InitAttribFloat(Shader->BoneIDsAttr,
+                        1, sizeof(u32),
+                        Mesh->Offsets.OffsetBoneIndices);
     }
-    
-    //glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    
-    mesh_handles Result = {};
-    Result.ArrayObject = VAO;
-    Result.BufferObject = VBO;
-    Result.ElementBufferObject = EBO;
-    Result.Initialized = true;
-    
-    return(Result);
 }
 
-INTERNAL_FUNCTION void OpenGLFreeMesh(mesh* Mesh)
+INTERNAL_FUNCTION renderer_handle* OpenGLAllocateMesh(mesh* Mesh, opengl_shader* Shader)
 {
-    if(Mesh)
+    renderer_handle* Result = &Mesh->Handle;
+    
+    b32 MeshWasDeleted = OpenGLProcessHandleInvalidation(Result);
+    
+    if(!Result->Initialized || MeshWasDeleted)
     {
-        glDeleteBuffers(1, (const GLuint*)&Mesh->ApiHandles.ElementBufferObject);
-        glDeleteBuffers(1, (const GLuint*)&Mesh->ApiHandles.BufferObject);
-        glDeleteVertexArrays(1, (const GLuint*)&Mesh->ApiHandles.ArrayObject);
+        GLuint VAO = 0;
+        GLuint VBO = 0;
+        GLuint EBO = 0;
+        
+        // NOTE(Dima): Init VAO and VBO
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO);
+        
+        glBindVertexArray(VAO);
+        
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, 
+                     Mesh->FreeSize, 
+                     Mesh->Free, 
+                     GL_STATIC_DRAW);
+        
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
+                     sizeof(u32) * Mesh->IndexCount, 
+                     Mesh->Indices, 
+                     GL_STATIC_DRAW);
+        
+        OpenGLInitMeshAttribs(Mesh, Shader);
+        
+        //glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+        
+        Mesh->Handle = CreateRendererHandle(RendererHandle_Mesh);
+        Result->Mesh.ArrayObject = VAO;
+        Result->Mesh.BufferObject = VBO;
+        Result->Mesh.ElementBufferObject = EBO;
+        Result->Initialized = true;
     }
+    
+    return(Result);
 }
 
 INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
@@ -514,14 +577,11 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
                                         int MeshInstanceCount,
                                         b32 UseInstancing)
 {
-    if(!Mesh->ApiHandles.Initialized)
-    {
-        Mesh->ApiHandles = OpenGLAllocateMesh(Mesh, &OpenGL.StdShader);
-    }
+    OpenGLAllocateMesh(Mesh, &OpenGL.StdShader);
     
     // NOTE(Dima): Render
-    glBindVertexArray(Mesh->ApiHandles.ArrayObject);
-    glBindBuffer(GL_ARRAY_BUFFER, Mesh->ApiHandles.BufferObject);
+    glBindVertexArray(Mesh->Handle.Mesh.ArrayObject);
+    glBindBuffer(GL_ARRAY_BUFFER, Mesh->Handle.Mesh.BufferObject);
     
     glUseProgram(OpenGL.StdShader.ID);
     
@@ -532,17 +592,13 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
     glUniformMatrix4fv(Shader->ModelLoc, 1, GL_TRUE, InstanceModelTransforms[0].e);
     glUniform3f(Shader->MultColorLoc, Color.r, Color.g, Color.b);
     
-    glUniform1i(Shader->PremultipliedTransformLoc, Mesh->PremultipliedTransform);
     glUniform1i(Shader->UseInstancingLoc, UseInstancing);
     
     // NOTE(Dima): Uniform skinning matrices
-    GLuint SkinningMatricesBO;
-    GLuint SkinningMatricesTBO;
+    renderer_handle SkinningMatricesTexBuf = {};
     if(Mesh->IsSkinned)
     {
-        
-        OpenGLCreateAndBindTextureBuffer(&SkinningMatricesBO,
-                                         &SkinningMatricesTBO,
+        OpenGLCreateAndBindTextureBuffer(&SkinningMatricesTexBuf,
                                          sizeof(m44) * NumInstanceSkMat * MeshInstanceCount,
                                          SkinningMatrices,
                                          GL_RGBA32F,
@@ -553,18 +609,61 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
     glUniform1i(Shader->MeshIsSkinnedLoc, Mesh->IsSkinned);
     
     // NOTE(Dima): Instancing
+    
     GLuint InstanceModelBO;
     GLuint InstanceModelTBO;
     if(UseInstancing)
     {
-        // NOTE(Dima): Uniform instance model matrices
-        OpenGLCreateAndBindTextureBuffer(&InstanceModelBO,
-                                         &InstanceModelTBO,
-                                         sizeof(m44) * MeshInstanceCount,
-                                         InstanceModelTransforms,
-                                         GL_RGBA32F,
-                                         2, 
-                                         Shader->InstanceModelMatricesLoc);
+        glGenBuffers(1, &InstanceModelBO);
+        
+        // NOTE(Dima): Generating buffer for holding instance model transforms and mesh
+        glBindBuffer(GL_ARRAY_BUFFER, InstanceModelBO);
+        glBufferData(GL_ARRAY_BUFFER, 
+                     sizeof(m44) * MeshInstanceCount + Mesh->FreeSize, 
+                     0,
+                     GL_STREAM_DRAW);
+        
+        // NOTE(Dima): Adding mesh to buffer
+        if(Mesh->FreeSize > 0)
+        {
+            glBufferSubData(GL_ARRAY_BUFFER,
+                            0,
+                            Mesh->FreeSize,
+                            Mesh->Free);
+        }
+        
+        // NOTE(Dima): Adding instance model transforms to buffer
+        if(MeshInstanceCount)
+        {
+            glBufferSubData(GL_ARRAY_BUFFER,
+                            Mesh->FreeSize,
+                            sizeof(m44) * MeshInstanceCount,
+                            InstanceModelTransforms);
+        }
+        
+        OpenGLInitMeshAttribs(Mesh, Shader);
+        
+        // NOTE(Dima): Setting instance model transform attribs
+        InitAttribFloat(Shader->InstanceModelTran1Attr,
+                        4, sizeof(m44),
+                        Mesh->FreeSize);
+        
+        InitAttribFloat(Shader->InstanceModelTran2Attr,
+                        4, sizeof(m44),
+                        Mesh->FreeSize + 1 * sizeof(v4));
+        
+        InitAttribFloat(Shader->InstanceModelTran3Attr,
+                        4, sizeof(m44),
+                        Mesh->FreeSize + 2 * sizeof(v4));
+        
+        InitAttribFloat(Shader->InstanceModelTran4Attr,
+                        4, sizeof(m44),
+                        Mesh->FreeSize + 3 * sizeof(v4));
+        
+        glVertexAttribDivisor(Shader->InstanceModelTran1Attr, 1);
+        glVertexAttribDivisor(Shader->InstanceModelTran2Attr, 1);
+        glVertexAttribDivisor(Shader->InstanceModelTran3Attr, 1);
+        glVertexAttribDivisor(Shader->InstanceModelTran4Attr, 1);
     }
     
     // NOTE(Dima): Setting material
@@ -582,7 +681,7 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
             OpenGLInitImage(Material->Diffuse);
             glUniform1i(Shader->TexDiffuseLoc, 0);
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, Material->Diffuse->ApiHandle);
+            glBindTexture(GL_TEXTURE_2D, Material->Diffuse->Handle.Image.TextureObject);
         }
     }
     
@@ -605,22 +704,106 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(opengl_shader* Shader,
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     
-    if(Mesh->PremultipliedTransform)
-    {
-        OpenGLFreeMesh(Mesh);
-    }
-    
-    if(Mesh->IsSkinned)
-    {
-        OpenGLFreeTextureBuffer(&SkinningMatricesBO,
-                                &SkinningMatricesTBO);
-    }
+    OpenGLDeleteHandle(&SkinningMatricesTexBuf);
     
     if(UseInstancing)
     {
-        OpenGLFreeTextureBuffer(&InstanceModelBO,
-                                &InstanceModelTBO);
+        glDisableVertexAttribArray(Shader->InstanceModelTran1Attr);
+        glDisableVertexAttribArray(Shader->InstanceModelTran2Attr);
+        glDisableVertexAttribArray(Shader->InstanceModelTran3Attr);
+        glDisableVertexAttribArray(Shader->InstanceModelTran4Attr);
+        
+        glDeleteBuffers(1, &InstanceModelBO);
     }
+}
+
+INTERNAL_FUNCTION void OpenGLRenderVoxelMesh(render_command_voxel_mesh* Command,
+                                             image* VoxelAtlas,
+                                             m44* View,
+                                             m44* Projection)
+{
+    opengl_shader* Shader = &OpenGL.VoxelShader;
+    voxel_mesh* Mesh = Command->Mesh;
+    
+#define VOXEL_MESH_ATLAS_TEXTURE_UNIT 0
+#define VOXEL_MESH_PER_FACE_TEXTURE_UNIT 1
+    
+    b32 MeshWasDeleted = OpenGLProcessHandleInvalidation(&Mesh->Handle);
+    if(!Mesh->Handle.Initialized || MeshWasDeleted)
+    {
+        // NOTE(Dima): Allocating voxel mesh
+        renderer_handle* Handle = &Mesh->Handle;
+        
+        GLuint VAO = 0;
+        GLuint VBO = 0;
+        
+        // NOTE(Dima): Init VAO and VBO
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        
+        glBindVertexArray(VAO);
+        
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, 
+                     Mesh->VerticesCount * sizeof(u32), 
+                     Mesh->Vertices, 
+                     GL_STATIC_DRAW);
+        
+        InitAttribInt(Shader->PositionAttr,
+                      1, sizeof(u32), 0);
+        
+        glBindVertexArray(0);
+        
+        Handle->Mesh.ArrayObject = VAO;
+        Handle->Mesh.BufferObject = VBO;
+        Handle->Initialized = true;
+    }
+    
+    b32 PerFaceBufWasDeleted = OpenGLProcessHandleInvalidation(&Mesh->PerFaceBufHandle);
+    if(!Mesh->PerFaceBufHandle.Initialized || PerFaceBufWasDeleted)
+    {
+        renderer_handle* Handles = &Mesh->PerFaceBufHandle;
+        
+        // NOTE(Dima): This is not under VAO. I think it's OK
+        OpenGLCreateTextureBuffer(Handles,
+                                  Mesh->FaceCount * sizeof(u32),
+                                  Mesh->PerFaceData,
+                                  VOXEL_MESH_PER_FACE_TEXTURE_UNIT,
+                                  GL_R32UI,
+                                  true);
+    }
+    
+    glBindVertexArray(Mesh->Handle.Mesh.ArrayObject);
+    glBindBuffer(GL_ARRAY_BUFFER, Mesh->Handle.Mesh.BufferObject);
+    glUseProgram(Shader->ID);
+    
+    m44 ViewProjection = *View * *Projection;
+    glUniformMatrix4fv(Shader->ViewProjectionLoc, 1, GL_TRUE, ViewProjection.e);
+    glUniformMatrix4fv(Shader->ProjectionLoc, 1, GL_TRUE, Projection->e);
+    glUniformMatrix4fv(Shader->ViewLoc, 1, GL_TRUE, View->e);
+    
+    // NOTE(Dima): Uniform chunk location
+    glUniform3f(Shader->ChunkAtLoc, 
+                Command->ChunkAt.x,
+                Command->ChunkAt.y,
+                Command->ChunkAt.z);
+    
+    // NOTE(Dima): Uniform voxel atlas
+    GLuint AtlasTexture = OpenGLInitImage(VoxelAtlas);
+    
+    glActiveTexture(GL_TEXTURE0 + VOXEL_MESH_ATLAS_TEXTURE_UNIT);
+    glBindTexture(GL_TEXTURE_2D, AtlasTexture);
+    glUniform1i(Shader->TextureAtlasLoc, VOXEL_MESH_ATLAS_TEXTURE_UNIT);
+    
+    // NOTE(Dima): Uniform per-face data
+    OpenGLBindTextureBuffer(&Mesh->PerFaceBufHandle,
+                            VOXEL_MESH_PER_FACE_TEXTURE_UNIT,
+                            Shader->PerFaceDataLoc);
+    
+    glDrawArrays(GL_TRIANGLES, 0, Mesh->VerticesCount);
+    
+    glUseProgram(0);
+    glBindVertexArray(0);
 }
 
 INTERNAL_FUNCTION void OpenGLRenderImage(opengl_shader* Shader,
@@ -690,16 +873,16 @@ INTERNAL_FUNCTION void OpenGLRenderImage(opengl_shader* Shader,
     u16 IndicesToTransform[1] = {1};
     
     // NOTE(Dima): Creating and binding Rects transforms buffer
-    GLuint TransBuffer, TransTBO;
-    OpenGLCreateAndBindTextureBuffer(&TransBuffer, &TransTBO,
+    renderer_handle TransTexBuf = {};
+    OpenGLCreateAndBindTextureBuffer(&TransTexBuf,
                                      sizeof(TransformsBuffer),
                                      &TransformsBuffer[0],
                                      GL_RGBA32F,
                                      3, Shader->RectsTransformsLoc);
     
     // NOTE(Dima): Creating and binding indices to transforms buffer
-    GLuint IndexToTranBuffer, IndexToTranTBO;
-    OpenGLCreateAndBindTextureBuffer(&IndexToTranBuffer, &IndexToTranTBO,
+    renderer_handle IndexToTranTexBuf = {};
+    OpenGLCreateAndBindTextureBuffer(&IndexToTranTexBuf,
                                      sizeof(IndicesToTransform),
                                      &IndicesToTransform[0],
                                      GL_R16UI,
@@ -720,7 +903,7 @@ INTERNAL_FUNCTION void OpenGLRenderImage(opengl_shader* Shader,
         
         glActiveTexture(GL_TEXTURE0);
         glUniform1i(Shader->ImageLoc, 0);
-        glBindTexture(GL_TEXTURE_2D, Image->ApiHandle);
+        glBindTexture(GL_TEXTURE_2D, Image->Handle.Image.TextureObject);
     }
     glUniform1i(Shader->IsImageLoc, IsImage);
     
@@ -735,11 +918,8 @@ INTERNAL_FUNCTION void OpenGLRenderImage(opengl_shader* Shader,
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     
-    OpenGLFreeTextureBuffer(&TransBuffer,
-                            &TransTBO);
-    
-    OpenGLFreeTextureBuffer(&IndexToTranBuffer,
-                            &IndexToTranTBO);
+    OpenGLDeleteHandle(&TransTexBuf);
+    OpenGLDeleteHandle(&IndexToTranTexBuf);
     
     glEnable(GL_DEPTH_TEST);
 }
@@ -830,6 +1010,17 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands)
                                  MeshCommand->InstanceCount,
                                  true);
             }break;
+            
+            case RenderCommand_VoxelChunkMesh:
+            {
+                render_command_voxel_mesh* MeshCommand = GetRenderCommand(Commands, CommandIndex,
+                                                                          render_command_voxel_mesh);
+                
+                OpenGLRenderVoxelMesh(MeshCommand,
+                                      Commands->VoxelAtlas,
+                                      &Commands->View,
+                                      &Commands->Projection);
+            }break;
         }
     }
 }
@@ -862,7 +1053,7 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
         
         glActiveTexture(GL_TEXTURE0);
         glUniform1i(Shader->ImageLoc, 0);
-        glBindTexture(GL_TEXTURE_2D, Commands->FontAtlas->ApiHandle);
+        glBindTexture(GL_TEXTURE_2D, Commands->FontAtlas->Handle.Image.TextureObject);
     }
     glUniform1i(Shader->IsImageLoc, IsImage);
     
@@ -886,32 +1077,32 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
                  GL_STREAM_DRAW);
     
     // NOTE(Dima): Creating and binding colors buffer
-    GLuint ColorsBuffer, ColorsTBO;
-    OpenGLCreateAndBindTextureBuffer(&ColorsBuffer, &ColorsTBO,
+    renderer_handle ColorsTexBuf = {};
+    OpenGLCreateAndBindTextureBuffer(&ColorsTexBuf,
                                      sizeof(u32) * RectBuffer->RectCount,
                                      &RectBuffer->Colors[0],
                                      GL_R32UI,
                                      1, Shader->RectsColorsLoc);
     
     // NOTE(Dima): Creating and binding geometry types buffer
-    GLuint TypesBuffer, TypesTBO;
-    OpenGLCreateAndBindTextureBuffer(&TypesBuffer, &TypesTBO,
+    renderer_handle TypesTexBuf = {};
+    OpenGLCreateAndBindTextureBuffer(&TypesTexBuf,
                                      sizeof(u8) * RectBuffer->RectCount,
                                      &RectBuffer->Types[0],
                                      GL_R8UI,
                                      2, Shader->RectsTypesLoc);
     
     // NOTE(Dima): Creating and binding Rects transforms buffer
-    GLuint TransBuffer, TransTBO;
-    OpenGLCreateAndBindTextureBuffer(&TransBuffer, &TransTBO,
+    renderer_handle TransTexBuf = {};
+    OpenGLCreateAndBindTextureBuffer(&TransTexBuf,
                                      sizeof(m44) * RectBuffer->TransformsCount,
                                      &RectBuffer->Transforms[0],
                                      GL_RGBA32F,
                                      3, Shader->RectsTransformsLoc);
     
     // NOTE(Dima): Creating and binding indices to transforms buffer
-    GLuint IndexToTranBuffer, IndexToTranTBO;
-    OpenGLCreateAndBindTextureBuffer(&IndexToTranBuffer, &IndexToTranTBO,
+    renderer_handle IndexToTranTexBuf = {};
+    OpenGLCreateAndBindTextureBuffer(&IndexToTranTexBuf,
                                      sizeof(u16) * RectBuffer->RectCount,
                                      &RectBuffer->IndicesToTransforms[0],
                                      GL_R16UI,
@@ -949,10 +1140,10 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     
-    OpenGLFreeTextureBuffer(&ColorsBuffer, &ColorsTBO);
-    OpenGLFreeTextureBuffer(&TypesBuffer, &TypesTBO);
-    OpenGLFreeTextureBuffer(&TransBuffer, &TransTBO);
-    OpenGLFreeTextureBuffer(&IndexToTranBuffer, &IndexToTranTBO);
+    OpenGLDeleteHandle(&ColorsTexBuf);
+    OpenGLDeleteHandle(&TypesTexBuf);
+    OpenGLDeleteHandle(&TransTexBuf);
+    OpenGLDeleteHandle(&IndexToTranTexBuf);
     
     glUseProgram(0);
     
@@ -964,9 +1155,22 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_BEGIN_FRAME(OpenGLBeginFrame)
     
 }
 
+INTERNAL_FUNCTION void OpenGLProcessDeallocList(render_commands* Commands)
+{
+    render_api_dealloc_entry* At = Commands->UseDealloc.Next;
+    
+    while(At != &Commands->UseDealloc)
+    {
+        
+        At = At->Next;
+    }
+}
+
 INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
 {
     FUNCTION_TIMING();
+    
+    OpenGLProcessDeallocList(Commands);
     
     //glClearColor(0.3f, 0.4f, 0.8f, 1.0f);
     glClearColor(0.6f, 0.6f, 0.9f, 1.0f);

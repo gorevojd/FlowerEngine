@@ -1,4 +1,4 @@
-#include "flower_rubiks.cpp"
+#include "prj_rubiks.cpp"
 
 struct rubiks_state
 {
@@ -16,7 +16,7 @@ SCENE_INIT(RubiksCube)
     InitCamera(&State->Camera, Camera_RotateAround);
     State->Camera.ShowcaseRotateTime = 20.0f;
     
-    f32 CubeWidth = 3.0f;
+    f32 CubeWidth = 5.0f;
     int CubeDim = 111;
     int CountOfCubes = 1;
     
@@ -210,7 +210,7 @@ SCENE_UPDATE(RubiksCube)
 {
     rubiks_state* State = GetSceneState(rubiks_state);
     
-    PushClear(V3(0.96f, 0.9f, 0.8f));
+    PushClear(V3(0.7f, 0.75f, 0.95f));
     
     u32 CameraStates[2] = 
     {
@@ -245,5 +245,5 @@ SCENE_UPDATE(RubiksCube)
     PushImage(&Global_Assets->FontsAtlas, V2(0.0f), 1300);
 #endif
     
-    SetMatrices(GetViewMatrix(&State->Camera));
+    SetMatrices(&State->Camera);
 }

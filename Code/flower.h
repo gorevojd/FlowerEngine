@@ -4,6 +4,8 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <atomic>
+#include <intrin.h>
 
 #include "flower_defines.h"
 #include "flower_math.h"

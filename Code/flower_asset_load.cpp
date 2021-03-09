@@ -389,7 +389,7 @@ INTERNAL_FUNCTION mesh MakeMesh(const helper_mesh& HelperMesh)
     const char* SrcName = HelperMesh.Name.c_str();
     CopyStringsSafe(Result.Name, ArrayCount(Result.Name), (char*)SrcName);
     
-    mesh_offsets* Offsets = &Result.Offsets;
+    render_mesh_offsets* Offsets = &Result.Offsets;
     helper_byte_buffer Help = {};
     
     Offsets->OffsetP = Help.AddPlace("P", HelperMesh.Vertices.size(), sizeof(v3));
@@ -414,7 +414,6 @@ INTERNAL_FUNCTION mesh MakeMesh(const helper_mesh& HelperMesh)
     Result.FreeSize = Help.DataSize;
     Result.VertexCount = HelperMesh.Vertices.size();
     Result.IsSkinned = HelperMesh.IsSkinned;
-    Result.PremultipliedTransform = false;
     
     // NOTE(Dima): Allocating indices
     Result.Indices = (u32*)Help.GetPlace("Indices");;

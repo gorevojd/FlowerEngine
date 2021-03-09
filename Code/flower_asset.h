@@ -52,6 +52,8 @@ struct asset_system
     v2 FontAtlasAtP;
     int FontAtlasMaxRowY;
     
+    image VoxelAtlas;
+    
     // NOTE(Dima): Assets
     mesh Cube;
     mesh Plane;
@@ -65,6 +67,7 @@ struct asset_system
     font LifeIsGoofy;
     font Arial;
 #endif
+    
     font BerlinSans;
     font LiberationMono;
     

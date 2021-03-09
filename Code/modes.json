@@ -11,4 +11,7 @@
 	"RubiksCube": {
 		"FileName": "mode_rubiks.cpp"
 	},
+	"Minecraft": {
+		"FileName": "mode_minecraft.cpp"
+	},
 }

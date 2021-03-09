@@ -15,6 +15,9 @@ struct game_camera
     
     m33 Transform;
     
+    f32 NearClipPlane;
+    f32 FarClipPlane;
+    
     // NOTE(Dima): Staff for rotating around
     f32 ViewRadius;
     f32 ViewTargetRadius;
@@ -30,9 +33,11 @@ enum game_object_type
 {
     GameObject_Root,
     GameObject_Sentinel,
-    GameObject_Model,
+    
+    GameObject_Object,
 };
 
+#include "flower_component.h"
 struct game_object
 {
     b32 IsActive;
@@ -54,11 +59,8 @@ struct game_object
     char Name[128];
     
     // NOTE(Dima): Model related stuff
-    model* Model_Model;
-    m44* Model_NodeToModel;
-    m44* Model_SkinningMatrices;
-    b32 Model_ToModelIsComputed;
-    animation* Model_PlayingAnimation;
+    u32 ComponentsMask;
+    component Components[8];
 };
 
 struct game_object_pool

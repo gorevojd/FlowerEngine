@@ -1,7 +1,13 @@
-inline void InitCamera(game_camera* Cam, u32 State)
+#include "flower_component.cpp"
+
+inline void InitCamera(game_camera* Cam, u32 State,
+                       f32 Near = 0.5f,
+                       f32 Far = 500.0f)
 {
     Cam->State = State;
     
+    Cam->NearClipPlane = Near;
+    Cam->FarClipPlane = Far;
     
     Cam->ViewRadiusMax = 20.0f;
     Cam->ViewRadiusMin = 1.0f;
@@ -138,14 +144,15 @@ void ShowLabel3D(game_camera* Camera,
                         Color);
 }
 
-INTERNAL_FUNCTION void SetMatrices(m44 ViewMatrix)
+INTERNAL_FUNCTION void SetMatrices(game_camera* Camera)
 {
     window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
     
-    Global_RenderCommands->View = ViewMatrix;
+    Global_RenderCommands->View = GetViewMatrix(Camera);
     Global_RenderCommands->Projection = PerspectiveProjection(WndDims->Width, 
                                                               WndDims->Height,
-                                                              500.0f, 0.5f);
+                                                              Camera->FarClipPlane, 
+                                                              Camera->NearClipPlane);
     
     Global_RenderCommands->ViewProjection = 
         Global_RenderCommands->View * 
@@ -279,6 +286,7 @@ void DeleteGameObjectRec(game* Game, game_object* Obj)
     
     // TODO(Dima): If needed - we can call destructors on object's components here
     // ....
+    RemoveAllComponents(Obj);
     
     // NOTE(Dima): Deleting this object
     DLIST_REMOVE(Obj, Next, Prev);
@@ -308,52 +316,74 @@ game_object* CreateModelGameObject(game* Game,
                                    model* Model,
                                    char* Name = 0)
 {
-    game_object* Result = CreateGameObject(Game, GameObject_Model, Name);
+    game_object* Result = CreateGameObject(Game, GameObject_Object, Name);
     
-    Result->Model_Model = Model;
+    AddComponent(Result, Component_component_model);
+    component_model* ModelComp = GetComp(Result, component_model);
+    ModelComp->Model = Model;
+    
+    helper_byte_buffer Help = {};
+    component* Component = AddComponent(Result, Component_component_model);
     
     if(Model->Shared.NumNodes)
     {
-        Result->Model_NodeToModel = PushArray(Game->Arena, m44, Model->Shared.NumNodes);
+        Help.AddPlace("NodeToModel", Model->Shared.NumNodes, sizeof(m44));
     }
     
     if(Model->Shared.NumBones)
     {
-        Result->Model_SkinningMatrices = PushArray(Game->Arena, m44, Model->Shared.NumBones);
+        Help.AddPlace("SkinningMatrices", Model->Shared.NumBones, sizeof(m44));
     }
+    
+    Help.Generate();
+    
+    ModelComp->NodeToModel = (m44*)Help.GetPlace("NodeToModel");
+    ModelComp->SkinningMatrices = (m44*)Help.GetPlace("SkinningMatrices");
+    
+    Component->Free = Help.Data;
+    Component->FreeSize = Help.DataSize;
     
     return(Result);
 }
 
 void UpdateModelGameObject(game_object* Object)
 {
+    component_model* CompModel = GetComp(Object, component_model);
+    
     m44* SkinningMatrices = 0;
     int SkinningMatricesCount = 0;
-    model* Model = Object->Model_Model;
-    animation* Animation = Object->Model_PlayingAnimation;
+    model* Model = CompModel->Model;
+    
+    component_animator* AnimatorComp = GetComp(Object, component_animator);
+    animation* Animation = 0;
+    
+    if(AnimatorComp)
+    {
+        Animation = AnimatorComp->PlayingAnimation;
+    }
     
     if(Animation != 0)
     {
         UpdateAnimation(Animation, Global_Time->Time, Model->Node_ToParent);
         
-        SkinningMatrices = Object->Model_SkinningMatrices;
+        SkinningMatrices = CompModel->SkinningMatrices;
         SkinningMatricesCount = Model->Shared.NumBones;
         
-        CalculateToModelTransforms(Model, Object->Model_NodeToModel);
+        CalculateToModelTransforms(Model, CompModel->NodeToModel);
         // NOTE(Dima): Setting this to false so next time they should be recomputed again
-        Object->Model_ToModelIsComputed = false;
+        CompModel->ToModelIsComputed = false;
         
         CalculateSkinningMatrices(Model,
-                                  Object->Model_NodeToModel,
-                                  Object->Model_SkinningMatrices);
+                                  CompModel->NodeToModel,
+                                  CompModel->SkinningMatrices);
     }
     else
     {
-        if(!Object->Model_ToModelIsComputed)
+        if(!CompModel->ToModelIsComputed)
         {
-            CalculateToModelTransforms(Model, Object->Model_NodeToModel);
+            CalculateToModelTransforms(Model, CompModel->NodeToModel);
             // NOTE(Dima): 
-            Object->Model_ToModelIsComputed = true;
+            CompModel->ToModelIsComputed = true;
         }
     }
     
@@ -365,7 +395,7 @@ void UpdateModelGameObject(game_object* Object)
     {
         model_node* Node = &Model->Nodes[NodeIndex];
         
-        m44 NodeTran = Object->Model_NodeToModel[NodeIndex] * ModelToWorld;
+        m44 NodeTran = CompModel->NodeToModel[NodeIndex] * ModelToWorld;
         
         for(int MeshIndex = 0;
             MeshIndex < Node->NumMeshIndices;
@@ -401,7 +431,42 @@ void UpdateModelGameObject(game_object* Object)
     }
 }
 
-void UpdateGameObjectRec(game* Game, game_object* Obj)
+#define PROCESS_GAME_OBJECT_FUNC(name) void name(game* Game, game_object* Obj)
+typedef PROCESS_GAME_OBJECT_FUNC(process_game_object_func);
+
+PROCESS_GAME_OBJECT_FUNC(UpdateGameObject)
+{
+    switch(Obj->Type)
+    {
+        case GameObject_Object:
+        {
+            UpdateModelGameObject(Obj);
+        }break;
+        
+        default:
+        {
+            // NOTE(Dima): Nothing to do!
+        }break;
+    }
+}
+
+PROCESS_GAME_OBJECT_FUNC(RenderGameObject)
+{
+    switch(Obj->Type)
+    {
+        case GameObject_Object:
+        {
+            // TODO(Dima): Do something
+        }break;
+        
+        default:
+        {
+            // NOTE(Dima): Nothing to do!
+        }break;
+    }
+}
+
+void GameObjectRec(game* Game, game_object* Obj, process_game_object_func* Func)
 {
     Assert(Obj->ChildSentinel);
     
@@ -414,28 +479,17 @@ void UpdateGameObjectRec(game* Game, game_object* Obj)
             
             while(At != Obj->ChildSentinel)
             {
-                UpdateGameObjectRec(Game, At);
+                GameObjectRec(Game, At, Func);
                 
                 At = At->Next;
             }
         }
         
-        switch(Obj->Type)
-        {
-            case GameObject_Model:
-            {
-                UpdateModelGameObject(Obj);
-            }break;
-            
-            default:
-            {
-                // NOTE(Dima): Nothing to do!
-            }break;
-        }
+        Func(Game, Obj);
     }
 }
 
 void UpdateGameObjects(game* Game)
 {
-    UpdateGameObjectRec(Game, Game->GameObjectPool.Root);
+    GameObjectRec(Game, Game->GameObjectPool.Root, UpdateGameObject);
 }

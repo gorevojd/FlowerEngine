@@ -1,14 +1,39 @@
 #ifndef FLOWER_PLATFORM_H
 #define FLOWER_PLATFORM_H
 
-#include <intrin.h>
-
 #if defined(_WIN32) || defined(_WIN64)
 #define PLATFORM_IS_WINDOWS
 #endif
 
 #define PLATFORM_CALLBACK(name) void name(void* Data)
 typedef PLATFORM_CALLBACK(platform_callback);
+
+// NOTE(Dima): Ticket mutex
+struct ticket_mutex
+{
+    std::atomic_uint32_t Acquire;
+    std::atomic_uint32_t Release;
+};
+
+inline void InitTicketMutex(ticket_mutex* Mutex)
+{
+    Mutex->Acquire = 0;
+    Mutex->Release = 0;
+}
+
+inline void BeginTicketMutex(ticket_mutex* Mutex)
+{
+    uint64_t Before = Mutex->Acquire.fetch_add(1);
+    while(Before != Mutex->Release.load())
+    {
+        _mm_pause();
+    }
+}
+
+inline void EndTicketMutex(ticket_mutex* Mutex)
+{
+    Mutex->Release.fetch_add(1);
+}
 
 // NOTE(Dima): Memory block allocation
 #define PLATFORM_ALLOCATE_BLOCK(name) struct memory_block* name(u32 Size)

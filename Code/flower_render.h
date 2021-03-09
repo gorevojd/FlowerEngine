@@ -12,6 +12,7 @@ enum render_command_type
     RenderCommand_Image,
     RenderCommand_Mesh,
     RenderCommand_InstancedMesh,
+    RenderCommand_VoxelChunkMesh,
 };
 
 #define RENDER_COMMAND_STRUCT(type) render_command_##type
@@ -62,6 +63,13 @@ struct render_command_instanced_mesh
     m44* InstanceMatrices;
     int InstanceCount;
     int MaxInstanceCount;
+};
+
+struct render_command_voxel_mesh
+{
+    voxel_mesh* Mesh;
+    
+    v3 ChunkAt;
 };
 
 struct render_precompute_transform_mesh
@@ -122,7 +130,6 @@ struct rect_buffer
     int RectCount;
 };
 
-
 struct window_dimensions
 {
     int InitWidth;
@@ -132,9 +139,20 @@ struct window_dimensions
     int Height;
 };
 
+struct render_api_dealloc_entry
+{
+    renderer_handle* Handle;
+    
+    u32 Type;
+    
+    render_api_dealloc_entry* Next;
+    render_api_dealloc_entry* Prev;
+};
+
 struct render_commands
 {
     memory_arena CommandsBuffer;
+    memory_arena* Arena;
     
     // TODO(Dima): Make those dynamic
 #define MAX_RENDER_COMMANDS_COUNT 200000
@@ -151,6 +169,7 @@ struct render_commands
     
     window_dimensions WindowDimensions;
     image* FontAtlas;
+    image* VoxelAtlas;
     
     // NOTE(Dima): List of to precompute mesh arrays
     render_precompute_transform_mesh* FirstPrecomputeMesh;
@@ -162,6 +181,11 @@ struct render_commands
     // NOTE(Dima): Settings
     b32 BackfaceCulling;
     b32 BackfaceCullingChanged;
+    
+    // NOTE(Dima): Deallocate entries
+    ticket_mutex DeallocEntriesMutex;
+    render_api_dealloc_entry UseDealloc;
+    render_api_dealloc_entry FreeDealloc;
 };
 
 inline void* GetRenderCommand_(render_commands* Commands, int CommandIndex)

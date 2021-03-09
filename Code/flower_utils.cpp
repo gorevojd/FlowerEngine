@@ -69,13 +69,14 @@ struct helper_byte_buffer
     {
         void* Result = 0;
         
-        Assert(NameToCount.find(GetName) != NameToCount.end());
-        
-        if(NameToCount[GetName] > 0)
+        if(NameToCount.find(GetName) != NameToCount.end())
         {
-            Assert(NameToOffset.find(GetName) != NameToOffset.end());
-            
-            Result = (void*)((u8*)Data + NameToOffset[GetName]);
+            if(NameToCount[GetName] > 0)
+            {
+                Assert(NameToOffset.find(GetName) != NameToOffset.end());
+                
+                Result = (void*)((u8*)Data + NameToOffset[GetName]);
+            }
         }
         
         return(Result);
@@ -201,5 +202,5 @@ INTERNAL_FUNCTION void CopyImage(image* Dst,
 
 INTERNAL_FUNCTION inline void InvalidateImage(image* Image)
 {
-    Image->Invalidated = true;
+    Image->Handle.Invalidated = true;
 }

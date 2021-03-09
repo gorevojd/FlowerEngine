@@ -393,6 +393,9 @@ struct rubiks_cube
     // NOTE(Dima): Size of this array is Dim * Dim * Dim
     int* Current;
     
+    int NumTasks;
+    task_memory_pool* TaskPool;
+    
     // NOTE(Dima): Side faces colors. Each side stores colors indices Left-Right Top-Bottom when looking
     u8* Sides[RubiksColor_Count];
     u8* SideTemp;

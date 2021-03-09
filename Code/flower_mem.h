@@ -36,6 +36,11 @@ inline memory_block* GetCurrentBlock(memory_arena* Arena)
 {
     memory_block* Block = Arena->Block;
     
+    if(Arena->IsStatic)
+    {
+        Block = &Arena->StaticBlockSource;
+    }
+    
     return(Block);
 }
 
@@ -70,7 +75,7 @@ inline void* AllocateFromArena(memory_arena* Arena, u32 Size, u32 Align = 16)
     
     if(Arena->IsStatic && !CanAllocate)
     {
-        Assert(!"Can't allocate memory!");
+        Assert(!"Can't allocate any more memory in static arena!");
     }
     
     b32 ShouldAllocateBlock = !CanAllocate && !Arena->IsStatic;
@@ -124,31 +129,39 @@ inline void* AllocateFromArena(memory_arena* Arena, u32 Size, u32 Align = 16)
 
 inline void FreeArena(memory_arena* Arena, b32 JustResetData = false)
 {
-    memory_block* At = Arena->Block;
+    memory_block* At = GetCurrentBlock(Arena);;
     
-    while(At)
+    if(Arena->IsStatic)
     {
-        memory_block* PrevBlock = At->Prev;
+        At->Used = 0;
+    }
+    else
+    {
+        
+        while(At)
+        {
+            memory_block* PrevBlock = At->Prev;
+            
+            if(!JustResetData)
+            {
+                At->Next = At->Prev = 0;
+                
+                Platform.DeallocateBlock(At);
+            }
+            else
+            {
+                At->Used = 0;
+                
+                Arena->Block = At;
+            }
+            
+            At = PrevBlock;
+        }
         
         if(!JustResetData)
         {
-            At->Next = At->Prev = 0;
-            
-            Platform.DeallocateBlock(At);
+            Arena->Block = 0;
         }
-        else
-        {
-            At->Used = 0;
-            
-            Arena->Block = At;
-        }
-        
-        At = PrevBlock;
-    }
-    
-    if(!JustResetData)
-    {
-        Arena->Block = 0;
     }
 }
 
@@ -161,14 +174,15 @@ inline void ResetArena(memory_arena* Arena)
 
 inline memory_arena CreateArenaInsideMemory(void* Memory, mi Size)
 {
-    memory_arena Result;
-    
+    memory_arena Result = {};
     memory_block* NewBlock = &Result.StaticBlockSource;
     
     NewBlock->Base = Memory;
     NewBlock->Size = Size;
     NewBlock->Used = 0;
+    
     NewBlock->Prev = 0;
+    NewBlock->Next = 0;
     
     Result.Block = NewBlock;
     Result.IsStatic = true;
@@ -191,9 +205,14 @@ inline memory_arena SplitArena(memory_arena* Arena)
     return(Result);
 }
 
-#define PushSize(arena, size) AllocateFromArena(arena, size)
+#define PushSize(arena, size, ...) AllocateFromArena(arena, size, __VA_ARGS__)
+#define PushSizeSafe(arena, size) AllocateFromArena(arena, size + 64, 64)
+
 #define PushStruct(arena, type, ...) (type*)AllocateFromArena(arena, sizeof(type), __VA_ARGS__)
+#define PushStructSafe(arena, type) (type*)AllocateFromArena(arena, sizeof(type) + 64, 64)
+
 #define PushArray(arena, type, count, ...) (type*)AllocateFromArena(arena, sizeof(type) * count, __VA_ARGS__)
+#define PushArraySafe(arena, type, count) (type*)AllocateFromArena(arena, sizeof(type) * count + 64, 64)
 
 template<typename t> inline  t* PushNew(memory_arena* Arena)
 {

@@ -4,6 +4,43 @@
 #include <intrin.h>
 #include <math.h>
 
+inline u32 Hash32(u64 A, u64 B = 0)
+{
+    __m128i SeedValue = _mm_set1_epi32(12324);
+    __m128i Value = _mm_set_epi64x(A, B);
+    __m128i Hash = _mm_aesdec_si128(Value, SeedValue);
+    Hash = _mm_aesdec_si128(Hash, SeedValue);
+    
+    u32 Result = _mm_extract_epi32(Hash, 0);
+    
+    return(Result);
+}
+
+inline u32 Hash32Slow(u64 A)
+{
+    u8 TempStr[16];
+    
+    for(int i = 0; i < 8; i++)
+    {
+        TempStr[i] = (A >> (i * 8)) & 255;
+    }
+    TempStr[8] = 0;
+    
+    // NOTE(Dima): FNV Hash
+    u32 Result = 2166136261;
+    
+    u8* At = TempStr;
+    while (*At) {
+        
+        Result *= 16777619;
+        Result ^= *At;
+        
+        At++;
+    }
+    
+    return(Result);
+}
+
 inline float Sqrt(f32 Value)
 {
 	f32 Result = _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(Value)));

@@ -1330,7 +1330,7 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     // NOTE(Dima): Init visible cubies
     int VisibleCount = GetVisibleCubiesCount(CubeDim);
     Result.Visible.Count = VisibleCount;
-    Result.Visible.FinalTransform = PushArray(Arena, m44, CeilAlign(VisibleCount, 4));
+    Result.Visible.FinalTransform = PushArray(Arena, m44, CeilAlign(VisibleCount, 4), 64);
     Result.Visible.Transform = PushArray(Arena, m44, CeilAlign(VisibleCount, 4));
     Result.Visible.AppliedRotation = PushArray(Arena, m44, CeilAlign(VisibleCount, 4));
     Result.Visible.InitP = PushArray(Arena, v3, CeilAlign(VisibleCount, 4));
@@ -1390,7 +1390,68 @@ inline rubiks_cube CreateCube(memory_arena* Arena,
     
     ChangeCubeSpeed(&Result, RUBIKS_SPEED_SLOW);
     
+    // NOTE(Dima): Tasks pool
+    Result.NumTasks = 32;
+    mi SizePerTask = Kilobytes(100); 
+    Result.TaskPool = CreateTaskMemoryPoolStatic(Arena, 
+                                                 Result.NumTasks,
+                                                 SizePerTask);
+    
     return(Result);
+}
+
+INTERNAL_FUNCTION inline void CalcCubieFinalTransformInternal(rubiks_cube* Cube,
+                                                              int FirstIndex,
+                                                              int OnePastLastIndex,
+                                                              const m44_4x& OffsetMatrix)
+{
+    rubiks_visible_cubies* Vis = &Cube->Visible;
+    
+    for(int VisibleIndex = FirstIndex;
+        VisibleIndex < OnePastLastIndex;
+        VisibleIndex += 4)
+    {
+        m44_4x Transform = M44_4X(Vis->Transform[VisibleIndex + 0],
+                                  Vis->Transform[VisibleIndex + 1],
+                                  Vis->Transform[VisibleIndex + 2],
+                                  Vis->Transform[VisibleIndex + 3]);
+        
+        m44_4x AppliedRotation = M44_4X(Vis->AppliedRotation[VisibleIndex + 0],
+                                        Vis->AppliedRotation[VisibleIndex + 1],
+                                        Vis->AppliedRotation[VisibleIndex + 2],
+                                        Vis->AppliedRotation[VisibleIndex + 3]);
+        
+        m44_4x FinalTransform = Transform * AppliedRotation * OffsetMatrix;
+        
+        M44_4X_Store(FinalTransform, 
+                     Vis->FinalTransform[VisibleIndex],
+                     Vis->FinalTransform[VisibleIndex + 1],
+                     Vis->FinalTransform[VisibleIndex + 2],
+                     Vis->FinalTransform[VisibleIndex + 3]);
+    }
+    
+}
+
+struct calculate_cubie_task
+{
+    rubiks_cube* Cube;
+    int FirstIndex;
+    int OnePastLastIndex;
+    m44_4x* OffsetMatrix;
+};
+
+JOB_CALLBACK(CalcCubieFinalTransformCallback)
+{
+    task_memory* Task = (task_memory*)Data;
+    
+    calculate_cubie_task* CubieTask = (calculate_cubie_task*)Task->Memory;
+    
+    CalcCubieFinalTransformInternal(CubieTask->Cube,
+                                    CubieTask->FirstIndex,
+                                    CubieTask->OnePastLastIndex,
+                                    *CubieTask->OffsetMatrix);
+    
+    FreeTaskMemory(CubieTask->Cube->TaskPool, Task);
 }
 
 // TODO(Dima): Walk only on outer cubies
@@ -1434,29 +1495,47 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
         m44_4x OffsetMatrix4x = M44_4X(OffsetMatrix);
         
         // NOTE(Dima): Transformations calculation
-        for(int VisibleIndex = 0;
-            VisibleIndex < Vis->Count;
-            VisibleIndex += 4)
+#if 1
+        int FirstIndex = 0;
+        int OnePastLastIndex = Vis->Count;
+        
+        CalcCubieFinalTransformInternal(Cube,
+                                        FirstIndex,
+                                        OnePastLastIndex,
+                                        OffsetMatrix4x);
+#else
+        int CubiesPerTask = CeilAlign(Cube->Visible.Count, 4) / Cube->NumTasks;
+        
+        for(int TaskIndex = 0;
+            TaskIndex < Cube->NumTasks;
+            TaskIndex++)
         {
-            m44_4x Transform = M44_4X(Vis->Transform[VisibleIndex + 0],
-                                      Vis->Transform[VisibleIndex + 1],
-                                      Vis->Transform[VisibleIndex + 2],
-                                      Vis->Transform[VisibleIndex + 3]);
+            int i = TaskIndex * CubiesPerTask;
+            int OnePastLastIndex = i + CubiesPerTask;
             
-            m44_4x AppliedRotation = M44_4X(Vis->AppliedRotation[VisibleIndex + 0],
-                                            Vis->AppliedRotation[VisibleIndex + 1],
-                                            Vis->AppliedRotation[VisibleIndex + 2],
-                                            Vis->AppliedRotation[VisibleIndex + 3]);
+            task_memory* Task = GetTaskMemoryForUse(Cube->TaskPool, 0);
             
-            m44_4x FinalTransform = Transform * AppliedRotation * OffsetMatrix4x;
-            
-            M44_4X_Store(FinalTransform, 
-                         Vis->FinalTransform[VisibleIndex],
-                         Vis->FinalTransform[VisibleIndex + 1],
-                         Vis->FinalTransform[VisibleIndex + 2],
-                         Vis->FinalTransform[VisibleIndex + 3]);
-            
+            if(Task)
+            {
+                calculate_cubie_task* CubieTask = (calculate_cubie_task*)Task->Memory;
+                
+                CubieTask->Cube = Cube;
+                
+                if(TaskIndex == (Cube->NumTasks - 1))
+                {
+                    OnePastLastIndex = std::min(Cube->Visible.Count, OnePastLastIndex);
+                }
+                CubieTask->FirstIndex = i;
+                CubieTask->OnePastLastIndex = OnePastLastIndex;
+                
+                CubieTask->OffsetMatrix = &OffsetMatrix4x;
+                
+                KickJob(CalcCubieFinalTransformCallback, Task, JobPriority_High);
+            }
         }
+        
+        WaitForCompletion(JobPriority_High);
+#endif
     }
     
     // NOTE(Dima): For DEBUG mode

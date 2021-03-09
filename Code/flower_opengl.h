@@ -28,6 +28,11 @@ struct opengl_shader
     GLint WeightsAttr;
     GLint BoneIDsAttr;
     
+    GLint InstanceModelTran1Attr;
+    GLint InstanceModelTran2Attr;
+    GLint InstanceModelTran3Attr;
+    GLint InstanceModelTran4Attr;
+    
     // NOTE(Dima): Uniforms
     GLint ViewProjectionLoc;
     GLint ProjectionLoc;
@@ -36,14 +41,16 @@ struct opengl_shader
     GLint SkinningMatricesLoc;
     GLint SkinningMatricesCountLoc;
     GLint MeshIsSkinnedLoc;
-    GLint InstanceModelMatricesLoc;
     GLint UseInstancingLoc;
-    GLint PremultipliedTransformLoc;
     
     GLint MultColorLoc;
     GLint TexDiffuseLoc;
     GLint HasDiffuseLoc;
     GLint MaterialMissingLoc;
+    
+    GLint TextureAtlasLoc;
+    GLint ChunkAtLoc;
+    GLint PerFaceDataLoc;
     
     GLint IsImageLoc;
     GLint ImageLoc;
@@ -61,6 +68,7 @@ struct opengl_state
 {
     opengl_shader StdShader;
     opengl_shader UIRectShader;
+    opengl_shader VoxelShader;
 };
 
 #endif
