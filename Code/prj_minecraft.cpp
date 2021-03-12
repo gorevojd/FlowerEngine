@@ -175,6 +175,19 @@ INTERNAL_FUNCTION inline minc_biome* CreateDefaultBiome(minecraft* Mine,
     Result->NoiseFrequency = 256.0f;
     Result->NoiseScale = 20.0f;
     
+    // NOTE(Dima): Trees
+    Result->TreeDensity = 0.01f;
+    Result->HasTrees = true;
+    Result->TrunkMinH = 3;
+    Result->TrunkMaxH = 5;
+    Result->CrownMinH = 3;
+    Result->CrownMaxH = 5;
+    Result->CrownMinRad = 1;
+    Result->CrownMaxRad = 3;
+    
+    Result->TreeCrownBlock = MincBlock_TreeLeaves;
+    Result->TreeTrunkBlock = MincBlock_TreeWoodDark;
+    
     return(Result);
 }
 
@@ -190,17 +203,23 @@ INTERNAL_FUNCTION void InitMinecraftBiomes(minecraft* Mine)
     Desert->LayerBlocks[1] = MincBlock_Sand;
     Desert->LayerBlocks[2] = MincBlock_Ground;
     Desert->LayerBlocks[3] = MincBlock_Stone;
+    Desert->HasTrees = false;
     
     minc_biome* Standard = CreateDefaultBiome(Mine, MincBiome_Standard, 20);
     Standard->NoiseFrequency = 700.0f;
     Standard->NoiseScale = 20.0f;
     Standard->BaseHeight = 50.0f;
+    Standard->TreeCrownBlock = MincBlock_TreeLeaves;
+    Standard->TreeTrunkBlock = MincBlock_TreeWoodBirch;
     
     minc_biome* SnowTaiga = CreateDefaultBiome(Mine, MincBiome_SnowTaiga, 20);
     SnowTaiga->NoiseFrequency = 256.0f;
     SnowTaiga->NoiseScale = 40.0f;
     SnowTaiga->BaseHeight = 60.0f;
     SnowTaiga->LayerBlocks[0] = MincBlock_SnowGround;
+    SnowTaiga->TreeDensity = 0.02f;
+    SnowTaiga->TreeCrownBlock = MincBlock_TreeLeavesSnow;
+    SnowTaiga->TreeTrunkBlock = MincBlock_TreeWood;
     
     // NOTE(Dima): Backpropagate biome weights
     f32 OneOverTotalWeight = 1.0f / Mine->BiomesTotalWeight;
@@ -234,21 +253,34 @@ INTERNAL_FUNCTION inline u8 GetBlockInChunk(minc_chunk* Chunk,
     return(Result);
 }
 
+INTERNAL_FUNCTION inline u8 GetBlockInChunkSide(minc_chunk_side* Side,
+                                                int X, int Y)
+{
+    u8 Result = Side->Blocks[Y * MINC_CHUNK_WIDTH + X];
+    
+    return(Result);
+}
+
 struct minc_generate_chunks
 {
     minc_chunk* Dst;
     
-    minc_chunk* SideChunks[MincFaceNormal_Count];
+    minc_chunk_side* ChunksSides[6];
+    minc_chunk* Chunks[6];
 };
 
-INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
-                                         minc_temp_mesh* Mesh,
-                                         minc_generate_chunks Chunks)
+// NOTE(Dima): Returns false if there were not enough vertices
+INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
+                                        minc_temp_mesh* Mesh,
+                                        minc_generate_chunks Chunks)
 {
     minc_chunk* Chunk = Chunks.Dst;
     
     Mesh->VerticesCount = 0;
     Mesh->FaceCount = 0;
+    
+    int TotalVerticesCount = 0;
+    int TotalFaceCount = 0;
     
     for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
     {
@@ -274,7 +306,7 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
                     {
                         u8 NeighbourBlock = MincBlock_Empty;
                         
-                        minc_chunk* SideChunk = Chunks.SideChunks[NormalDir];
+                        minc_chunk_side* SideChunk = Chunks.ChunksSides[NormalDir];
                         
                         switch(NormalDir)
                         {
@@ -288,7 +320,7 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
                                 {
                                     if(SideChunk)
                                     {
-                                        NeighbourBlock = GetBlockInChunk(SideChunk, 0, y, z);
+                                        NeighbourBlock = GetBlockInChunkSide(SideChunk, z, y);
                                     }
                                 }
                             }break;
@@ -303,7 +335,7 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
                                 {
                                     if(SideChunk)
                                     {
-                                        NeighbourBlock = GetBlockInChunk(SideChunk, MINC_CHUNK_WIDTH - 1, y, z);
+                                        NeighbourBlock = GetBlockInChunkSide(SideChunk, z, y);
                                     }
                                 }
                             }break;
@@ -318,7 +350,7 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
                                 {
                                     if(SideChunk)
                                     {
-                                        NeighbourBlock = GetBlockInChunk(SideChunk, x, y, 0);
+                                        NeighbourBlock = GetBlockInChunkSide(SideChunk, x, y);
                                     }
                                 }
                             }break;
@@ -333,7 +365,7 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
                                 {
                                     if(SideChunk)
                                     {
-                                        NeighbourBlock = GetBlockInChunk(SideChunk, x, y, MINC_CHUNK_WIDTH - 1);
+                                        NeighbourBlock = GetBlockInChunkSide(SideChunk, x, y);
                                     }
                                 }
                             }break;
@@ -348,7 +380,7 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
                                 {
                                     if(SideChunk)
                                     {
-                                        NeighbourBlock = GetBlockInChunk(SideChunk, x, 0, z);
+                                        NeighbourBlock = GetBlockInChunkSide(SideChunk, x, z);
                                     }
                                 }
                             }break;
@@ -363,7 +395,7 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
                                 {
                                     if(SideChunk)
                                     {
-                                        NeighbourBlock = GetBlockInChunk(SideChunk, x, MINC_CHUNK_HEIGHT, z);
+                                        NeighbourBlock = GetBlockInChunkSide(SideChunk, x, z);
                                     }
                                 }
                             }break;
@@ -383,24 +415,33 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
                             {
                                 minc_offsets_to_vertex* Offset = &OffsetToV->VertexOffsets[VertexIndex];
                                 
-                                u32 Vertex = 0;
-                                
-                                int VertexX = x + Offset->x;
-                                int VertexY = y + Offset->y;
-                                int VertexZ = z + Offset->z;
-                                
-                                Vertex |= (VertexX & 63);
-                                Vertex |= (VertexZ & 63) << 6;
-                                Vertex |= (VertexY & 255) << 12;
-                                
-                                Mesh->Vertices[Mesh->VerticesCount++] = Vertex;
+                                if(Mesh->VerticesCount < Mesh->MaxVerticesCount)
+                                {
+                                    
+                                    u32 Vertex = 0;
+                                    
+                                    int VertexX = x + Offset->x;
+                                    int VertexY = y + Offset->y;
+                                    int VertexZ = z + Offset->z;
+                                    
+                                    Vertex |= (VertexX & 63);
+                                    Vertex |= (VertexZ & 63) << 6;
+                                    Vertex |= (VertexY & 255) << 12;
+                                    
+                                    Mesh->Vertices[Mesh->VerticesCount++] = Vertex;
+                                }
+                                TotalVerticesCount++;
                             }
                             
-                            // NOTE(Dima): Generating and Setting per face data
-                            u32 PerFace = NormalDir;
-                            PerFace |= ((TexIndex & 255) << 3);
-                            
-                            Mesh->PerFaceData[Mesh->FaceCount++] = PerFace;
+                            if(Mesh->FaceCount < Mesh->MaxFaceCount)
+                            {
+                                // NOTE(Dima): Generating and Setting per face data
+                                u32 PerFace = NormalDir;
+                                PerFace |= ((TexIndex & 255) << 3);
+                                
+                                Mesh->PerFaceData[Mesh->FaceCount++] = PerFace;
+                            }
+                            TotalFaceCount++;
                         }
                     }
                 }
@@ -409,17 +450,32 @@ INTERNAL_FUNCTION void GenerateChunkMesh(minecraft* Minecraft,
         } // Loop z
     } // Loop y
     
+    Chunk->ExpectedVerticesCount = TotalVerticesCount;
+    
+    b32 Result = true;
+    if(TotalVerticesCount > Mesh->VerticesCount)
+    {
+        Result = false;
+    }
+    
+    return(Result);
 }
+
 
 INTERNAL_FUNCTION void MincCopyTempMeshToMesh(voxel_mesh* Mesh, minc_temp_mesh* TempMesh)
 {
+    if(Mesh->Handle.Initialized)
+    {
+        // NOTE(Dima): If mesh is already initialized - then just invalidate to reallocate it.
+        InvalidateHandle(&Mesh->Handle);
+    }
+    
     Mesh->VerticesCount = TempMesh->VerticesCount;
     Mesh->FaceCount = TempMesh->FaceCount;
     
     mi DataSize = TempMesh->VerticesCount * sizeof(u32) + TempMesh->FaceCount * sizeof(u32);
     if(DataSize > 0)
     {
-        
         Mesh->Free = malloc(DataSize);
         
         // NOTE(Dima): Copy vertices;
@@ -444,6 +500,7 @@ INTERNAL_FUNCTION void MincCopyTempMeshToMesh(voxel_mesh* Mesh, minc_temp_mesh* 
         Mesh->Free = 0;
     }
 }
+
 
 INTERNAL_FUNCTION inline void MincSetColumn(minc_chunk* Blocks,
                                             int MinIndex,
@@ -514,7 +571,6 @@ INTERNAL_FUNCTION void CopyChunkMeta(minc_chunk_meta* Dst,
     for(int i = 0; i < MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH; i++)
     {
         Dst->BiomeMap[i] = Src->BiomeMap[i];
-        Dst->NoiseMap[i] = Src->NoiseMap[i];
         Dst->HeightMap[i] = Src->HeightMap[i];
     }
 }
@@ -537,7 +593,6 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMapsWork)
     minecraft* Mine = Work->Mine;
     
     u8* BiomeMap = Meta->BiomeMap;
-    f32* NoiseMap = Meta->NoiseMap;
     u16* HeightMap = Meta->HeightMap;
     
     v3 ChunkWorldP = V3(Work->X * MINC_CHUNK_WIDTH,
@@ -585,7 +640,6 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMapsWork)
             f32 TempZ = (ChunkWorldP.z + z) / CurBiome->NoiseFrequency;
             
             f32 Noise = stb_perlin_fbm_noise3(TempX, 0.0f, TempZ, 2.0f, 0.5f, 6);
-            NoiseMap[TargetIndex] = Noise;
             
             // NOTE(Dima): Generating height and setting it in height map
             f32 ScaledNoise = Noise * CurBiome->NoiseScale;
@@ -596,7 +650,7 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMapsWork)
     }
     
     Meta->State.store(MincChunk_MapsGenerated);
-    FreeTaskMemory(Mine->TaskPool, Work->Task);
+    FreeTaskMemory(Work->Task);
 }
 
 struct minc_fix_gaps_work
@@ -626,7 +680,6 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
     int Z = Work->Z;
     
     u8* BiomeMap = Meta->BiomeMap;
-    f32* NoiseMap = Meta->NoiseMap;
     u16* HeightMap = Meta->HeightMap;
     
     f32 AvgNearHeights[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
@@ -718,7 +771,7 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
     }
     
     Meta->State.store(MincChunk_ReadyToGenerateChunk);
-    FreeTaskMemory(Mine->TaskPool, Work->Task);
+    FreeTaskMemory(Work->Task);
 }
 
 struct minc_generate_chunk_work
@@ -738,6 +791,8 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
     minc_chunk* Chunk = Work->Chunk;
     task_memory* TaskMemory = Work->TaskMemory;
     
+    random_generation Random = SeedRandom(Hash32(MincGetKey(Chunk->CoordX, 0, Chunk->CoordZ)));
+    
     for(int BlockIndex = 0;
         BlockIndex < MINC_CHUNK_COUNT;
         BlockIndex++)
@@ -756,15 +811,13 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
             
             minc_biome* Biome = Minecraft->Biomes + Meta->BiomeMap[IndexInMap];
             
-            f32 Noise = Meta->NoiseMap[IndexInMap];
-            
             // NOTE(Dima): Setting block type at height
             int CurrentHeight = Meta->HeightMap[IndexInMap];
             Chunk->Blocks[MincGetBlockIndex(x, CurrentHeight, z)] = Biome->LayerBlocks[0];
             
             // NOTE(Dima): 
             --CurrentHeight;
-            int GroundLayerHeight = std::max(4 + (int)(Noise * 8), 2);
+            int GroundLayerHeight = RandomBetweenU32(&Random, 5, 7);
             MincSetColumn(Chunk, 
                           CurrentHeight - (GroundLayerHeight - 1), 
                           CurrentHeight,
@@ -782,18 +835,19 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
     
     Meta->State = MincChunk_ReadyToGenerateMesh;
     
-    FreeTaskMemory(Minecraft->TaskPool, TaskMemory);
+    FreeTaskMemory(TaskMemory);
 }
 
 struct minc_generate_mesh_work
 {
     minecraft* Minecraft;
-    minc_generate_chunks GenerationChunks;
     task_memory* TaskMemory;
     minc_chunk* Chunk;
     minc_chunk_meta* Meta;
     
-    minc_temp_mesh TempMesh;
+    minc_generate_chunks GenerationChunks;
+    
+    minc_temp_mesh* TempMesh;
 };
 
 INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMeshWork)
@@ -805,38 +859,319 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMeshWork)
     minc_chunk* Chunk = Work->Chunk;
     minc_chunk_meta* Meta = Work->Meta;
     
-    GenerateChunkMesh(Minecraft, 
-                      &Work->TempMesh,
-                      Work->GenerationChunks);
+    Chunk->SucceededGenerateMesh = GenerateChunkMesh(Minecraft, 
+                                                     Work->TempMesh,
+                                                     Work->GenerationChunks);
     
-    MincCopyTempMeshToMesh(&Chunk->Mesh, &Work->TempMesh);
-    
-    Meta->State.store(MincChunk_MeshGenerated);
-    
-    FreeTaskMemory(Minecraft->TaskPool, TaskMemory);
+    Meta->State = MincChunk_GeneratingMeshFinalizing;
 }
 
-INTERNAL_FUNCTION inline minc_chunk* MincGetGeneratedChunk(minecraft* Mine, int X, int Z)
+INTERNAL_FUNCTION inline minc_chunk_side* GetFreeChunkSide(minecraft* Mine)
+{
+    minc_chunk_side* Result = Mine->ChunkSidePool;
+    
+    if(Result)
+    {
+        Mine->ChunkSidePool = Result->NextInList;
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline void ReturnUsedChunkSide(minecraft* Mine, minc_chunk_side* Side)
+{
+    Side->NextInList = Mine->ChunkSidePool;
+    Mine->ChunkSidePool = Side;
+}
+
+INTERNAL_FUNCTION inline void MincGetGeneratedChunk(minecraft* Mine, 
+                                                    int X, 
+                                                    int Z,
+                                                    minc_generate_chunks* GenerateChunks,
+                                                    int Direction,
+                                                    int* MissedCount,
+                                                    b32 JustCountChunks)
 {
     minc_chunk_meta_slot* Slot = MincFindSlot(Mine, X, Z);
     
-    minc_chunk* Result = 0;
+    minc_chunk_side* Result = 0;
+    minc_chunk* ResultChunk = 0;
+    
     if(Slot)
     {
         if(Slot->Chunk)
         {
             if(Slot->Meta->State > MincChunk_GeneratingChunk)
             {
-                Result = Slot->Chunk;
+                // NOTE(Dima): Getting source chunk
+                minc_chunk* Src = Slot->Chunk;
+                
+                ResultChunk = Src;
+                
+                if(!JustCountChunks)
+                {
+                    
+                    Result = GetFreeChunkSide(Mine);
+                    
+                    if(Result)
+                    {
+                        // NOTE(Dima): Getting copy of adjacent neighbours chunk blocks
+                        switch(Direction)
+                        {
+                            case MincFaceNormal_Left:
+                            {
+                                for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+                                {
+                                    for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+                                    {
+                                        int DstIndex = y * MINC_CHUNK_WIDTH + z;
+                                        
+                                        Result->Blocks[DstIndex] = GetBlockInChunk(Src, 0, y, z);
+                                    }
+                                }
+                            }break;
+                            
+                            case MincFaceNormal_Right:
+                            {
+                                for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+                                {
+                                    for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+                                    {
+                                        int DstIndex = y * MINC_CHUNK_WIDTH + z;
+                                        
+                                        Result->Blocks[DstIndex] = GetBlockInChunk(Src, 
+                                                                                   MINC_CHUNK_WIDTH - 1, y, z);
+                                    }
+                                }
+                            }break;
+                            
+                            case MincFaceNormal_Front:
+                            {
+                                for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+                                {
+                                    for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+                                    {
+                                        int DstIndex = y * MINC_CHUNK_WIDTH + x;
+                                        
+                                        Result->Blocks[DstIndex] = GetBlockInChunk(Src, x, y, 0);
+                                    }
+                                }
+                            }break;
+                            
+                            case MincFaceNormal_Back:
+                            {
+                                for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+                                {
+                                    for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+                                    {
+                                        int DstIndex = y * MINC_CHUNK_WIDTH + x;
+                                        
+                                        Result->Blocks[DstIndex] = GetBlockInChunk(Src, 
+                                                                                   x, y, 
+                                                                                   MINC_CHUNK_WIDTH - 1);
+                                    }
+                                }
+                            }break;
+                            
+                            case MincFaceNormal_Up:
+                            {
+                                for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+                                {
+                                    for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+                                    {
+                                        int DstIndex = z * MINC_CHUNK_WIDTH + x;
+                                        
+                                        Result->Blocks[DstIndex] = GetBlockInChunk(Src, x, 0, z);
+                                    }
+                                }
+                            }break;
+                            
+                            case MincFaceNormal_Down:
+                            {
+                                for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+                                {
+                                    for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+                                    {
+                                        int DstIndex = z * MINC_CHUNK_WIDTH + x;
+                                        
+                                        Result->Blocks[DstIndex] = GetBlockInChunk(Src, x, MINC_CHUNK_HEIGHT - 1, z);
+                                    }
+                                }
+                            }break;
+                        }
+                    }
+                    else
+                    {
+                        if(MissedCount)
+                        {
+                            (*MissedCount)++;
+                        }
+                    }
+                }
             }
+        }
+    }
+    
+    GenerateChunks->ChunksSides[Direction] = Result;
+    GenerateChunks->Chunks[Direction] = ResultChunk;
+}
+
+INTERNAL_FUNCTION void MincGetGenerationChunks(minecraft* Mine, 
+                                               minc_generate_chunks* Chunks,
+                                               minc_chunk* Chunk,
+                                               int* OutChunksCount,
+                                               int* OutMissedCount)
+{
+    int X = Chunk->CoordX;
+    int Z = Chunk->CoordZ;
+    
+    b32 JustCount = OutMissedCount == 0;
+    
+    for(int i = 0; i < 6; i++)
+    {
+        Chunks->ChunksSides[i] = 0;
+        Chunks->Chunks[i] = 0;
+    }
+    
+    int MissedCount = 0;
+    
+    Chunks->Dst = Chunk;
+    
+    MincGetGeneratedChunk(Mine, X + 1, Z,
+                          Chunks,
+                          MincFaceNormal_Left,
+                          &MissedCount,
+                          JustCount);
+    
+    if(!MissedCount)
+    {
+        
+        MincGetGeneratedChunk(Mine, X - 1, Z, 
+                              Chunks,
+                              MincFaceNormal_Right,
+                              &MissedCount,
+                              JustCount);
+    }
+    
+    if(!MissedCount)
+    {
+        
+        MincGetGeneratedChunk(Mine, X, Z + 1, 
+                              Chunks,
+                              MincFaceNormal_Front,
+                              &MissedCount,
+                              JustCount);
+    }
+    
+    if(!MissedCount)
+    {
+        
+        MincGetGeneratedChunk(Mine, X, Z - 1, 
+                              Chunks,
+                              MincFaceNormal_Back,
+                              &MissedCount,
+                              JustCount);
+    }
+    
+    int GenerationChunksCount = 0;
+    for(int i = 0; i < 6; i++)
+    {
+        if(Chunks->Chunks[i])
+        {
+            GenerationChunksCount++;
+        }
+    }
+    
+    *OutChunksCount = GenerationChunksCount;
+    if(OutMissedCount)
+    {
+        *OutMissedCount = MissedCount;
+    }
+}
+
+INTERNAL_FUNCTION void MincReturnUsedChunkSides(minecraft* Mine, minc_generate_chunks* GenerationChunks)
+{
+    // NOTE(Dima): Freing used chunk sides
+    for(int i = 0; i < MincFaceNormal_Count; i++)
+    {
+        minc_chunk_side* ChunkSide = GenerationChunks->ChunksSides[i];
+        
+        if(ChunkSide)
+        {
+            ReturnUsedChunkSide(Mine, ChunkSide);
+        }
+    }
+}
+
+
+
+GLOBAL_VARIABLE int Minc_MaxVertCount[] = 
+{
+    25002,
+    50004,
+    100008,
+    500004,
+    MINC_MAX_VERTS_COUNT,
+};
+
+GLOBAL_VARIABLE int Minc_TempMeshCountInList[] =
+{
+    80,
+    40,
+    20,
+    10,
+    2,
+};
+
+INTERNAL_FUNCTION minc_temp_mesh* GetFreeTempMesh(minecraft* Mine, int VerticesCount)
+{
+    minc_temp_mesh* Result = 0;
+    
+    for(int ListIndex = 0;
+        ListIndex < ARC(Mine->TempMeshLists);
+        ListIndex++)
+    {
+        minc_temp_mesh* At = Mine->TempMeshLists[ListIndex];
+        
+        if(At && (At->MaxVerticesCount >= VerticesCount))
+        {
+            Result = At;
+            
+            Mine->TempMeshLists[ListIndex] = Result->NextInList;
+            Result->NextInList = 0;
+            
+            break;
         }
     }
     
     return(Result);
 }
 
+INTERNAL_FUNCTION void ReturnFreeTempMesh(minecraft* Mine, minc_temp_mesh* Mesh)
+{
+    
+    int TargetListIndex = Mesh->TempMeshListIndex;
+    Assert(Mesh->MaxVerticesCount == Minc_MaxVertCount[TargetListIndex]);
+    
+    // NOTE(Dima): Storing back into singly linked list
+    Mesh->NextInList = Mine->TempMeshLists[TargetListIndex];
+    Mine->TempMeshLists[TargetListIndex] = Mesh;
+}
+
+INTERNAL_FUNCTION inline void MincFreeChunkMesh(minc_chunk* Chunk)
+{
+    // NOTE(Dima): Free chunk mesh data
+    if(Chunk->Mesh.Free && Chunk->Mesh.VerticesCount > 0)
+    {
+        free(Chunk->Mesh.Free);
+    }
+    Chunk->Mesh.Free = 0;
+}
+
 INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
-                                          int X, int Z)
+                                          int X, int Z,
+                                          int PlayerChunkX,
+                                          int PlayerChunkZ)
 {
     minc_chunk_meta_slot* ChunkMetaSlot = MincFindSlot(Minecraft, X, Z);
     
@@ -928,9 +1263,13 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                 Meta->State.store(MincChunk_GeneratingChunk, std::memory_order_relaxed);
                 
                 // NOTE(Dima): Allocating chunk
+                Assert(ChunkMetaSlot->Chunk == 0);
+                
                 ChunkMetaSlot->Chunk = (minc_chunk*)malloc(sizeof(minc_chunk));
                 Chunk = ChunkMetaSlot->Chunk;
                 memset(Chunk->Blocks, 0, MINC_CHUNK_COUNT);
+                Chunk->Mesh.Free = 0;
+                Chunk->ExpectedVerticesCount = 0;
                 
                 // NOTE(Dima): Setting chunk
                 Chunk->CoordX = X;
@@ -952,35 +1291,177 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
             
             case MincChunk_ReadyToGenerateMesh:
             {
-                Meta->State.store(MincChunk_GeneratingMesh, std::memory_order_relaxed);
+                Assert(Chunk->ExpectedVerticesCount <= MINC_MAX_VERTS_COUNT);
                 
-                task_memory* Task = GetTaskMemoryForUse(Minecraft->TaskPool, sizeof(minc_generate_mesh_work));
-                Assert(Task);
-                
-                minc_generate_mesh_work* Work = PushStruct(&Task->Arena, minc_generate_mesh_work);
-                
-                Work->GenerationChunks = {};
-                Work->GenerationChunks.Dst = Chunk;
-                Work->GenerationChunks.SideChunks[MincFaceNormal_Left] = MincGetGeneratedChunk(Minecraft, X + 1, Z);
-                Work->GenerationChunks.SideChunks[MincFaceNormal_Right] = MincGetGeneratedChunk(Minecraft, X - 1, Z);
-                Work->GenerationChunks.SideChunks[MincFaceNormal_Front] = MincGetGeneratedChunk(Minecraft, X, Z + 1);
-                Work->GenerationChunks.SideChunks[MincFaceNormal_Back] = MincGetGeneratedChunk(Minecraft, X, Z - 1);
-                
-                Work->Chunk = Chunk;
-                Work->Minecraft = Minecraft;
-                Work->TaskMemory = Task;
-                Work->Meta = Meta;
-                
-                KickJob(MincGenerateMeshWork, Work, JobPriority_High);
+                minc_temp_mesh* TempMesh = GetFreeTempMesh(Minecraft, Chunk->ExpectedVerticesCount);
+                if(TempMesh)
+                {
+                    task_memory* Task = GetTaskMemoryForUse(Minecraft->TaskPool, sizeof(minc_generate_mesh_work));
+                    if(Task)
+                    {
+                        minc_generate_mesh_work* Work = PushStruct(&Task->Arena, minc_generate_mesh_work);
+                        Chunk->GenerateMeshWork = Work;
+                        
+                        // NOTE(Dima): Getting side chunks
+                        Work->GenerationChunks = {};
+                        int MissedChunksSides;
+                        MincGetGenerationChunks(Minecraft, 
+                                                &Work->GenerationChunks,
+                                                Chunk,
+                                                &Chunk->GenerationSidesCount,
+                                                &MissedChunksSides);
+                        
+                        if(MissedChunksSides > 0)
+                        {
+                            MincReturnUsedChunkSides(Minecraft, &Work->GenerationChunks);
+                            
+                            FreeTaskMemory(Task);
+                            ReturnFreeTempMesh(Minecraft, TempMesh);
+                        }
+                        else
+                        {
+                            // NOTE(Dima): Filling work parameters
+                            Work->Chunk = Chunk;
+                            Work->Minecraft = Minecraft;
+                            Work->TaskMemory = Task;
+                            Work->Meta = Meta;
+                            Work->Chunk->Mesh.Handle = CreateRendererHandle(RendererHandle_Mesh);
+                            Work->Chunk->Mesh.PerFaceBufHandle = CreateRendererHandle(RendererHandle_TextureBuffer);
+                            Work->TempMesh = TempMesh;
+                            
+                            Meta->State.store(MincChunk_GeneratingMesh, std::memory_order_relaxed);
+                            KickJob(MincGenerateMeshWork, Work, JobPriority_High);
+                        }
+                    }
+                    else
+                    {
+                        ReturnFreeTempMesh(Minecraft, TempMesh);
+                    }
+                }
             }break;
             
-            case MincChunk_MeshGenerated:
+            case MincChunk_GeneratingMeshFinalizing:
             {
-                PushVoxelChunkMesh(&Chunk->Mesh, ChunkWorldP);
+                Assert(Chunk->GenerateMeshWork);
+                Assert(Chunk->Mesh.Free == 0);
+                
+                minc_generate_mesh_work* Work = Chunk->GenerateMeshWork;
+                task_memory* TaskMemory = Work->TaskMemory;
+                minc_chunk_meta* Meta = Work->Meta;
+                
+                MincReturnUsedChunkSides(Minecraft, &Work->GenerationChunks);
+                
+                if(Chunk->SucceededGenerateMesh)
+                {
+                    MincCopyTempMeshToMesh(&Chunk->Mesh, Work->TempMesh);
+                    ReturnFreeTempMesh(Minecraft, Work->TempMesh);
+                    FreeTaskMemory(TaskMemory);
+                    
+                    Meta->State.store(MincChunk_MeshGenerated);
+                    
+                    Chunk->GenerateMeshWork = 0;
+                    
+                    // NOTE(Dima): Invalidate handles so that they are reallocated if were allocated previously
+                    InvalidateHandle(&Chunk->Mesh.Handle);
+                    InvalidateHandle(&Chunk->Mesh.PerFaceBufHandle);
+                }
+                else
+                {
+                    ReturnFreeTempMesh(Minecraft, Work->TempMesh);
+                    FreeTaskMemory(TaskMemory);
+                    
+                    // NOTE(Dima): Try to generate mesh once again
+                    Meta->State.store(MincChunk_ReadyToGenerateMesh);
+                    
+                    Chunk->GenerateMeshWork = 0;
+                }
             }break;
         }
+        
+        if(Chunk)
+        {
+            int DiffX = Chunk->CoordX - PlayerChunkX;
+            int DiffZ = Chunk->CoordZ - PlayerChunkZ;
+            
+            int DistToChunk = Sqrt(DiffX * DiffX + DiffZ * DiffZ);
+            
+            if(DistToChunk > Minecraft->ChunksViewDistance)
+            {
+                // NOTE(Dima): Deallocating mesh
+                if(Chunk->Mesh.Handle.Initialized &&
+                   Chunk->Mesh.PerFaceBufHandle.Initialized)
+                {
+                    u32 DesiredState = MincChunk_ReadyToGenerateMesh;
+                    u32 CompareState = MincChunk_MeshGenerated;
+                    
+                    if(ChunkMetaSlot->Meta->State.compare_exchange_weak(CompareState, DesiredState))
+                    {
+                        RenderPushDeallocateHandle(&Chunk->Mesh.Handle);
+                        RenderPushDeallocateHandle(&Chunk->Mesh.PerFaceBufHandle);
+                        
+                        MincFreeChunkMesh(Chunk);
+                    }
+                }
+                
+#if 1                
+                // NOTE(Dima): We can only free chunk if it's handles were freed
+                if((Chunk->Mesh.Handle.Initialized == false) &&
+                   (Chunk->Mesh.PerFaceBufHandle.Initialized == false))
+                {
+                    // NOTE(Dima): Deallocating chunk
+                    u32 DesiredState = MincChunk_ReadyToGenerateChunk;
+                    u32 CompareState = MincChunk_ReadyToGenerateMesh;
+                    
+                    if(ChunkMetaSlot->Meta->State.compare_exchange_weak(CompareState, DesiredState))
+                    {
+                        free(Chunk);
+                        
+                        // NOTE(Dima): Remove this chunk from map
+                        ChunkMetaSlot->Chunk = 0;
+                    }
+                }
+#endif
+            }
+            else
+            {
+                if(Meta->State == MincChunk_MeshGenerated)
+                {
+                    minc_generate_chunks GenChunks = {};
+                    int GenSidesCount;
+                    int MissedCount;
+                    MincGetGenerationChunks(Minecraft, &GenChunks, Chunk,
+                                            &GenSidesCount, 0);
+                    b32 Changed = GenSidesCount != Chunk->GenerationSidesCount;
+                    
+                    // NOTE(Dima): If chunks sides changed then we can reallocate mesh
+                    if(Changed)
+                    {
+                        u32 DesiredState = MincChunk_ReadyToGenerateMesh;
+                        u32 CompareState = MincChunk_MeshGenerated;
+                        
+                        if(Meta->State.compare_exchange_weak(CompareState, DesiredState))
+                        {
+                            Chunk->GenerationSidesCount = GenSidesCount;
+                            MincFreeChunkMesh(Chunk);
+                        }
+                    }
+                    else
+                    {
+                        // NOTE(Dima): Render chunk
+                        PushVoxelChunkMesh(&Chunk->Mesh, ChunkWorldP);
+                    }
+                }
+            }
+        }
     }
-    else
+}
+
+INTERNAL_FUNCTION void MincTryInitChunk(minecraft* Minecraft, 
+                                        int X, int Z)
+{
+    minc_chunk_meta_slot* ChunkMetaSlot = MincFindSlot(Minecraft, X, Z);
+    
+    if(!ChunkMetaSlot)
     {
         // NOTE(Dima): Insert meta to table
         u64 Key = MincGetKey(X, 0, Z);
@@ -1018,16 +1499,76 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
     }
 }
 
+INTERNAL_FUNCTION void MincInitTempMeshList(minecraft* Mine, 
+                                            int ListIndex, 
+                                            int MaxVertsCount,
+                                            int MeshesCount)
+{
+    Mine->TempMeshLists[ListIndex] = 0;
+    
+    for(int MeshIndex = 0;
+        MeshIndex < MeshesCount;
+        MeshIndex++)
+    {
+        minc_temp_mesh* New = PushStruct(Mine->Arena, minc_temp_mesh);
+        
+        New->MaxVerticesCount = MaxVertsCount;
+        New->MaxFaceCount = MaxVertsCount / 6;
+        
+        New->Vertices = PushArray(Mine->Arena, u32, MaxVertsCount);
+        New->PerFaceData = PushArray(Mine->Arena, u32, MaxVertsCount / 6);
+        
+        New->TempMeshListIndex = ListIndex;
+        New->NextInList = Mine->TempMeshLists[ListIndex];
+        Mine->TempMeshLists[ListIndex] = New;
+    }
+}
+
+INTERNAL_FUNCTION void MincInitTempMeshLists(minecraft* Mine)
+{
+    for(int ListIndex = 0;
+        ListIndex < ARC(Mine->TempMeshLists);
+        ListIndex++)
+    {
+        MincInitTempMeshList(Mine, ListIndex,
+                             Minc_MaxVertCount[ListIndex], 
+                             Minc_TempMeshCountInList[ListIndex]);
+    }
+}
+
+INTERNAL_FUNCTION void MincInitChunksSidesPool(minecraft* Mine)
+{
+    // NOTE(Dima): 5000 of theese will take take ~20mb.
+    int PoolSize = 5000;
+    
+    minc_chunk_side* Pool = PushArray(Mine->Arena, minc_chunk_side, PoolSize);
+    
+    Mine->ChunkSidePool = 0;
+    
+    for(int EntryIndex = 0;
+        EntryIndex < PoolSize;
+        EntryIndex++)
+    {
+        minc_chunk_side* Entry = &Pool[EntryIndex];
+        
+        // NOTE(Dima): Inserting to list
+        Entry->NextInList = Mine->ChunkSidePool;
+        Mine->ChunkSidePool = Entry;
+    }
+}
+
 INTERNAL_FUNCTION void CreateMinecraft(memory_arena* Arena, minecraft* Mine)
 {
     Mine->Arena = Arena;
-    Mine->ChunksViewDistance = 20;
+    Mine->ChunksViewDistance = 30;
     
     InitMinecraftBlockTextures(Mine);
     InitMinecraftTextureOffsets(Mine);
     InitMinecraftBiomes(Mine);
     
     Mine->TaskPool = CreateTaskMemoryPoolDynamic(Arena);
+    MincInitTempMeshLists(Mine);
+    MincInitChunksSidesPool(Mine);
     
     // NOTE(Dima): Init meta table
     for(int MetaIndex = 0;
@@ -1042,46 +1583,25 @@ INTERNAL_FUNCTION void UpdateMinecraft(minecraft* Mine, v3 PlayerP)
 {
     int vd = Mine->ChunksViewDistance;
     
-    int CurChunkX = Floor(PlayerP.x / (f32)MINC_CHUNK_WIDTH);
-    int CurChunkZ = Floor(PlayerP.z / (f32)MINC_CHUNK_WIDTH);
+    int PlayerChunkX = Floor(PlayerP.x / (f32)MINC_CHUNK_WIDTH);
+    int PlayerChunkZ = Floor(PlayerP.z / (f32)MINC_CHUNK_WIDTH);
     
+    // NOTE(Dima): Iterating to remove unseen
+    for(int i = 0; i < MINC_META_TABLE_SIZE; i++)
     {
-        BLOCK_TIMING("Minc: Remove Unseen");
+        minc_chunk_meta_slot* At = Mine->MetaTable[i];
         
-        // NOTE(Dima): Iterating to remove unseen
-        for(int i = 0; i < MINC_META_TABLE_SIZE; i++)
+        while(At)
         {
-            minc_chunk_meta_slot* At = Mine->MetaTable[i];
+            minc_chunk* Chunk = At->Chunk;
             
-            while(At)
-            {
-                minc_chunk* Chunk = At->Chunk;
-                
-                if(Chunk)
-                {
-                    int DiffX = Chunk->CoordX - CurChunkX;
-                    int DiffZ = Chunk->CoordZ - CurChunkZ;
-                    
-                    int DistToChunk = Sqrt(DiffX * DiffX + 
-                                           DiffZ * DiffZ);
-                    
-                    if(DistToChunk > vd)
-                    {
-                        // NOTE(Dima): Free chunk data
-                        if(Chunk->Mesh.Free)
-                        {
-                            //free(Chunk->Mesh.Free);
-                        }
-                        //free(Chunk);
-                        
-                        // NOTE(Dima): Remove this chunk from map
-                        //At->Meta->State.store(MincChunk_ReadyToGenerateChunk);
-                        //At->Chunk = 0;
-                    }
-                }
-                
-                At = At->NextInHash;
-            }
+            UpdateChunkAtIndex(Mine, 
+                               At->Meta->CoordX,
+                               At->Meta->CoordZ,
+                               PlayerChunkX,
+                               PlayerChunkZ);
+            
+            At = At->NextInHash;
         }
     }
     
@@ -1097,10 +1617,10 @@ INTERNAL_FUNCTION void UpdateMinecraft(minecraft* Mine, v3 PlayerP)
                 
                 if(DistToChunk <= vd)
                 {
-                    int X = CurChunkX + i;
-                    int Z = CurChunkZ + j;
+                    int X = PlayerChunkX + i;
+                    int Z = PlayerChunkZ + j;
                     
-                    UpdateChunkAtIndex(Mine, X, Z);
+                    MincTryInitChunk(Mine, X, Z);
                 }
             }
         }

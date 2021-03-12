@@ -1451,7 +1451,7 @@ JOB_CALLBACK(CalcCubieFinalTransformCallback)
                                     CubieTask->OnePastLastIndex,
                                     *CubieTask->OffsetMatrix);
     
-    FreeTaskMemory(CubieTask->Cube->TaskPool, Task);
+    FreeTaskMemory(Task);
 }
 
 // TODO(Dima): Walk only on outer cubies

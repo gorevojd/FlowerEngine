@@ -168,6 +168,8 @@ INTERNAL_FUNCTION task_memory* GetTaskMemoryForUse(task_memory_pool* Pool, mi Si
         // NOTE(Dima): If everything is ok - push to Use list
         DLIST_INSERT_BEFORE_SENTINEL(Result, Pool->Use, Next, Prev);
         
+        Result->ParentPool = Pool;
+        
         Pool->FreeCount--;
         Pool->UseCount++;
     }
@@ -177,9 +179,10 @@ INTERNAL_FUNCTION task_memory* GetTaskMemoryForUse(task_memory_pool* Pool, mi Si
     return(Result);
 }
 
-INTERNAL_FUNCTION inline void FreeTaskMemory(task_memory_pool* Pool,
-                                             task_memory* Task)
+INTERNAL_FUNCTION inline void FreeTaskMemory(task_memory* Task)
 {
+    task_memory_pool* Pool = Task->ParentPool;
+    
     Pool->Lock->lock();
     
     DLIST_REMOVE(Task, Next, Prev);

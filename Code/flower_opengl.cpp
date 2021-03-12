@@ -300,6 +300,7 @@ INTERNAL_FUNCTION void OpenGLDeleteHandle(renderer_handle* Handle)
             }break;
         }
         
+        Handle->Invalidated = false;
         Handle->Initialized = false;
     }
 }
@@ -527,39 +528,43 @@ INTERNAL_FUNCTION renderer_handle* OpenGLAllocateMesh(mesh* Mesh, opengl_shader*
     
     if(!Result->Initialized || MeshWasDeleted)
     {
-        GLuint VAO = 0;
-        GLuint VBO = 0;
-        GLuint EBO = 0;
-        
-        // NOTE(Dima): Init VAO and VBO
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-        glGenBuffers(1, &EBO);
-        
-        glBindVertexArray(VAO);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, 
-                     Mesh->FreeSize, 
-                     Mesh->Free, 
-                     GL_STATIC_DRAW);
-        
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-                     sizeof(u32) * Mesh->IndexCount, 
-                     Mesh->Indices, 
-                     GL_STATIC_DRAW);
-        
-        OpenGLInitMeshAttribs(Mesh, Shader);
-        
-        //glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-        
-        Mesh->Handle = CreateRendererHandle(RendererHandle_Mesh);
-        Result->Mesh.ArrayObject = VAO;
-        Result->Mesh.BufferObject = VBO;
-        Result->Mesh.ElementBufferObject = EBO;
-        Result->Initialized = true;
+        if(Mesh->FreeSize > 0)
+        {
+            
+            GLuint VAO = 0;
+            GLuint VBO = 0;
+            GLuint EBO = 0;
+            
+            // NOTE(Dima): Init VAO and VBO
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+            glGenBuffers(1, &EBO);
+            
+            glBindVertexArray(VAO);
+            
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferData(GL_ARRAY_BUFFER, 
+                         Mesh->FreeSize, 
+                         Mesh->Free, 
+                         GL_STATIC_DRAW);
+            
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
+                         sizeof(u32) * Mesh->IndexCount, 
+                         Mesh->Indices, 
+                         GL_STATIC_DRAW);
+            
+            OpenGLInitMeshAttribs(Mesh, Shader);
+            
+            //glBindBuffer(GL_ARRAY_BUFFER, 0);
+            glBindVertexArray(0);
+            
+            Mesh->Handle = CreateRendererHandle(RendererHandle_Mesh);
+            Result->Mesh.ArrayObject = VAO;
+            Result->Mesh.BufferObject = VBO;
+            Result->Mesh.ElementBufferObject = EBO;
+            Result->Initialized = true;
+        }
     }
     
     return(Result);
@@ -731,46 +736,54 @@ INTERNAL_FUNCTION void OpenGLRenderVoxelMesh(render_command_voxel_mesh* Command,
     b32 MeshWasDeleted = OpenGLProcessHandleInvalidation(&Mesh->Handle);
     if(!Mesh->Handle.Initialized || MeshWasDeleted)
     {
-        // NOTE(Dima): Allocating voxel mesh
-        renderer_handle* Handle = &Mesh->Handle;
-        
-        GLuint VAO = 0;
-        GLuint VBO = 0;
-        
-        // NOTE(Dima): Init VAO and VBO
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-        
-        glBindVertexArray(VAO);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, 
-                     Mesh->VerticesCount * sizeof(u32), 
-                     Mesh->Vertices, 
-                     GL_STATIC_DRAW);
-        
-        InitAttribInt(Shader->PositionAttr,
-                      1, sizeof(u32), 0);
-        
-        glBindVertexArray(0);
-        
-        Handle->Mesh.ArrayObject = VAO;
-        Handle->Mesh.BufferObject = VBO;
-        Handle->Initialized = true;
+        if(Mesh->VerticesCount > 0)
+        {
+            
+            // NOTE(Dima): Allocating voxel mesh
+            renderer_handle* Handle = &Mesh->Handle;
+            
+            GLuint VAO = 0;
+            GLuint VBO = 0;
+            
+            // NOTE(Dima): Init VAO and VBO
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+            
+            glBindVertexArray(VAO);
+            
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferData(GL_ARRAY_BUFFER, 
+                         Mesh->VerticesCount * sizeof(u32), 
+                         Mesh->Vertices, 
+                         GL_STATIC_DRAW);
+            
+            InitAttribInt(Shader->PositionAttr,
+                          1, sizeof(u32), 0);
+            
+            glBindVertexArray(0);
+            
+            InitRendererHandle(Handle, RendererHandle_Mesh);
+            Handle->Mesh.ArrayObject = VAO;
+            Handle->Mesh.BufferObject = VBO;
+            Handle->Initialized = true;
+        }
     }
     
     b32 PerFaceBufWasDeleted = OpenGLProcessHandleInvalidation(&Mesh->PerFaceBufHandle);
     if(!Mesh->PerFaceBufHandle.Initialized || PerFaceBufWasDeleted)
     {
-        renderer_handle* Handles = &Mesh->PerFaceBufHandle;
-        
-        // NOTE(Dima): This is not under VAO. I think it's OK
-        OpenGLCreateTextureBuffer(Handles,
-                                  Mesh->FaceCount * sizeof(u32),
-                                  Mesh->PerFaceData,
-                                  VOXEL_MESH_PER_FACE_TEXTURE_UNIT,
-                                  GL_R32UI,
-                                  true);
+        if(Mesh->FaceCount > 0)
+        {
+            renderer_handle* Handles = &Mesh->PerFaceBufHandle;
+            
+            // NOTE(Dima): This is not under VAO. I think it's OK
+            OpenGLCreateTextureBuffer(Handles,
+                                      Mesh->FaceCount * sizeof(u32),
+                                      Mesh->PerFaceData,
+                                      VOXEL_MESH_PER_FACE_TEXTURE_UNIT,
+                                      GL_R32UI,
+                                      true);
+        }
     }
     
     glBindVertexArray(Mesh->Handle.Mesh.ArrayObject);
@@ -1161,9 +1174,14 @@ INTERNAL_FUNCTION void OpenGLProcessDeallocList(render_commands* Commands)
     
     while(At != &Commands->UseDealloc)
     {
+        OpenGLDeleteHandle(At->Handle);
         
         At = At->Next;
     }
+    
+    BeginTicketMutex(&Commands->DeallocEntriesMutex);
+    DLIST_REMOVE_ENTIRE_LIST(&Commands->UseDealloc, &Commands->FreeDealloc, Next, Prev);
+    EndTicketMutex(&Commands->DeallocEntriesMutex);
 }
 
 INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)

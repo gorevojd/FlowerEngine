@@ -42,7 +42,7 @@ struct renderer_handle
 
 inline void InitRendererHandle(renderer_handle* Handle, u32 Type)
 {
-    Handle->Initialized = true;
+    Handle->Initialized = false;
     Handle->Invalidated = false;
     Handle->Type = Type;
 }

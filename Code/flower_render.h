@@ -143,8 +143,6 @@ struct render_api_dealloc_entry
 {
     renderer_handle* Handle;
     
-    u32 Type;
-    
     render_api_dealloc_entry* Next;
     render_api_dealloc_entry* Prev;
 };

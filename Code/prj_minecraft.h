@@ -5,6 +5,7 @@
 #define MINC_CHUNK_HEIGHT 128
 
 #define MINC_CHUNK_COUNT (MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH * MINC_CHUNK_HEIGHT)
+#define MINC_MAX_VERTS_COUNT (MINC_CHUNK_COUNT / 2 * 6 * 6)
 
 #define MINC_ATLAS_TEXTURE_INDEX(x, y) (y * 16 + x)
 enum minc_atlas_texture
@@ -115,7 +116,6 @@ union minc_block_texture_indices
     int Sides[MincFaceNormal_Count];
 };
 
-
 struct minc_offsets_to_vertex
 {
     u8 x, y, z;
@@ -129,13 +129,19 @@ struct minc_face_offsets_to_vertex
 struct minc_temp_mesh
 {
     // NOTE(Dima): At the worst case we'll have each second block * 6 faces * 6 vertex-per-face
-    u32 Vertices[MINC_CHUNK_COUNT / 2 * 6 * 6];
+    u32* Vertices;
     
     // NOTE(Dima): The same but except face vertices
-    u32 PerFaceData[MINC_CHUNK_COUNT / 2 * 6];
+    u32* PerFaceData;
     
     int VerticesCount;
     int FaceCount;
+    
+    int MaxVerticesCount;
+    int MaxFaceCount;
+    
+    minc_temp_mesh* NextInList;
+    int TempMeshListIndex;
 };
 
 enum minc_biome_type
@@ -163,17 +169,39 @@ struct minc_biome
     f32 BaseHeight;
     f32 NoiseFrequency;
     f32 NoiseScale;
+    
+    // NOTE(Dima): Trees related stuff
+    f32 TreeDensity;
+    b32 HasTrees;
+    int TrunkMinH;
+    int TrunkMaxH;
+    int CrownMinH;
+    int CrownMaxH;
+    int CrownMinRad;
+    int CrownMaxRad;
+    
+    u8 TreeTrunkBlock;
+    u8 TreeCrownBlock;
+};
+
+struct minc_tree
+{
+    int TrunkHeight;
+    int CrownHeight;
+    int CrownRadius;
 };
 
 struct minc_chunk_meta
 {
     // NOTE(Dima): Generate biome map and height map
     u8 BiomeMap[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
-    f32 NoiseMap[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
     u16 HeightMap[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
     
     int CoordX;
     int CoordZ;
+    
+#define MINC_MAX_TREES_PER_CHUNK 20
+    minc_tree Trees[MINC_MAX_TREES_PER_CHUNK];
     
     std::atomic_uint32_t State;
 };
@@ -192,6 +220,7 @@ enum minc_chunk_state
     
     MincChunk_ReadyToGenerateMesh,
     MincChunk_GeneratingMesh,
+    MincChunk_GeneratingMeshFinalizing,
     MincChunk_MeshGenerated,
 };
 
@@ -204,6 +233,18 @@ struct minc_chunk
     u8 Blocks[MINC_CHUNK_COUNT];
     
     voxel_mesh Mesh;
+    
+    struct minc_generate_mesh_work* GenerateMeshWork;
+    int GenerationSidesCount;
+    int ExpectedVerticesCount;
+    b32 SucceededGenerateMesh;
+};
+
+struct minc_chunk_side
+{
+    u8 Blocks[MINC_CHUNK_WIDTH * MINC_CHUNK_HEIGHT];
+    
+    minc_chunk_side* NextInList;
 };
 
 struct minc_chunk_meta_slot
@@ -221,9 +262,8 @@ struct minecraft
     
     minc_chunk Chunks[10][10];
     
-#define MINC_META_TABLE_SIZE 1024
+#define MINC_META_TABLE_SIZE 2048
     minc_chunk_meta_slot* MetaTable[MINC_META_TABLE_SIZE];
-    
     minc_chunk_meta_slot MetaSentinel;
     
     minc_block_texture_indices BlocksTextureIndices[MincBlock_Count];
@@ -232,6 +272,9 @@ struct minecraft
     f32 BiomesTotalWeight;
     
     task_memory_pool* TaskPool;
+    
+    minc_temp_mesh* TempMeshLists[5];
+    minc_chunk_side* ChunkSidePool;
     
     int ChunksViewDistance;
 };

@@ -636,6 +636,7 @@ INTERNAL_FUNCTION render_api_dealloc_entry* AllocateDeallocEntry()
     return(Result);
 }
 
+#if 0
 INTERNAL_FUNCTION void DeallocateDeallocEntry(render_api_dealloc_entry* Entry)
 {
     BeginTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);
@@ -644,6 +645,14 @@ INTERNAL_FUNCTION void DeallocateDeallocEntry(render_api_dealloc_entry* Entry)
     DLIST_INSERT_BEFORE_SENTINEL(Entry, Global_RenderCommands->FreeDealloc, Next, Prev);
     
     EndTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);
+}
+#endif
+
+INTERNAL_FUNCTION void RenderPushDeallocateHandle(renderer_handle* Handle)
+{
+    render_api_dealloc_entry* Entry = AllocateDeallocEntry();
+    
+    Entry->Handle = Handle;
 }
 
 INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions)
@@ -689,6 +698,8 @@ INTERNAL_FUNCTION inline void SetBackfaceCulling(b32 Value)
 INTERNAL_FUNCTION void InitRender(memory_arena* Arena)
 {
     Global_RenderCommands = PushStruct(Arena, render_commands);
+    
+    Global_RenderCommands->Arena = Arena;
     
     // NOTE(Dima): Init dealloc list
     InitTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);

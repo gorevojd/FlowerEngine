@@ -24,7 +24,7 @@ struct job
 
 struct job_queue
 {
-#define DEFAULT_JOBS_COUNT 4096
+#define DEFAULT_JOBS_COUNT 8192
     job* Jobs;
     int JobsCount;
     
@@ -53,6 +53,9 @@ struct task_memory
     
     void* Memory;
     size_t MemorySize;
+    
+    // NOTE(Dima): Storing pointer to pool from which we were allocated
+    struct task_memory_pool* ParentPool;
     
     memory_arena Arena;
 };
