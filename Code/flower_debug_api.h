@@ -42,19 +42,23 @@ struct debug_global_table{
 
 extern debug_global_table* Global_DebugTable;
 
-inline void DEBUGAddRecord(char* UniqueName, u8 Type){
-    u32 ToParseIndex = Global_DebugTable->RecordAndTableIndex.fetch_add(1);
-    
-    u32 TableIndex = (ToParseIndex & DEBUG_TABLE_INDEX_MASK) >> DEBUG_TABLE_INDEX_BITSHIFT;
-    u32 RecordIndex = ToParseIndex & DEBUG_RECORD_INDEX_MASK;
-    
-    debug_record* TargetArray = Global_DebugTable->RecordTables[TableIndex];
-    debug_record* TargetRecord = &TargetArray[RecordIndex];
-    
-    TargetRecord->UniqueName = UniqueName;
-    TargetRecord->Type = Type;
-    TargetRecord->TimeStampCounter = __rdtsc();
-    TargetRecord->ThreadID = Platform.GetThreadID();
+inline void DEBUGAddRecord(char* UniqueName, u8 Type)
+{
+    if(Global_DebugTable)
+    {
+        u32 ToParseIndex = Global_DebugTable->RecordAndTableIndex.fetch_add(1);
+        
+        u32 TableIndex = (ToParseIndex & DEBUG_TABLE_INDEX_MASK) >> DEBUG_TABLE_INDEX_BITSHIFT;
+        u32 RecordIndex = ToParseIndex & DEBUG_RECORD_INDEX_MASK;
+        
+        debug_record* TargetArray = Global_DebugTable->RecordTables[TableIndex];
+        debug_record* TargetRecord = &TargetArray[RecordIndex];
+        
+        TargetRecord->UniqueName = UniqueName;
+        TargetRecord->Type = Type;
+        TargetRecord->TimeStampCounter = __rdtsc();
+        TargetRecord->ThreadID = Platform.GetThreadID();
+    }
 }
 
 inline void DEBUGAddFloatToLastRecord(float Value){

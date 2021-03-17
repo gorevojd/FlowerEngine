@@ -1129,7 +1129,7 @@ int main(int ArgsCount, char** Args)
     // NOTE(Dima): Setting up global variables after game init
     SetGlobalVariables(Game);
     
-#if 1    
+#if 1
     App->WndDims.InitWidth = 1920;
     App->WndDims.InitHeight = 1080;
 #else
@@ -1170,7 +1170,7 @@ int main(int ArgsCount, char** Args)
     
     App->OpenGLContext = SDL_GL_CreateContext(App->Window);
     
-    OpenGLInit();
+    OpenGLInit(Game->RenderCommands);
     
     Global_Time->Time = 0.0f;
     Global_Time->DeltaTime = 0.001f;
@@ -1205,7 +1205,7 @@ int main(int ArgsCount, char** Args)
         Global_Input->DeltaTime = Global_Time->DeltaTime;
         
         // NOTE(Dima): Tell the game that it's code has just been reloaded
-        Game->CodeDllWasJustReloaded = DllWasJustReloaded;
+        Game->ShouldReloadGameCode = DllWasJustReloaded;
         
         // NOTE(Dima): Updating a game
         Game->WindowDimensions = App->WndDims;
@@ -1214,7 +1214,7 @@ int main(int ArgsCount, char** Args)
         END_TIMING();
     }
     
-    OpenGLFree();
+    OpenGLFree(Game->RenderCommands);
     
     SDL_GL_DeleteContext(App->OpenGLContext);
     SDL_DestroyWindow(App->Window);

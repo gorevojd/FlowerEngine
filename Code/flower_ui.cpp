@@ -63,7 +63,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     
     rect_buffer* Buffer = &Global_RenderCommands->Rects2D;
     
-    int IndexToTransformMatrix = Buffer->IdentityMatrixIndex;
+    //int IndexToTransformMatrix = Buffer->IdentityMatrixIndex;
     
     u32 FontStyle = FontStyle_Regular;
     if(BoolFlag(Flags, PrintText_StyleShadow))
@@ -78,7 +78,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     b32 Is3D = BoolFlag(Flags, PrintText_3D);
     if(Is3D)
     {
-        Buffer = &Global_RenderCommands->Rects3D;
+        //Buffer = &Global_RenderCommands->Rects3D;
         AtP = {};
         
         Scale *= 1.0f / Font->PixelsPerMeter;
@@ -87,7 +87,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
                                             V4(Up, 0.0f), 
                                             V4(Forward, 0.0f),
                                             V4(P.x, P.y, P.z, 1.0f));
-        IndexToTransformMatrix = PushRectTransform(Buffer, &TextTransform);
+        //IndexToTransformMatrix = PushRectTransform(Buffer, TextTransform);
     }
     
     rc2 Bounds;
@@ -113,10 +113,12 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
             f32 TargetHeight = (f32)Image->Height * Scale;
             
             v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;
-            PushGlyph(Buffer, Glyph, ImageP, 
-                      TargetHeight, 
-                      FontStyle,
-                      IndexToTransformMatrix, C);
+            if(!Is3D)
+            {
+                PushGlyph(Buffer, Glyph, ImageP, 
+                          TargetHeight, 
+                          FontStyle, C);
+            }
         }
         
         f32 Kerning = GetKerning(Font, *At, *(At + 1)); 

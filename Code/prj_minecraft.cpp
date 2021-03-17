@@ -176,12 +176,12 @@ INTERNAL_FUNCTION inline minc_biome* CreateDefaultBiome(minecraft* Mine,
     Result->NoiseScale = 20.0f;
     
     // NOTE(Dima): Trees
-    Result->TreeDensity = 0.01f;
+    Result->TreeDensity = 0.002f;
     Result->HasTrees = true;
-    Result->TrunkMinH = 3;
-    Result->TrunkMaxH = 5;
-    Result->CrownMinH = 3;
-    Result->CrownMaxH = 5;
+    Result->TrunkMinH = 5;
+    Result->TrunkMaxH = 10;
+    Result->CrownMinH = 5;
+    Result->CrownMaxH = 12;
     Result->CrownMinRad = 1;
     Result->CrownMaxRad = 3;
     
@@ -217,7 +217,7 @@ INTERNAL_FUNCTION void InitMinecraftBiomes(minecraft* Mine)
     SnowTaiga->NoiseScale = 40.0f;
     SnowTaiga->BaseHeight = 60.0f;
     SnowTaiga->LayerBlocks[0] = MincBlock_SnowGround;
-    SnowTaiga->TreeDensity = 0.02f;
+    SnowTaiga->TreeDensity = 0.004f;
     SnowTaiga->TreeCrownBlock = MincBlock_TreeLeavesSnow;
     SnowTaiga->TreeTrunkBlock = MincBlock_TreeWood;
     
@@ -304,7 +304,7 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                         NormalDir < MincFaceNormal_Count;
                         NormalDir++)
                     {
-                        u8 NeighbourBlock = MincBlock_Empty;
+                        u8 NeighbourBlock = MincBlock_Ground;
                         
                         minc_chunk_side* SideChunk = Chunks.ChunksSides[NormalDir];
                         
@@ -393,10 +393,15 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                                 }
                                 else
                                 {
+#if 0
                                     if(SideChunk)
                                     {
                                         NeighbourBlock = GetBlockInChunkSide(SideChunk, x, z);
                                     }
+#else
+                                    NeighbourBlock = 1;
+#endif
+                                    
                                 }
                             }break;
                         }
@@ -649,7 +654,7 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMapsWork)
         }
     }
     
-    Meta->State.store(MincChunk_MapsGenerated);
+    Meta->State.store(MincChunk_ReadyToFixBiomeGaps);
     FreeTaskMemory(Work->Task);
 }
 
@@ -662,7 +667,7 @@ struct minc_fix_gaps_work
     int X;
     int Z;
     
-    minc_chunk_meta* LookupChunks[9];
+    minc_lookup_chunks_metas LookupMetas;
 };
 
 INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
@@ -731,7 +736,7 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
                         LookupChunkX++;
                     }
                     
-                    minc_chunk_meta* Lookup = Work->LookupChunks[LookupChunkZ * 3 + LookupChunkX];
+                    minc_chunk_meta* Lookup = Work->LookupMetas.LookupChunks[LookupChunkZ * 3 + LookupChunkX];
                     
                     if(Lookup)
                     {
@@ -813,6 +818,52 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
             
             // NOTE(Dima): Setting block type at height
             int CurrentHeight = Meta->HeightMap[IndexInMap];
+            
+            if(Biome->HasTrees)
+            {
+                f32 RandomVal = RandomUnilateral(&Random);
+                
+                if(RandomVal < Biome->TreeDensity)
+                {
+                    int TrunkHeight = RandomBetweenU32(&Random, Biome->TrunkMinH, Biome->TrunkMaxH + 1);
+                    int CrownHeight = RandomBetweenU32(&Random, Biome->CrownMinH, Biome->CrownMaxH + 1);
+                    int CrownRadius = RandomBetweenU32(&Random, Biome->CrownMinRad, Biome->CrownMaxRad + 1);
+                    
+                    MincSetColumn(Chunk, 
+                                  CurrentHeight, 
+                                  CurrentHeight + TrunkHeight - 1,
+                                  x, z, 
+                                  Biome->TreeTrunkBlock);
+                    
+                    for(int dz = -CrownRadius; dz <= CrownRadius; dz++)
+                    {
+                        for(int dx = -CrownRadius; dx <= CrownRadius; dx++)
+                        {
+                            int TargetX = x + dx;
+                            int TargetZ = z + dz;
+                            
+                            if(TargetX >= 0 && TargetX < MINC_CHUNK_WIDTH &&
+                               TargetZ >= 0 && TargetZ < MINC_CHUNK_WIDTH)
+                            {
+                                MincSetColumn(Chunk,
+                                              CurrentHeight + TrunkHeight,
+                                              CurrentHeight + TrunkHeight + CrownHeight - 1,
+                                              TargetX, TargetZ,
+                                              Biome->TreeCrownBlock);
+                            }
+                            else
+                            {
+                                // TODO(Dima): Do something to push this column into neighbour chunk
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                
+            }
+            
             Chunk->Blocks[MincGetBlockIndex(x, CurrentHeight, z)] = Biome->LayerBlocks[0];
             
             // NOTE(Dima): 
@@ -1168,6 +1219,36 @@ INTERNAL_FUNCTION inline void MincFreeChunkMesh(minc_chunk* Chunk)
     Chunk->Mesh.Free = 0;
 }
 
+INTERNAL_FUNCTION inline b32 GetLookupChunksMetas(minecraft* Mine, 
+                                                  minc_lookup_chunks_metas* Metas,
+                                                  int X, int Z,
+                                                  u32 MinimumState)
+{
+    int CountOK = 0;
+    for(int j = -1; j <= 1; j++)
+    {
+        for(int i = -1; i <= 1; i++)
+        {
+            int LookupIndex = (j + 1) * 3 + (i + 1);
+            Metas->LookupChunks[LookupIndex] = 0;
+            
+            minc_chunk_meta* LookupChunkMeta = MincFindChunkMeta(Mine, X + i, Z + j);
+            if(LookupChunkMeta)
+            {
+                if(LookupChunkMeta->State >= MinimumState)
+                {
+                    Metas->LookupChunks[LookupIndex] = LookupChunkMeta;
+                    CountOK++;
+                }
+            }
+        }
+    }
+    
+    b32 AllOK = (CountOK == 9);
+    
+    return(AllOK);
+}
+
 INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                                           int X, int Z,
                                           int PlayerChunkX,
@@ -1202,25 +1283,14 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                 Work->X = X;
                 Work->Z = Z;
                 
-                Meta->State.store(MincChunk_GeneratingMaps);
+                Meta->State = MincChunk_GeneratingMaps;
                 KickJob(MincGenerateMapsWork, Work, JobPriority_High);
             }break;
             
-            case MincChunk_MapsGenerated:
+            case MincChunk_ReadyToFixBiomeGaps:
             {
-                b32 CanFix = true;
-                
-                for(int j = -1; j <= 1; j++)
-                {
-                    for(int i = -1; i <= 1; i++)
-                    {
-                        if(!MincFindChunkMeta(Minecraft, X + i, Z + j))
-                        {
-                            CanFix = false;
-                            break;
-                        }
-                    }
-                }
+                minc_lookup_chunks_metas LookupMetas;
+                b32 CanFix = GetLookupChunksMetas(Minecraft, &LookupMetas, X, Z, MincChunk_ReadyToFixBiomeGaps);
                 
                 if(CanFix)
                 {
@@ -1234,33 +1304,15 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                     Work->Task = Task;
                     Work->X = X;
                     Work->Z = Z;
+                    Work->LookupMetas = LookupMetas;
                     
-                    for(int j = -1; j <= 1; j++)
-                    {
-                        for(int i = -1; i <= 1; i++)
-                        {
-                            int LookupIndex = (j + 1) * 3 + (i + 1);
-                            Work->LookupChunks[LookupIndex] = 0;
-                            
-                            minc_chunk_meta* LookupChunkMeta = MincFindChunkMeta(Minecraft, X + i, Z + j);
-                            if(LookupChunkMeta)
-                            {
-                                if(LookupChunkMeta->State >= MincChunk_MapsGenerated)
-                                {
-                                    Work->LookupChunks[LookupIndex] = LookupChunkMeta;
-                                }
-                            }
-                        }
-                    }
-                    
-                    Meta->State.store(MincChunk_FixingBiomeGaps, std::memory_order_relaxed);
+                    Meta->State = MincChunk_FixingBiomeGaps;
                     KickJob(MincFixBiomeGapsWork, Work, JobPriority_High);
                 }
             }break;
             
             case MincChunk_ReadyToGenerateChunk:
             {
-                Meta->State.store(MincChunk_GeneratingChunk, std::memory_order_relaxed);
                 
                 // NOTE(Dima): Allocating chunk
                 Assert(ChunkMetaSlot->Chunk == 0);
@@ -1286,6 +1338,7 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                 Work->Chunk = Chunk;
                 Work->Meta = Meta;
                 
+                Meta->State = MincChunk_GeneratingChunk;
                 KickJob(MincGenerateChunkWork, Work, JobPriority_High);
             }break;
             
@@ -1329,7 +1382,7 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                             Work->Chunk->Mesh.PerFaceBufHandle = CreateRendererHandle(RendererHandle_TextureBuffer);
                             Work->TempMesh = TempMesh;
                             
-                            Meta->State.store(MincChunk_GeneratingMesh, std::memory_order_relaxed);
+                            Meta->State = MincChunk_GeneratingMesh;
                             KickJob(MincGenerateMeshWork, Work, JobPriority_High);
                         }
                     }
@@ -1357,7 +1410,7 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                     ReturnFreeTempMesh(Minecraft, Work->TempMesh);
                     FreeTaskMemory(TaskMemory);
                     
-                    Meta->State.store(MincChunk_MeshGenerated);
+                    Meta->State = MincChunk_MeshGenerated;
                     
                     Chunk->GenerateMeshWork = 0;
                     
@@ -1371,7 +1424,7 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                     FreeTaskMemory(TaskMemory);
                     
                     // NOTE(Dima): Try to generate mesh once again
-                    Meta->State.store(MincChunk_ReadyToGenerateMesh);
+                    Meta->State = MincChunk_ReadyToGenerateMesh;
                     
                     Chunk->GenerateMeshWork = 0;
                 }

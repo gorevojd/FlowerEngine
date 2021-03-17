@@ -128,9 +128,24 @@ SCENE_UPDATE(TestGame)
         }break;
     }
     
+    
     UpdateGameObjects(Scene->Game);
     
     SetMatrices(&State->Camera);
+    
+#if 1
+    // NOTE(Dima): SSAO samples
+    for(int i = 0; i < Global_RenderCommands->PostProcessing.SSAO_Params.KernelSize; i++)
+    {
+        v3 Sample = Global_RenderCommands->PostProcessing.SSAO_Kernel[i];
+        
+        v3 Pos = Sample * 3.0f;
+        PushMesh(&Global_Assets->Cube,
+                 0,
+                 ScalingMatrix(0.05f) * TranslationMatrix(Pos));
+    }
+#endif
+    
 }
 
 

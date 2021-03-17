@@ -982,8 +982,8 @@ inline quat Slerp(quat A, quat B, f32 t){
 }
 
 // NOTE(Dima): Matrices operations
-
-inline m44 LookAt(v3 Pos, v3 TargetPos, v3 WorldUp) {
+inline m44 LookAt(v3 Pos, v3 TargetPos, v3 WorldUp)
+{
     m44 Result;
     
     v3 Fwd = TargetPos - Pos;

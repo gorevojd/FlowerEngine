@@ -26,7 +26,7 @@ enum minc_atlas_texture
     MincTexture_WoodTreeGrass = MINC_ATLAS_TEXTURE_INDEX(5, 8),
     
     MincTexture_LeavesSnow = MINC_ATLAS_TEXTURE_INDEX(4, 3),
-    MincTexture_Leaves = MINC_ATLAS_TEXTURE_INDEX(5, 4),
+    MincTexture_Leaves = MINC_ATLAS_TEXTURE_INDEX(5, 3),
     
     MincTexture_BlockIron = MINC_ATLAS_TEXTURE_INDEX(6, 1),
     MincTexture_BlockGold = MINC_ATLAS_TEXTURE_INDEX(7, 1),
@@ -87,7 +87,6 @@ enum minc_block_type
     
     MincBlock_Count,
 };
-
 
 enum minc_normal_type
 {
@@ -153,12 +152,6 @@ enum minc_biome_type
     MincBiome_Count,
 };
 
-struct minc_tree_blocks
-{
-    u8 Trunc;
-    u8 Crown;
-};
-
 struct minc_biome
 {
     u8 LayerBlocks[4];
@@ -171,8 +164,11 @@ struct minc_biome
     f32 NoiseScale;
     
     // NOTE(Dima): Trees related stuff
-    f32 TreeDensity;
     b32 HasTrees;
+    b32 HasGrass;
+    f32 TreeDensity;
+    f32 GrassDensity;
+    
     int TrunkMinH;
     int TrunkMaxH;
     int CrownMinH;
@@ -184,13 +180,6 @@ struct minc_biome
     u8 TreeCrownBlock;
 };
 
-struct minc_tree
-{
-    int TrunkHeight;
-    int CrownHeight;
-    int CrownRadius;
-};
-
 struct minc_chunk_meta
 {
     // NOTE(Dima): Generate biome map and height map
@@ -200,10 +189,12 @@ struct minc_chunk_meta
     int CoordX;
     int CoordZ;
     
-#define MINC_MAX_TREES_PER_CHUNK 20
-    minc_tree Trees[MINC_MAX_TREES_PER_CHUNK];
-    
     std::atomic_uint32_t State;
+};
+
+struct minc_lookup_chunks_metas
+{
+    minc_chunk_meta* LookupChunks[9];
 };
 
 enum minc_chunk_state
@@ -211,8 +202,8 @@ enum minc_chunk_state
     MincChunk_Unloaded,
     
     MincChunk_GeneratingMaps,
-    MincChunk_MapsGenerated,
     
+    MincChunk_ReadyToFixBiomeGaps,
     MincChunk_FixingBiomeGaps,
     
     MincChunk_ReadyToGenerateChunk,

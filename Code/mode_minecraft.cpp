@@ -35,10 +35,10 @@ SCENE_UPDATE(Minecraft)
     }
     
     //PushImage(&Global_Assets->VoxelAtlas, V2(0.0f, 0.0f), 400);
+    //PushFullscreenRect(ColorRed());
     
     // NOTE(Dima): Updating camera
     UpdateCamera(&State->Camera, SpeedMultiplier);
-    
     UpdateMinecraft(&State->Minecraft, State->Camera.P);
     
     SetMatrices(&State->Camera);

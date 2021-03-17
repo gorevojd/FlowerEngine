@@ -9,7 +9,7 @@ struct random_generation
     u64 Inc;
 };
 
-inline random_generation SeedRandom(int Seed)
+inline random_generation SeedRandom(i64 Seed)
 {
     random_generation RandomGen = {};
     

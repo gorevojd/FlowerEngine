@@ -1,3 +1,5 @@
+// TODO(Dima): Stop queues receiving jobs when game code should be reloaded.
+
 INTERNAL_FUNCTION void KickJob(job_callback* Callback, void* Data, u32 Priority)
 {
     job_queue* Queue = Global_Jobs->Queues + Priority;

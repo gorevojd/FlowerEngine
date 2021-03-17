@@ -101,7 +101,8 @@ struct game
     
     window_dimensions WindowDimensions;
     
-    b32 CodeDllWasJustReloaded;
+    b32 ShouldReloadGameCode;
+    b32 GameCodeWasJustReloaded;
 };
 
 #endif //FLOWER_GAMEPLAY_H

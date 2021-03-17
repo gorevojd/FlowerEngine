@@ -1,6 +1,9 @@
 #ifndef FLOWER_RENDER_H
 #define FLOWER_RENDER_H
 
+#include "flower_lighting.h"
+#include "flower_postprocess.h"
+
 #define RENDER_DEFAULT_2D_LINE_THICKNESS 4.0f
 #define RENDER_DEFAULT_2D_LINE_DASH_LENGTH 20.0f
 #define RENDER_DEFAULT_2D_LINE_DASH_SPACING 8.0f
@@ -9,7 +12,6 @@
 enum render_command_type
 {
     RenderCommand_Clear,
-    RenderCommand_Image,
     RenderCommand_Mesh,
     RenderCommand_InstancedMesh,
     RenderCommand_VoxelChunkMesh,
@@ -38,6 +40,9 @@ struct render_command_image
     v2 P;
     v2 Dim;
     v4 C;
+    
+    render_command_image* Next;
+    render_command_image* Prev;
 };
 
 struct render_command_mesh
@@ -70,18 +75,6 @@ struct render_command_voxel_mesh
     voxel_mesh* Mesh;
     
     v3 ChunkAt;
-};
-
-struct render_precompute_transform_mesh
-{
-    mesh ResultMesh;
-    mesh** Meshes;
-    m44* Transforms;
-    
-    render_precompute_transform_mesh* Next;
-    
-    int Count;
-    int MaxCount;
 };
 
 struct render_mesh_instance
@@ -118,14 +111,6 @@ struct rect_buffer
     u32 Indices[MAX_RECTS_COUNT * 6];
     u32 Colors[MAX_RECTS_COUNT];
     u8 Types[MAX_RECTS_COUNT];
-    u16 IndicesToTransforms[MAX_RECTS_COUNT];
-    
-    m44 Transforms[MAX_RECTS_COUNT / 10];
-    int TransformsCount;
-    
-    int IdentityMatrixIndex;
-    int OrthoMatrixIndex;
-    int ViewProjMatrixIndex;
     
     int RectCount;
 };
@@ -147,30 +132,38 @@ struct render_api_dealloc_entry
     render_api_dealloc_entry* Prev;
 };
 
+struct render_pass
+{
+    m44 View;
+    m44 Projection;
+    m44 ViewProjection;
+    v3 CameraP;
+};
+
 struct render_commands
 {
     memory_arena CommandsBuffer;
     memory_arena* Arena;
+    
+    m44 ScreenOrthoProjection;
+    rect_buffer Rects2D;
+    
+    void* StateOfGraphicsAPI;
     
     // TODO(Dima): Make those dynamic
 #define MAX_RENDER_COMMANDS_COUNT 200000
     render_command_header CommandHeaders[MAX_RENDER_COMMANDS_COUNT];
     int CommandCount;
     
-    rect_buffer Rects2D;
-    rect_buffer Rects3D;
+    render_pass RenderPasses[128];
+    int RenderPassCount;
     
-    m44 View;
-    m44 Projection;
-    m44 ViewProjection;
-    m44 ScreenOrthoProjection;
+    render_command_image ImageUse;
+    render_command_image ImageFree;
     
     window_dimensions WindowDimensions;
     image* FontAtlas;
     image* VoxelAtlas;
-    
-    // NOTE(Dima): List of to precompute mesh arrays
-    render_precompute_transform_mesh* FirstPrecomputeMesh;
     
     // NOTE(Dima): Instance table
 #define RENDER_INSTANCE_TABLE_SIZE 256
@@ -179,6 +172,9 @@ struct render_commands
     // NOTE(Dima): Settings
     b32 BackfaceCulling;
     b32 BackfaceCullingChanged;
+    
+    lighting Lighting;
+    postprocessing PostProcessing;
     
     // NOTE(Dima): Deallocate entries
     ticket_mutex DeallocEntriesMutex;

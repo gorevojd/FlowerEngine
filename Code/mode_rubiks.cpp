@@ -17,7 +17,7 @@ SCENE_INIT(RubiksCube)
     State->Camera.ShowcaseRotateTime = 20.0f;
     
     f32 CubeWidth = 5.0f;
-    int CubeDim = 111;
+    int CubeDim = 3;
     int CountOfCubes = 1;
     
     State->Cubes = PushArray(Scene->Arena, rubiks_cube, CountOfCubes);
@@ -29,7 +29,7 @@ SCENE_INIT(RubiksCube)
         i < CountOfCubes;
         i++)
     {
-        State->Cubes[i] = CreateCube(Scene->Arena, CubeDim, CubeWidth, 0);
+        State->Cubes[i] = CreateCube(Scene->Arena, CubeDim, CubeWidth);
         State->CubesP[i] = V3(i, 0.0f, 0.0f) * CubeWidth * 1.1f;
     }
 #else

@@ -1,3 +1,6 @@
+#include "flower_lighting.cpp"
+#include "flower_postprocess.cpp"
+
 inline void* PushRenderCommand_(u32 CommandType, u32 SizeOfCommandStruct)
 {
     render_commands* Commands = Global_RenderCommands;
@@ -189,7 +192,28 @@ inline void PushInstanceMesh(int MaxInstanceCount,
 
 inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    render_command_image* Entry = PushRenderCommand(RenderCommand_Image, render_command_image);
+    if(Global_RenderCommands->ImageFree.Next == &Global_RenderCommands->ImageFree)
+    {
+        int ToAddCount = 128;
+        
+        render_command_image* Pool = PushArray(Global_RenderCommands->Arena, 
+                                               render_command_image, 
+                                               ToAddCount);
+        
+        for(int i = 0; i < ToAddCount; i++)
+        {
+            DLIST_INSERT_BEFORE_SENTINEL(&Pool[i], 
+                                         Global_RenderCommands->ImageFree, 
+                                         Next, Prev);
+        }
+    }
+    
+    render_command_image* Entry = Global_RenderCommands->ImageFree.Next;;
+    
+    DLIST_REMOVE(Entry, Next, Prev);
+    DLIST_INSERT_BEFORE_SENTINEL(Entry, 
+                                 Global_RenderCommands->ImageUse,
+                                 Next, Prev);
     
     Entry->Image = Img;
     Entry->P = P;
@@ -206,32 +230,9 @@ inline void PushCenteredImage(image* Img, v2 CenterP, f32 Height, v4 C = V4(1.0f
     PushImage(Img, PushP, Height, C);
 }
 
-INTERNAL_FUNCTION inline int PushRectTransform(rect_buffer* RectBuffer, m44* Transform)
-{
-    int Index = RectBuffer->TransformsCount++;
-    
-    RectBuffer->Transforms[Index] = *Transform;
-    
-    return(Index);
-}
-
-INTERNAL_FUNCTION inline int GetCurrentRectTransformIndex(rect_buffer* RectBuffer)
-{
-    int Result = RectBuffer->TransformsCount - 1;
-    
-    /*
-/// By default rect transform is pushed at BeginRender function so that result must 
-/// never be less than 0. But I assert here just to make sure it's OK.
-*/
-    Assert(Result >= 0);
-    
-    return(Result);
-}
-
 INTERNAL_FUNCTION inline void PushRectInternal(rect_buffer* RectBuffer,
                                                rect_vertex Verts[4],
                                                u32 RectType,
-                                               int IndexToTransformMatrix,
                                                v4 C = ColorWhite())
 {
     Assert(RectBuffer->RectCount < MAX_RECTS_COUNT);
@@ -254,7 +255,6 @@ INTERNAL_FUNCTION inline void PushRectInternal(rect_buffer* RectBuffer,
     
     RectBuffer->Colors[RectBuffer->RectCount] = PackRGBA(PremultiplyAlpha(C));
     RectBuffer->Types[RectBuffer->RectCount] = RectType;
-    RectBuffer->IndicesToTransforms[RectBuffer->RectCount] = IndexToTransformMatrix;
     
     RectBuffer->RectCount++;
 }
@@ -271,9 +271,8 @@ INTERNAL_FUNCTION inline void PushTriangle2D(v2 Point0,
     Verts[3] = { Point2, V2(0.0f, 0.0f)};
     
     rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
-    int ModelTransformMatrixIndex = RectBuffer->IdentityMatrixIndex;;
     
-    PushRectInternal(RectBuffer, Verts, Rect_Solid, ModelTransformMatrixIndex, C);
+    PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
 }
 
 INTERNAL_FUNCTION inline void PushQuadrilateral2D(v2 Point0, 
@@ -289,9 +288,8 @@ INTERNAL_FUNCTION inline void PushQuadrilateral2D(v2 Point0,
     Verts[3] = { Point3, V2(0.0f, 0.0f)};
     
     rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
-    int ModelTransformMatrixIndex = RectBuffer->IdentityMatrixIndex;;
     
-    PushRectInternal(RectBuffer, Verts, Rect_Solid, ModelTransformMatrixIndex, C);
+    PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
 }
 
 INTERNAL_FUNCTION inline void PushCircleInternal2D(v2 P, 
@@ -378,6 +376,15 @@ INTERNAL_FUNCTION inline void PushRect(rc2 Rect,
                         C);
 }
 
+INTERNAL_FUNCTION inline void PushFullscreenRect(v4 C = ColorWhite())
+{
+    rc2 Rect = RectMinDim(V2(0.0f, 0.0f), 
+                          V2(Global_RenderCommands->WindowDimensions.Width,
+                             Global_RenderCommands->WindowDimensions.Height));
+    
+    PushRect(Rect, C);
+}
+
 INTERNAL_FUNCTION inline void PushRectOutline(rc2 Rect,
                                               f32 Thickness,
                                               v4 C = ColorBlack())
@@ -454,9 +461,8 @@ INTERNAL_FUNCTION inline void PushLineInternal2D(v2 Begin,
         Verts[3] = { LineBegin - Offset, V2(0.0f, 0.0f)};
         
         rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
-        int ModelTransformMatrixIndex = RectBuffer->IdentityMatrixIndex;
         
-        PushRectInternal(RectBuffer, Verts, Rect_Solid, ModelTransformMatrixIndex, C);
+        PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
     }
     
     v2 ArrowOffset = Thickness * 0.5 * ArrowThickness * PerpVector;
@@ -571,7 +577,6 @@ inline void PushGlyph(rect_buffer* RectBuffer,
                       glyph* Glyph, 
                       v2 P, f32 Height, 
                       int StyleIndex,
-                      int ModelTransformMatrixIndex,
                       v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     glyph_style* Style = &Glyph->Styles[StyleIndex];
@@ -586,25 +591,12 @@ inline void PushGlyph(rect_buffer* RectBuffer,
     Verts[2] = { V2(P.x + Dim.x, P.y + Dim.y), V2(MaxUV.x, MaxUV.y)};
     Verts[3] = { V2(P.x, P.y + Dim.y), V2(MinUV.x, MaxUV.y)};
     
-    PushRectInternal(RectBuffer, Verts, Rect_Textured, ModelTransformMatrixIndex, C);
-}
-
-INTERNAL_FUNCTION void PushDefaultMatricesToRectBuffer(rect_buffer* RectBuffer)
-{
-    m44 Id = IdentityMatrix4();
-    RectBuffer->IdentityMatrixIndex = PushRectTransform(RectBuffer, &Id);
-    
-    // NOTE(Dima): Pushing screen orthographic projection matrix
-    RectBuffer->OrthoMatrixIndex = PushRectTransform(RectBuffer, &Global_RenderCommands->ScreenOrthoProjection);
-    
-    // NOTE(Dima): Pushing screen perspective projection matrix
-    RectBuffer->ViewProjMatrixIndex = PushRectTransform(RectBuffer, &Global_RenderCommands->ViewProjection);
+    PushRectInternal(RectBuffer, Verts, Rect_Textured, C);
 }
 
 INTERNAL_FUNCTION void ResetRectBuffer(rect_buffer* RectBuffer)
 {
     RectBuffer->RectCount = 0;
-    RectBuffer->TransformsCount = 0;
 }
 
 INTERNAL_FUNCTION render_api_dealloc_entry* AllocateDeallocEntry()
@@ -636,7 +628,6 @@ INTERNAL_FUNCTION render_api_dealloc_entry* AllocateDeallocEntry()
     return(Result);
 }
 
-#if 0
 INTERNAL_FUNCTION void DeallocateDeallocEntry(render_api_dealloc_entry* Entry)
 {
     BeginTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);
@@ -646,7 +637,21 @@ INTERNAL_FUNCTION void DeallocateDeallocEntry(render_api_dealloc_entry* Entry)
     
     EndTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);
 }
-#endif
+
+INTERNAL_FUNCTION render_pass* AddRenderPass(const m44& CameraView,
+                                             const m44& CameraProjection,
+                                             v3 CameraP)
+{
+    Assert(Global_RenderCommands->RenderPassCount < ARC(Global_RenderCommands->RenderPasses));
+    render_pass* Result = &Global_RenderCommands->RenderPasses[Global_RenderCommands->RenderPassCount++];
+    
+    Result->View = CameraView;
+    Result->Projection = CameraProjection;
+    Result->ViewProjection = CameraView * CameraProjection;
+    Result->CameraP = CameraP;
+    
+    return(Result);
+}
 
 INTERNAL_FUNCTION void RenderPushDeallocateHandle(renderer_handle* Handle)
 {
@@ -659,17 +664,11 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions)
 {
     render_commands* Commands = Global_RenderCommands;
     
+    Commands->RenderPassCount = 0;
     Commands->WindowDimensions = WindowDimensions;
     
     // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();
-    
-    // NOTE(Dima): Resetting to precompute mesh list
-    Commands->FirstPrecomputeMesh = 0;
-    
-    // NOTE(Dima): Pushing default matrices to buffer
-    PushDefaultMatricesToRectBuffer(&Commands->Rects2D);
-    PushDefaultMatricesToRectBuffer(&Commands->Rects3D);
 }
 
 INTERNAL_FUNCTION void PreRender()
@@ -682,11 +681,11 @@ INTERNAL_FUNCTION void EndRender()
     render_commands* Commands = Global_RenderCommands;
     
     FreeArena(&Commands->CommandsBuffer, true);
-    
     Commands->CommandCount = 0;
     
     ResetRectBuffer(&Commands->Rects2D);
-    ResetRectBuffer(&Commands->Rects3D);
+    
+    DLIST_REMOVE_ENTIRE_LIST(&Commands->ImageUse, &Commands->ImageFree, Next, Prev);
 }
 
 INTERNAL_FUNCTION inline void SetBackfaceCulling(b32 Value)
@@ -705,6 +704,13 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena)
     InitTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);
     DLIST_REFLECT_PTRS(Global_RenderCommands->UseDealloc, Next, Prev);
     DLIST_REFLECT_PTRS(Global_RenderCommands->FreeDealloc, Next, Prev);
+    
+    // NOTE(Dima): Init images list
+    DLIST_REFLECT_PTRS(Global_RenderCommands->ImageUse, Next, Prev);
+    DLIST_REFLECT_PTRS(Global_RenderCommands->ImageFree, Next, Prev);
+    
+    InitLighting(&Global_RenderCommands->Lighting);
+    InitPostprocessing(&Global_RenderCommands->PostProcessing);
     
     // NOTE(Dima): Init some settings
     SetBackfaceCulling(false);

@@ -1,7 +1,7 @@
 Build/
-Data/
 Libs/
-!Data/Shaders/
+Data/*
+!Data/Shaders
 
 # Prerequisites
 *.d

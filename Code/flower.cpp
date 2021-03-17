@@ -196,10 +196,10 @@ extern "C" __declspec(dllexport) GAME_INIT(GameInit)
 extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
     // NOTE(Dima): Restoring Global variables
-    b32 DllWasJustReloaded = Game->CodeDllWasJustReloaded;
-    if(DllWasJustReloaded)
+    if(Game->ShouldReloadGameCode)
     {
-        Game->CodeDllWasJustReloaded = false;
+        Game->GameCodeWasJustReloaded = true;
+        Game->ShouldReloadGameCode = false;
         
         RestoreGlobalVariables(Game);
         
@@ -212,6 +212,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         }
     }
     
+    // NOTE(Dima): This should happen after we processed reloading game code!!!
     FUNCTION_TIMING();
     
     // NOTE(Dima): Processing Input
@@ -240,6 +241,11 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     
     if(GetKey(Key_LeftShift) && GetKey(Key_LeftControl))
     {
+        
+        if(GetKeyDown(Key_O))
+        {
+            Global_RenderCommands->PostProcessing.SSAO_Params.Enabled = !Global_RenderCommands->PostProcessing.SSAO_Params.Enabled;
+        }
         
         if(GetKeyDown(Key_N))
         {
@@ -280,15 +286,15 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     }
     
     // NOTE(Dima): Debug update
-    DEBUGSkipToNextBarrier(DllWasJustReloaded);
+    DEBUGSkipToNextBarrier(Game->GameCodeWasJustReloaded);
     DEBUGUpdate();
     
     // NOTE(Dima): Render everything
-    window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
-    Global_RenderCommands->FontAtlas = &Global_Assets->FontsAtlas;
-    Global_RenderCommands->VoxelAtlas = &Global_Assets->VoxelAtlas;
-    Global_RenderCommands->ScreenOrthoProjection = OrthographicProjection(WndDims->Width, 
-                                                                          WndDims->Height);
+    render_commands* Commands = Global_RenderCommands;
+    Commands->ScreenOrthoProjection = OrthographicProjection(Commands->WindowDimensions.Width, 
+                                                             Commands->WindowDimensions.Height);
+    Commands->FontAtlas = &Global_Assets->FontsAtlas;
+    Commands->VoxelAtlas = &Global_Assets->VoxelAtlas;
     
     PreRender();
     Platform.Render(Global_RenderCommands);
@@ -296,4 +302,6 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     
     // NOTE(Dima): Swapping buffers
     Platform.SwapBuffers(Global_RenderCommands);
+    
+    Game->GameCodeWasJustReloaded = false;
 }

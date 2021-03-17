@@ -144,19 +144,21 @@ void ShowLabel3D(game_camera* Camera,
                         Color);
 }
 
-INTERNAL_FUNCTION void SetMatrices(game_camera* Camera)
+INTERNAL_FUNCTION render_pass* SetMatrices(game_camera* Camera)
 {
     window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
     
-    Global_RenderCommands->View = GetViewMatrix(Camera);
-    Global_RenderCommands->Projection = PerspectiveProjection(WndDims->Width, 
-                                                              WndDims->Height,
-                                                              Camera->FarClipPlane, 
-                                                              Camera->NearClipPlane);
+    m44 View = GetViewMatrix(Camera);
+    m44 Projection = PerspectiveProjection(WndDims->Width, 
+                                           WndDims->Height,
+                                           Camera->FarClipPlane, 
+                                           Camera->NearClipPlane);
     
-    Global_RenderCommands->ViewProjection = 
-        Global_RenderCommands->View * 
-        Global_RenderCommands->Projection;
+    render_pass* RenderPass = AddRenderPass(View,
+                                            Projection,
+                                            Camera->P);
+    
+    return(RenderPass);
 }
 
 // NOTE(Dima): Object pool stuff
