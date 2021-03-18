@@ -174,7 +174,7 @@ extern "C" __declspec(dllexport) GAME_INIT(GameInit)
     InitInput(Arena);
     InitAssetSystem(Arena);
     InitUI(Arena);
-    InitRender(Arena);
+    InitRender(Arena, WindowDimensions);
     DEBUGInit(Arena);
     
     SaveGlobalVariables(Game);

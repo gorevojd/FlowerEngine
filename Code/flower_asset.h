@@ -58,6 +58,8 @@ struct asset_system
     mesh Cube;
     mesh Plane;
     
+    cubemap Sky;
+    
     image BoxTexture;
     image PlaneTexture;
     image Palette; 

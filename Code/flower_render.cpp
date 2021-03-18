@@ -190,6 +190,11 @@ inline void PushInstanceMesh(int MaxInstanceCount,
     Instance->Command->InstanceCount++;
 }
 
+inline void PushSky(cubemap* Cubemap)
+{
+    Global_RenderCommands->Sky = Cubemap;
+}
+
 inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     if(Global_RenderCommands->ImageFree.Next == &Global_RenderCommands->ImageFree)
@@ -684,6 +689,7 @@ INTERNAL_FUNCTION void EndRender()
     Commands->CommandCount = 0;
     
     ResetRectBuffer(&Commands->Rects2D);
+    Commands->Sky = 0;
     
     DLIST_REMOVE_ENTIRE_LIST(&Commands->ImageUse, &Commands->ImageFree, Next, Prev);
 }
@@ -694,11 +700,12 @@ INTERNAL_FUNCTION inline void SetBackfaceCulling(b32 Value)
     Global_RenderCommands->BackfaceCulling = Value;
 }
 
-INTERNAL_FUNCTION void InitRender(memory_arena* Arena)
+INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensions)
 {
     Global_RenderCommands = PushStruct(Arena, render_commands);
     
     Global_RenderCommands->Arena = Arena;
+    Global_RenderCommands->WindowDimensions = Dimensions;
     
     // NOTE(Dima): Init dealloc list
     InitTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);

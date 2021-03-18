@@ -1123,12 +1123,6 @@ int main(int ArgsCount, char** Args)
     int QueuesJobCounts[] = {DEFAULT_JOBS_COUNT, DEFAULT_JOBS_COUNT};
     Game->JobSystem = InitJobSystem(&GameArena, QueuesThreadCounts, QueuesJobCounts);
     
-    // NOTE(Dima): Init game
-    App->GameInit(Game, &GameArena, &Platform);
-    
-    // NOTE(Dima): Setting up global variables after game init
-    SetGlobalVariables(Game);
-    
 #if 1
     App->WndDims.InitWidth = 1920;
     App->WndDims.InitHeight = 1080;
@@ -1155,6 +1149,13 @@ int main(int ArgsCount, char** Args)
                                    App->WndDims.InitWidth,
                                    App->WndDims.InitHeight,
                                    SDL_WINDOW_OPENGL);
+    
+    // NOTE(Dima): Init game
+    App->GameInit(Game, &GameArena, &Platform, App->WndDims);
+    
+    // NOTE(Dima): Setting up global variables after game init
+    SetGlobalVariables(Game);
+    
     
 #if 0    
     random_generation Random = SeedRandom(1234);

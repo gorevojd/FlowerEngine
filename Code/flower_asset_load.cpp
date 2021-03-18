@@ -88,6 +88,25 @@ INTERNAL_FUNCTION image LoadImageFile(char* FilePath,
     return(Result);
 }
 
+INTERNAL_FUNCTION cubemap LoadCubemap(const char* Left,
+                                      const char* Right,
+                                      const char* Front,
+                                      const char* Back,
+                                      const char* Up,
+                                      const char* Down)
+{
+    cubemap Result = {};
+    
+    Result.Left = LoadImageFile((char*)Left);
+    Result.Right = LoadImageFile((char*)Right);
+    Result.Front = LoadImageFile((char*)Front);
+    Result.Back = LoadImageFile((char*)Back);
+    Result.Top = LoadImageFile((char*)Up);
+    Result.Down = LoadImageFile((char*)Down);
+    
+    return(Result);
+}
+
 INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer, 
                                           const loading_params& Params)
 {

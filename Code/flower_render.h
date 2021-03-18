@@ -164,6 +164,7 @@ struct render_commands
     window_dimensions WindowDimensions;
     image* FontAtlas;
     image* VoxelAtlas;
+    cubemap* Sky;
     
     // NOTE(Dima): Instance table
 #define RENDER_INSTANCE_TABLE_SIZE 256

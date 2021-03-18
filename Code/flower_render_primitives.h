@@ -10,6 +10,7 @@ enum renderer_handle_type
     RendererHandle_Image,
     RendererHandle_Mesh,
     RendererHandle_TextureBuffer,
+    RendererHandle_Cubemap,
 };
 
 struct renderer_handle
@@ -37,6 +38,11 @@ struct renderer_handle
             u64 BufferObject;
             u64 ElementBufferObject;
         } Mesh;
+        
+        struct 
+        {
+            u32 Handle;
+        } Cubemap;
     };
 };
 
@@ -150,6 +156,18 @@ struct image
     u32 Format;
     
     b32 FilteringIsClosest;
+    
+    renderer_handle Handle;
+};
+
+struct cubemap
+{
+    image Left;
+    image Right;
+    image Down;
+    image Top;
+    image Front;
+    image Back;
     
     renderer_handle Handle;
 };

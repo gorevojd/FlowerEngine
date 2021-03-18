@@ -9,6 +9,14 @@ struct pp_dilation_params
     f32 MaxThreshold;
 };
 
+struct pp_depth_of_field_params
+{
+    f32 MinDistance;
+    f32 MaxDistance;
+    
+    f32 FocusZ;
+};
+
 struct pp_ssao_params
 {
     int KernelSize;
@@ -47,6 +55,17 @@ inline pp_dilation_params PP_DilationDefaultParams()
     return(Result);
 }
 
+inline pp_depth_of_field_params PP_DepthOfFieldDefaultParams()
+{
+    pp_depth_of_field_params Result = {};
+    
+    Result.MinDistance = 120.0f;
+    Result.MaxDistance = 280.0f;
+    Result.FocusZ = 0.0f;
+    
+    return(Result);
+}
+
 struct postprocessing
 {
     random_generation Random;
@@ -54,6 +73,8 @@ struct postprocessing
     v3 SSAO_Kernel[128];
     v3 SSAO_Noise[16];
     pp_ssao_params SSAO_Params;
+    
+    pp_depth_of_field_params DOF_Params;
 };
 
 #endif //FLOWER_POSTPROCESS_H

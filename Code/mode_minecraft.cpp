@@ -34,6 +34,7 @@ SCENE_UPDATE(Minecraft)
         SpeedMultiplier *= 20.0f;
     }
     
+    PushSky(&Global_Assets->Sky);
     //PushImage(&Global_Assets->VoxelAtlas, V2(0.0f, 0.0f), 400);
     //PushFullscreenRect(ColorRed());
     

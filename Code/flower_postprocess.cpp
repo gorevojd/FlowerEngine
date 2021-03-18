@@ -30,4 +30,6 @@ INTERNAL_FUNCTION void InitPostprocessing(postprocessing* PP)
     PP->Random = SeedRandom(62313);
     
     InitSSAO(PP);
+    
+    PP->DOF_Params = PP_DepthOfFieldDefaultParams();
 }

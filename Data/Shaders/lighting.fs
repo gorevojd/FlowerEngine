@@ -16,6 +16,9 @@ uniform vec3 CameraP;
 uniform vec3 DirectionalLightDirection;
 uniform vec3 DirectionalLightColor;
 
+uniform samplerCube Sky;
+uniform bool SkyIsSet;
+
 uniform bool SSAOEnabled;
 
 vec3 CalcDirLit(vec3 FragSampleC, vec3 FragN)

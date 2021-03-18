@@ -358,6 +358,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Cube = MakeUnitCube();
     A->Plane = MakePlane();
     
+    A->Sky = LoadCubemap("../Data/Textures/Cubemaps/skybox/left.jpg",
+                         "../Data/Textures/Cubemaps/skybox/right.jpg",
+                         "../Data/Textures/Cubemaps/skybox/front.jpg",
+                         "../Data/Textures/Cubemaps/skybox/back.jpg",
+                         "../Data/Textures/Cubemaps/skybox/top.jpg",
+                         "../Data/Textures/Cubemaps/skybox/bottom.jpg");
+    
     A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");
     A->PlaneTexture = LoadImageFile("E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png");
     loading_params PaletteParams = DefaultLoadingParams();

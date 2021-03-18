@@ -199,6 +199,13 @@ struct opengl_framebuffer
     int Height;
 };
 
+struct opengl_pp_framebuffer
+{
+    opengl_framebuffer FB;
+    
+    b32 IsInUseNow;
+};
+
 struct opengl_g_buffer
 {
     u32 Framebuffer;
@@ -232,12 +239,15 @@ struct opengl_state
     opengl_shader BoxBlurShader;
     opengl_shader DilationShader;
     opengl_shader PosterizeShader;
+    opengl_shader DepthOfFieldShader;
     
     opengl_g_buffer GBuffer;
     opengl_ssao SSAO;
     
     u32 ScreenQuadVAO;
     u32 ScreenQuadVBO;
+    
+    opengl_pp_framebuffer PostProcFramebufferPool[4];
 };
 
 #endif
