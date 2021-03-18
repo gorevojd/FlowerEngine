@@ -490,8 +490,9 @@ INTERNAL_FUNCTION void OpenGLInitCubemap(cubemap* Cubemap)
     
     if(!CubemapHandle->Initialized || WasDeleted)
     {
-        glGenTextures(1, &CubemapHandle->Cubemap.Handle);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, CubemapHandle->Cubemap.Handle);
+        GLuint NewHandle;
+        glGenTextures(1, &NewHandle);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, NewHandle);
         
         BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_POSITIVE_X, &Cubemap->Left);
         BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, &Cubemap->Right);
@@ -505,6 +506,10 @@ INTERNAL_FUNCTION void OpenGLInitCubemap(cubemap* Cubemap)
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        
+        InitRendererHandle(CubemapHandle, RendererHandle_Cubemap);
+        CubemapHandle->Cubemap.Handle = NewHandle;
+        CubemapHandle->Initialized = true;
     }
 }
 
@@ -981,6 +986,65 @@ INTERNAL_FUNCTION void OpenGLInit(render_commands* Commands)
     glVertexAttribPointer(0, 4, GL_FLOAT, 0, 4 * sizeof(float), 0);
     glBindVertexArray(0);
     
+    // NOTE(Dima): Init skybox cube
+    float SkyboxVertices[] = 
+    {
+        // positions          
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+        
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+        
+        -1.0f,  1.0f, -1.0f,
+        1.0f,  1.0f, -1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+        
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f
+    };
+    
+    glGenVertexArrays(1, &OpenGL->SkyboxCubeVAO);
+    glGenBuffers(1, &OpenGL->SkyboxCubeVBO);
+    
+    glBindVertexArray(OpenGL->SkyboxCubeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, OpenGL->SkyboxCubeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(SkyboxVertices), SkyboxVertices, GL_STATIC_DRAW);
+    
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, 0, 3 * sizeof(float), 0);
+    glBindVertexArray(0);
+    
+    
     // NOTE(Dima): Init post process framebuffer pool
     for(int Index = 0;
         Index < ARC(OpenGL->PostProcFramebufferPool);
@@ -1067,6 +1131,14 @@ INTERNAL_FUNCTION void OpenGLInit(render_commands* Commands)
     OpenGL->DepthOfFieldShader = OpenGLLoadShader("DepthOfField",
                                                   "../Data/Shaders/screen.vs",
                                                   "../Data/Shaders/depth_of_field.fs");
+    
+    OpenGL->DepthOfFieldShader = OpenGLLoadShader("DepthOfField",
+                                                  "../Data/Shaders/screen.vs",
+                                                  "../Data/Shaders/depth_of_field.fs");
+    
+    OpenGL->SkyShader = OpenGLLoadShader("Sky",
+                                         "../Data/Shaders/sky.vs",
+                                         "../Data/Shaders/sky.fs");
     
 }
 
@@ -1498,11 +1570,6 @@ INTERNAL_FUNCTION void OpenGLRenderImage(render_commands* Commands,
     glDeleteBuffers(1, &EBO);
 }
 
-INTERNAL_FUNCTION void OpenGLRenderGBufferPass(render_commands* Commands, render_pass* RenderPass)
-{
-    
-}
-
 INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pass* RenderPass)
 {
     for(int CommandIndex = 0;
@@ -1580,35 +1647,70 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pa
                 render_command_voxel_mesh* MeshCommand = GetRenderCommand(Commands, CommandIndex,
                                                                           render_command_voxel_mesh);
                 
-                OpenGLRenderVoxelMesh(Commands,
-                                      RenderPass,
-                                      MeshCommand,
-                                      Commands->VoxelAtlas);
+                b32 IsCulled = IsFrustumCulled(RenderPass, &MeshCommand->CullingInfo);
+                
+                if(!IsCulled)
+                {
+                    OpenGLRenderVoxelMesh(Commands,
+                                          RenderPass,
+                                          MeshCommand,
+                                          Commands->VoxelAtlas);
+                }
             }break;
         }
     }
 }
 
+INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DrawSkyFramebuffer(render_commands* Commands, 
+                                                                   render_pass* Pass)
+{
+    opengl_pp_framebuffer* Result = OpenGL_BeginPP(Commands);
+    OpenGL_BindPP(Result);
+    
+    opengl_state* OpenGL = GetOpenGL(Commands);
+    opengl_shader* Shader = &OpenGL->SkyShader;
+    
+    Shader->Use();
+    m44 View = Pass->View;
+    View.Rows[3] = V4(0.0f, 0.0f, 0.0f, 1.0f);
+    Shader->SetMat4("View", View.e);
+    Shader->SetMat4("Projection", Pass->Projection.e);
+    Shader->SetInt("SkyType", Commands->SkyType);
+    Shader->SetVec3("SkyColor", Commands->SkyColor);
+    
+    if(Commands->Sky)
+    {
+        OpenGLInitCubemap(Commands->Sky);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, Commands->Sky->Handle.Cubemap.Handle);
+    }
+    
+    glBindVertexArray(OpenGL->SkyboxCubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    
+    return(Result);
+}
 
-INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* Commands)
+INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* Commands,
+                                                               render_pass* RenderPass)
 {
     FUNCTION_TIMING();
     
-    opengl_pp_framebuffer* Result = OpenGL_BeginPP(Commands);
-    
-    OpenGL_BindPP(Result);
     
     opengl_state* OpenGL = GetOpenGL(Commands);
     opengl_ssao* SSAO = &OpenGL->SSAO;
     opengl_shader* LitShader = &OpenGL->LightingShader;
     lighting* Lighting = &Commands->Lighting;
     postprocessing* PP = &Commands->PostProcessing;
-    render_pass* RenderPass = &Commands->RenderPasses[0];
-    const m44& Projection = RenderPass->Projection;
+    
+    
+    opengl_pp_framebuffer* SkyFramebuffer = OpenGL_DrawSkyFramebuffer(Commands, RenderPass);
+    opengl_pp_framebuffer* Result = OpenGL_BeginPP(Commands);
+    OpenGL_BindPP(Result);
     
     // NOTE(Dima): LIGHTING PASS. Preparing GBuffer
     LitShader->Use();
     
+    const m44& Projection = RenderPass->Projection;
     LitShader->SetVec4("PerspProjCoefs",
                        Projection.e[0],
                        Projection.e[5],
@@ -1638,6 +1740,9 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* 
                                 SSAO->BlurFramebufferTexture, 4);
     }
     
+    LitShader->SetTexture2D("SkyTexture",
+                            SkyFramebuffer->FB.Texture, 5);
+    
     // NOTE(Dima): Uniform lighting variables
     LitShader->SetVec3("CameraP", RenderPass->CameraP);
     LitShader->SetVec3("DirectionalLightDirection", Lighting->DirLit.Dir);
@@ -1646,6 +1751,8 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* 
     glBindVertexArray(OpenGL->ScreenQuadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+    
+    OpenGL_EndPP(SkyFramebuffer);
     
     return(Result);
 }
@@ -1775,11 +1882,6 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     opengl_state* OpenGL = GetOpenGL(Commands);
     postprocessing* PP = &Commands->PostProcessing;
     
-    if(Commands->Sky)
-    {
-        OpenGLInitCubemap(Commands->Sky);
-    }
-    
     // NOTE(Dima): Culling
     if(Commands->BackfaceCulling && Commands->BackfaceCullingChanged)
     {
@@ -1803,16 +1905,17 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     // NOTE(Dima): Rendering to GBuffer
-    OpenGLRenderCommands(Commands, &Commands->RenderPasses[0]);
+    render_pass* Pass = &Commands->RenderPasses[0];
+    OpenGLRenderCommands(Commands, Pass);
     
     if(PP->SSAO_Params.Enabled)
     {
         OpenGL_SSAO_DoPass(Commands, 
                            &OpenGL->GBuffer,
-                           &Commands->RenderPasses[0]);
+                           Pass);
     }
     
-    opengl_pp_framebuffer* LightingPass = OpenGL_DoLightingPass(Commands);
+    opengl_pp_framebuffer* LightingPass = OpenGL_DoLightingPass(Commands, Pass);
     
     opengl_pp_framebuffer* LittleBlur = OpenGL_DoBoxBlur(Commands, LightingPass->FB.Texture, 3);
     
@@ -1837,7 +1940,8 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     OpenGL_EndPP(Dilation);
     
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, DepthOfField->FB.Framebuffer);
+    //glBindFramebuffer(GL_READ_FRAMEBUFFER, DepthOfField->FB.Framebuffer);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, LightingPass->FB.Framebuffer);
     
     int Width = Commands->WindowDimensions.Width;
     int Height = Commands->WindowDimensions.Height;

@@ -48,7 +48,7 @@ inline pp_dilation_params PP_DilationDefaultParams()
 {
     pp_dilation_params Result = {};
     
-    Result.Size = 5;
+    Result.Size = 3;
     Result.MinThreshold = 0.1f;
     Result.MaxThreshold = 0.3f;
     

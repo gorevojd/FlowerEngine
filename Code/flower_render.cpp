@@ -45,12 +45,14 @@ inline void PushMesh(mesh* Mesh,
 }
 
 inline void PushVoxelChunkMesh(voxel_mesh* Mesh,
-                               v3 ChunkAt)
+                               v3 ChunkAt, 
+                               culling_info CullingInfo = DefaultCullingInfo())
 {
     render_command_voxel_mesh* Entry = PushRenderCommand(RenderCommand_VoxelChunkMesh, render_command_voxel_mesh);
     
     Entry->Mesh = Mesh;
     Entry->ChunkAt = ChunkAt;
+    Entry->CullingInfo = CullingInfo;
 }
 
 INTERNAL_FUNCTION inline u32 GetMeshHash(mesh* Mesh)
@@ -193,6 +195,13 @@ inline void PushInstanceMesh(int MaxInstanceCount,
 inline void PushSky(cubemap* Cubemap)
 {
     Global_RenderCommands->Sky = Cubemap;
+    Global_RenderCommands->SkyType = RenderSky_Skybox;
+}
+
+inline void PushSky(v3 Color)
+{
+    Global_RenderCommands->SkyColor = Color;
+    Global_RenderCommands->SkyType = RenderSky_SolidColor;
 }
 
 inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
@@ -645,7 +654,8 @@ INTERNAL_FUNCTION void DeallocateDeallocEntry(render_api_dealloc_entry* Entry)
 
 INTERNAL_FUNCTION render_pass* AddRenderPass(const m44& CameraView,
                                              const m44& CameraProjection,
-                                             v3 CameraP)
+                                             v3 CameraP,
+                                             f32 Far, f32 Near)
 {
     Assert(Global_RenderCommands->RenderPassCount < ARC(Global_RenderCommands->RenderPasses));
     render_pass* Result = &Global_RenderCommands->RenderPasses[Global_RenderCommands->RenderPassCount++];
@@ -654,6 +664,55 @@ INTERNAL_FUNCTION render_pass* AddRenderPass(const m44& CameraView,
     Result->Projection = CameraProjection;
     Result->ViewProjection = CameraView * CameraProjection;
     Result->CameraP = CameraP;
+    Result->Far = Far;
+    Result->Near = Near;
+    
+    v4* FrustumPlanes = Result->FrustumPlanes;
+    const m44& ViewProj = Result->ViewProjection;
+    
+    //NOTE(dima): Left plane
+    FrustumPlanes[0].A = ViewProj.e[3] + ViewProj.e[0];
+    FrustumPlanes[0].B = ViewProj.e[7] + ViewProj.e[4];
+    FrustumPlanes[0].C = ViewProj.e[11] + ViewProj.e[8];
+    FrustumPlanes[0].D = ViewProj.e[15] + ViewProj.e[12];
+    
+    //NOTE(dima): Right plane
+    FrustumPlanes[1].A = ViewProj.e[3] - ViewProj.e[0];
+    FrustumPlanes[1].B = ViewProj.e[7] - ViewProj.e[4];
+    FrustumPlanes[1].C = ViewProj.e[11] - ViewProj.e[8];
+    FrustumPlanes[1].D = ViewProj.e[15] - ViewProj.e[12];
+    
+    //NOTE(dima): Bottom plane
+    FrustumPlanes[2].A = ViewProj.e[3] + ViewProj.e[1];
+    FrustumPlanes[2].B = ViewProj.e[7] + ViewProj.e[5];
+    FrustumPlanes[2].C = ViewProj.e[11] + ViewProj.e[9];
+    FrustumPlanes[2].D = ViewProj.e[15] + ViewProj.e[13];
+    
+    //NOTE(dima): Top plane
+    FrustumPlanes[3].A = ViewProj.e[3] - ViewProj.e[1];
+    FrustumPlanes[3].B = ViewProj.e[7] - ViewProj.e[5];
+    FrustumPlanes[3].C = ViewProj.e[11] - ViewProj.e[9];
+    FrustumPlanes[3].D = ViewProj.e[15] - ViewProj.e[13];
+    
+    //NOTE(dima): Near plane
+    FrustumPlanes[4].A = ViewProj.e[3] + ViewProj.e[2];
+    FrustumPlanes[4].B = ViewProj.e[7] + ViewProj.e[6];
+    FrustumPlanes[4].C = ViewProj.e[11] + ViewProj.e[10];
+    FrustumPlanes[4].D = ViewProj.e[15] + ViewProj.e[14];
+    
+    //NOTE(dima): Far plane
+    FrustumPlanes[5].A = ViewProj.e[3] - ViewProj.e[2];
+    FrustumPlanes[5].B = ViewProj.e[7] - ViewProj.e[6];
+    FrustumPlanes[5].C = ViewProj.e[11] - ViewProj.e[10];
+    FrustumPlanes[5].D = ViewProj.e[15] - ViewProj.e[14];
+    
+    // NOTE(Dima): Normalizing planes
+    for (int PlaneIndex = 0;
+         PlaneIndex < 6;
+         PlaneIndex++)
+    {
+        FrustumPlanes[PlaneIndex] = NormalizePlane(FrustumPlanes[PlaneIndex]);
+    }
     
     return(Result);
 }
@@ -671,6 +730,11 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions)
     
     Commands->RenderPassCount = 0;
     Commands->WindowDimensions = WindowDimensions;
+    
+    // NOTE(Dima): Init sky
+    Commands->SkyColor = Commands->DefaultSkyColor;
+    Commands->SkyType = Commands->DefaultSkyType;
+    Commands->Sky = 0;
     
     // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();
@@ -718,6 +782,9 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensi
     
     InitLighting(&Global_RenderCommands->Lighting);
     InitPostprocessing(&Global_RenderCommands->PostProcessing);
+    
+    Global_RenderCommands->DefaultSkyColor = V3(0.1f, 0.7f, 0.8f);
+    Global_RenderCommands->DefaultSkyType = RenderSky_SolidColor;
     
     // NOTE(Dima): Init some settings
     SetBackfaceCulling(false);

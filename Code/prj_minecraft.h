@@ -229,6 +229,10 @@ struct minc_chunk
     int GenerationSidesCount;
     int ExpectedVerticesCount;
     b32 SucceededGenerateMesh;
+    
+    b32 BoundingSphereGenerated;
+    f32 BoundingSphereR;
+    v3 BoundingSphereCenter;
 };
 
 struct minc_chunk_side

@@ -8,7 +8,7 @@ uniform sampler2D NormalTex;
 uniform sampler2D ColorSpecTex;
 uniform sampler2D SSAOTex;
 uniform sampler2D PositionsTex;
-uniform sampler2D ViewPositionsTex;
+uniform sampler2D SkyTexture;
 uniform vec4 PerspProjCoefs;
 uniform vec2 WH;
 
@@ -16,8 +16,6 @@ uniform vec3 CameraP;
 uniform vec3 DirectionalLightDirection;
 uniform vec3 DirectionalLightColor;
 
-uniform samplerCube Sky;
-uniform bool SkyIsSet;
 
 uniform bool SSAOEnabled;
 
@@ -43,15 +41,19 @@ void main()
 	vec2 PixelDelta = vec2(1.0f) / WH;
 
 	vec4 SampleColorSpec = texture2D(ColorSpecTex, FragUV);
-	vec3 Normal = texture2D(NormalTex, FragUV).xyz;
-	vec3 SamplePosition = texture2D(PositionsTex, FragUV).xyz;
-	vec3 SampleViewPosition = texture2D(ViewPositionsTex, FragUV).xyz;
-	vec3 FragWorldP = SamplePosition;
+	vec3 WorldN = texture2D(NormalTex, FragUV).xyz;
+	vec3 WorldP = texture2D(PositionsTex, FragUV).xyz;
+	float SampleDepth = texture2D(DepthTex, FragUV).r;
 
 	vec3 ResultColor = vec3(0.0f);
 	ResultColor += SampleColorSpec.rgb * 0.25f;
-	ResultColor += CalcDirLit(SampleColorSpec.rgb, Normal);
+	ResultColor += CalcDirLit(SampleColorSpec.rgb, WorldN);
 	
+	if(SampleDepth > 0.999999)
+	{
+		ResultColor = texture2D(SkyTexture, FragUV).rgb;
+	}
+
 	if(SSAOEnabled)
 	{
 		float SampleOcclusion = texture2D(SSAOTex, FragUV).r;

@@ -91,7 +91,7 @@ INTERNAL_FUNCTION task_memory_pool* CreateTaskMemoryPoolStatic(memory_arena* Are
     
     Result->Arena = Arena;
     Result->Type = TaskMemoryPool_Static;
-    Result->Lock = PushNew<std::mutex>(Arena);
+    InitTicketMutex(&Result->Lock);
     
     // NOTE(Dima): Init sentinels
     DLIST_REFLECT_PTRS(Result->Use, Next, Prev);
@@ -110,7 +110,7 @@ INTERNAL_FUNCTION task_memory_pool* CreateTaskMemoryPoolDynamic(memory_arena* Ar
     
     Result->Arena = Arena;
     Result->Type = TaskMemoryPool_Dynamic;
-    Result->Lock = PushNew<std::mutex>(Arena);
+    InitTicketMutex(&Result->Lock);
     
     // NOTE(Dima): Init sentinels
     DLIST_REFLECT_PTRS(Result->Use, Next, Prev);
@@ -126,7 +126,7 @@ INTERNAL_FUNCTION task_memory* GetTaskMemoryForUse(task_memory_pool* Pool, mi Si
 {
     task_memory* Result = 0;
     
-    Pool->Lock->lock();
+    BeginTicketMutex(&Pool->Lock);
     
     if(Pool->Type == TaskMemoryPool_Static)
     {
@@ -176,7 +176,7 @@ INTERNAL_FUNCTION task_memory* GetTaskMemoryForUse(task_memory_pool* Pool, mi Si
         Pool->UseCount++;
     }
     
-    Pool->Lock->unlock();
+    EndTicketMutex(&Pool->Lock);
     
     return(Result);
 }
@@ -185,7 +185,7 @@ INTERNAL_FUNCTION inline void FreeTaskMemory(task_memory* Task)
 {
     task_memory_pool* Pool = Task->ParentPool;
     
-    Pool->Lock->lock();
+    BeginTicketMutex(&Pool->Lock);
     
     DLIST_REMOVE(Task, Next, Prev);
     DLIST_INSERT_BEFORE_SENTINEL(Task, Pool->Free, Next, Prev);
@@ -194,5 +194,5 @@ INTERNAL_FUNCTION inline void FreeTaskMemory(task_memory* Task)
     Pool->UseCount--;
     FreeArena(&Task->Arena);
     
-    Pool->Lock->unlock();
+    EndTicketMutex(&Pool->Lock);
 }

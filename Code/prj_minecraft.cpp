@@ -282,6 +282,9 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
     int TotalVerticesCount = 0;
     int TotalFaceCount = 0;
     
+    f32 MaxY = -1;
+    f32 MinY = MINC_CHUNK_HEIGHT + 1;
+    
     for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
     {
         for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
@@ -434,6 +437,16 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                                     Vertex |= (VertexY & 255) << 12;
                                     
                                     Mesh->Vertices[Mesh->VerticesCount++] = Vertex;
+                                    
+                                    if((f32)VertexY > MaxY)
+                                    {
+                                        MaxY = VertexY;
+                                    }
+                                    
+                                    if((f32)VertexY < MinY)
+                                    {
+                                        MinY = VertexY;
+                                    }
                                 }
                                 TotalVerticesCount++;
                             }
@@ -462,6 +475,20 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
     {
         Result = false;
     }
+    
+    // NOTE(Dima): Getting mesh bounding box
+    v3 ChunkWorldP = V3(Chunk->CoordX * MINC_CHUNK_WIDTH,
+                        0.0f,
+                        Chunk->CoordZ * MINC_CHUNK_WIDTH);
+    
+    
+    f32 YRad = std::abs(MaxY - MinY) * 0.5f;
+    f32 SideRad = (f32)MINC_CHUNK_WIDTH * 0.5f;
+    Chunk->BoundingSphereR = Sqrt(YRad * YRad + 2.0f * SideRad * SideRad);
+    Chunk->BoundingSphereCenter = V3(((f32)Chunk->CoordX + 0.5f) * (f32)MINC_CHUNK_WIDTH,
+                                     MinY + (MaxY - MinY) * 0.5f,
+                                     ((f32)Chunk->CoordZ + 0.5f) * (f32)MINC_CHUNK_WIDTH);
+    Chunk->BoundingSphereGenerated = true;
     
     return(Result);
 }
@@ -1322,6 +1349,7 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                 memset(Chunk->Blocks, 0, MINC_CHUNK_COUNT);
                 Chunk->Mesh.Free = 0;
                 Chunk->ExpectedVerticesCount = 0;
+                Chunk->BoundingSphereGenerated = false;
                 
                 // NOTE(Dima): Setting chunk
                 Chunk->CoordX = X;
@@ -1501,7 +1529,11 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                     else
                     {
                         // NOTE(Dima): Render chunk
-                        PushVoxelChunkMesh(&Chunk->Mesh, ChunkWorldP);
+                        PushVoxelChunkMesh(&Chunk->Mesh, 
+                                           ChunkWorldP, 
+                                           CullingInfo(Chunk->BoundingSphereCenter,
+                                                       Chunk->BoundingSphereR,
+                                                       true));
                     }
                 }
             }
@@ -1613,7 +1645,7 @@ INTERNAL_FUNCTION void MincInitChunksSidesPool(minecraft* Mine)
 INTERNAL_FUNCTION void CreateMinecraft(memory_arena* Arena, minecraft* Mine)
 {
     Mine->Arena = Arena;
-    Mine->ChunksViewDistance = 20;
+    Mine->ChunksViewDistance = 30;
     
     InitMinecraftBlockTextures(Mine);
     InitMinecraftTextureOffsets(Mine);

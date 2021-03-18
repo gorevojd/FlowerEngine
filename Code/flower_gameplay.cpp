@@ -156,7 +156,9 @@ INTERNAL_FUNCTION render_pass* SetMatrices(game_camera* Camera)
     
     render_pass* RenderPass = AddRenderPass(View,
                                             Projection,
-                                            Camera->P);
+                                            Camera->P,
+                                            Camera->FarClipPlane,
+                                            Camera->NearClipPlane);
     
     return(RenderPass);
 }

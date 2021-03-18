@@ -240,12 +240,18 @@ struct opengl_state
     opengl_shader DilationShader;
     opengl_shader PosterizeShader;
     opengl_shader DepthOfFieldShader;
+    opengl_shader SkyShader;
     
     opengl_g_buffer GBuffer;
     opengl_ssao SSAO;
     
+    // NOTE(Dima): Screen quad
     u32 ScreenQuadVAO;
     u32 ScreenQuadVBO;
+    
+    // NOTE(Dima): Skybox cube
+    u32 SkyboxCubeVAO;
+    u32 SkyboxCubeVBO;
     
     opengl_pp_framebuffer PostProcFramebufferPool[4];
 };

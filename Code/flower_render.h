@@ -9,6 +9,34 @@
 #define RENDER_DEFAULT_2D_LINE_DASH_SPACING 8.0f
 #define RENDER_MAX_BONES 256
 
+struct culling_info
+{
+    b32 Enabled;
+    
+    v3 BoundSphereP;
+    f32 BoundSphereR;
+};
+
+inline culling_info DefaultCullingInfo()
+{
+    culling_info Result = {};
+    
+    Result.Enabled = false;
+    
+    return(Result);
+}
+
+inline culling_info CullingInfo(v3 Center, f32 Rad, b32 Enabled)
+{
+    culling_info Result = {};
+    
+    Result.BoundSphereP = Center;
+    Result.BoundSphereR = Rad;
+    Result.Enabled = Enabled;
+    
+    return(Result);
+}
+
 enum render_command_type
 {
     RenderCommand_Clear,
@@ -75,6 +103,8 @@ struct render_command_voxel_mesh
     voxel_mesh* Mesh;
     
     v3 ChunkAt;
+    
+    culling_info CullingInfo;
 };
 
 struct render_mesh_instance
@@ -138,6 +168,39 @@ struct render_pass
     m44 Projection;
     m44 ViewProjection;
     v3 CameraP;
+    
+    f32 Far;
+    f32 Near;
+    
+    v4 FrustumPlanes[6];
+};
+
+inline b32 IsFrustumCulled(render_pass* Pass, culling_info* Culling)
+{
+    b32 Result = false;
+    
+    if(Culling->Enabled)
+    {
+        for(int i = 0; i < 6; i++)
+        {
+            f32 PlaneTest = PlanePointTest(Pass->FrustumPlanes[i], Culling->BoundSphereP);
+            if(PlaneTest + Culling->BoundSphereR < 0.0f)
+            {
+                // NOTE(Dima): It means that culling happened on one of sides and object will not be visible
+                Result = true;
+                break;
+            }
+        }
+    }
+    
+    return(Result);
+}
+
+enum render_sky_type
+{
+    RenderSky_SolidColor,
+    RenderSky_Gradient,
+    RenderSky_Skybox,
 };
 
 struct render_commands
@@ -165,6 +228,10 @@ struct render_commands
     image* FontAtlas;
     image* VoxelAtlas;
     cubemap* Sky;
+    int SkyType;
+    int DefaultSkyType;
+    v3 DefaultSkyColor;
+    v3 SkyColor;
     
     // NOTE(Dima): Instance table
 #define RENDER_INSTANCE_TABLE_SIZE 256

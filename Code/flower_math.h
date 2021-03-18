@@ -96,6 +96,21 @@ union v4
         f32 a;
     };
     
+    struct 
+    {
+        union
+        {
+            struct 
+            {
+                f32 A, B, C;
+            };
+            
+            v3 ABC;
+        };
+        
+        f32 D;
+    };
+    
     f32 e[4];
 };
 
@@ -1852,6 +1867,27 @@ inline v3 LineEquationFrom2Points(v2 P1, v2 P2)
 	Result *= RSqrt(PlaneNormalSq);
     
 	return(Result);
+}
+
+/*Plane math*/
+inline v4 NormalizePlane(v4 Plane)
+{
+    float NormalLen = Magnitude(Plane.ABC);
+    
+    v4 Result;
+    Result.A = Plane.A / NormalLen;
+    Result.B = Plane.B / NormalLen;
+    Result.C = Plane.C / NormalLen;
+    Result.D = Plane.D / NormalLen;
+    
+    return(Result);
+}
+
+inline float PlanePointTest(v4 Plane, v3 Point) 
+{
+    float Res = Dot(Plane.ABC, Point) + Plane.D;
+    
+    return(Res);
 }
 
 #endif

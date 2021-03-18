@@ -78,7 +78,7 @@ struct task_memory_pool
     int UseCount;
     int FreeCount;
     
-    std::mutex* Lock;
+    ticket_mutex Lock;
 };
 
 // NOTE(Dima): Returns true if no jobs to perform
