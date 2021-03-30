@@ -18,12 +18,12 @@ inline void* PushRenderCommand_(u32 CommandType, u32 SizeOfCommandStruct)
 
 #define PushRenderCommand(type, struct_type) (struct_type*)PushRenderCommand_(type, sizeof(struct_type))
 
-inline void PushClear(v3 Color, u32 Flags = RenderClear_Color)
+inline void PushClear(v3 Color, u32 Flags = RenderClear_Color | RenderClear_Depth)
 {
-    render_command_clear* Entry = PushRenderCommand(RenderCommand_Clear, render_command_clear);
+    Global_RenderCommands->ClearCommand.Set = true;
     
-    Entry->C = Color;
-    Entry->Flags = Flags;
+    Global_RenderCommands->ClearCommand.C = Color;
+    Global_RenderCommands->ClearCommand.Flags = Flags;
 }
 
 inline void PushMesh(mesh* Mesh, 
@@ -652,23 +652,21 @@ INTERNAL_FUNCTION void DeallocateDeallocEntry(render_api_dealloc_entry* Entry)
     EndTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);
 }
 
-INTERNAL_FUNCTION render_pass* AddRenderPass(const m44& CameraView,
-                                             const m44& CameraProjection,
-                                             v3 CameraP,
-                                             f32 Far, f32 Near)
+INTERNAL_FUNCTION inline render_pass* AddRenderPass(b32 IsShadowPass = false)
 {
     Assert(Global_RenderCommands->RenderPassCount < ARC(Global_RenderCommands->RenderPasses));
     render_pass* Result = &Global_RenderCommands->RenderPasses[Global_RenderCommands->RenderPassCount++];
     
-    Result->View = CameraView;
-    Result->Projection = CameraProjection;
-    Result->ViewProjection = CameraView * CameraProjection;
-    Result->CameraP = CameraP;
-    Result->Far = Far;
-    Result->Near = Near;
+    Result->ClippingPlaneIsSet = false;
+    Result->IsShadowPass = IsShadowPass;
     
-    v4* FrustumPlanes = Result->FrustumPlanes;
-    const m44& ViewProj = Result->ViewProjection;
+    return(Result);
+}
+
+INTERNAL_FUNCTION void CalculateFrustumPlanes(render_pass* RenderPass)
+{
+    v4* FrustumPlanes = RenderPass->FrustumPlanes;
+    const m44& ViewProj = RenderPass->ViewProjection;
     
     //NOTE(dima): Left plane
     FrustumPlanes[0].A = ViewProj.e[3] + ViewProj.e[0];
@@ -713,8 +711,148 @@ INTERNAL_FUNCTION render_pass* AddRenderPass(const m44& CameraView,
     {
         FrustumPlanes[PlaneIndex] = NormalizePlane(FrustumPlanes[PlaneIndex]);
     }
+}
+
+INTERNAL_FUNCTION void SetPerspectivePassData(render_pass* RenderPass,
+                                              v3 CameraP,
+                                              const m44& View,
+                                              f32 Width, f32 Height,
+                                              f32 Far, f32 Near,
+                                              f32 FOVDegrees = 45.0f)
+{
+    RenderPass->CameraP = CameraP;
+    RenderPass->View = View;
+    RenderPass->Projection = PerspectiveProjection(Width, Height,
+                                                   Far, Near,
+                                                   FOVDegrees);
+    RenderPass->ViewProjection = RenderPass->View * RenderPass->Projection;
+    
+    m44 InvView = InverseMatrix4(View);
+    RenderPass->CameraLeft = InvView.Rows[0].xyz;
+    RenderPass->CameraUp = InvView.Rows[1].xyz;
+    RenderPass->CameraFront = InvView.Rows[2].xyz;
+    
+    RenderPass->Width = Width;
+    RenderPass->Height = Height;
+    RenderPass->Far = Far;
+    RenderPass->Near = Near;
+    RenderPass->FOVDegrees = FOVDegrees;
+    
+    CalculateFrustumPlanes(RenderPass);
+}
+
+INTERNAL_FUNCTION inline void SetClippingPlane(render_pass* RenderPass, v4 ClippingPlane)
+{
+    RenderPass->ClippingPlaneIsSet = true;
+    RenderPass->ClippingPlane = ClippingPlane;
+}
+
+INTERNAL_FUNCTION void SetOrthographicPassData(render_pass* RenderPass,
+                                               v3 CameraP,
+                                               const m44& View,
+                                               f32 Far, f32 Near,
+                                               f32 RadiusW,
+                                               f32 RadiusH)
+{
+    RenderPass->CameraP = CameraP;
+    RenderPass->View = View;
+    RenderPass->Projection = OrthographicProjection(RadiusW, RadiusH,
+                                                    Far, Near);
+    RenderPass->ViewProjection = RenderPass->View * RenderPass->Projection;
+    
+    RenderPass->Far = Far;
+    RenderPass->Near = Near;
+}
+
+
+INTERNAL_FUNCTION void UpdateShadowCascades(render_pass* MainRenderPass)
+{
+    int CascadesCount;
+    shadow_cascade_info* Cascades = GetDirLitCascades(&Global_RenderCommands->Lighting, 
+                                                      MainRenderPass, 
+                                                      &CascadesCount);
+    
+    for(int CascadeIndex = 0;
+        CascadeIndex < CascadesCount;
+        CascadeIndex++)
+    {
+        shadow_cascade_info* Cascade = &Global_RenderCommands->Lighting.Cascades[CascadeIndex];
+        
+        Cascade->RenderPass = AddRenderPass(true);
+        
+        SetOrthographicPassData(Cascade->RenderPass,
+                                Cascade->P, Cascade->View,
+                                Cascade->Far, Cascade->Near,
+                                Cascade->ViewRadiusW,
+                                Cascade->ViewRadiusH);
+    }
+    
+}
+
+INTERNAL_FUNCTION inline render_water_params DefaultWaterParams()
+{
+    render_water_params Result = {};
+    
+    Result.Height = 0.0f;
+    Result.Color = ColorFromHex("#D4F1F9");
     
     return(Result);
+}
+
+INTERNAL_FUNCTION void  PushWater(render_water_params Params,
+                                  render_pass* MainRenderPass)
+{
+    render_water* Water = &Global_RenderCommands->Water;
+    Global_RenderCommands->WaterIsSet = true;
+    
+    v4 ReflectionPlane = V4(V3_Up(), -Params.Height);
+    
+    Water->Params = Params;
+    Water->PlaneEquation = ReflectionPlane;
+    
+    // NOTE(Dima): SEtting refraction pass
+    Water->RefractionPass = AddRenderPass();
+    SetPerspectivePassData(Water->RefractionPass, 
+                           MainRenderPass->CameraP,
+                           MainRenderPass->View,
+                           MainRenderPass->Width,
+                           MainRenderPass->Height,
+                           MainRenderPass->Far,
+                           MainRenderPass->Near,
+                           MainRenderPass->FOVDegrees);
+    SetClippingPlane(Water->RefractionPass, ReflectionPlane);
+    
+    // NOTE(Dima): Setting reflection pass
+    v3 OppositeCameraP = MainRenderPass->CameraP;
+    v3 OppositeCameraForward = V3(MainRenderPass->View.e[2],
+                                  MainRenderPass->View.e[6],
+                                  MainRenderPass->View.e[10]);
+    
+    // NOTE(Dima): Reflecting cameras position
+    v3 PlaneOrigin = ReflectionPlane.ABC * (-ReflectionPlane.D);
+    v3 OffsetToCameraInit = OppositeCameraP - PlaneOrigin;
+    v3 ReflectedOffset = Reflect(OffsetToCameraInit, ReflectionPlane.ABC);
+    OppositeCameraP = PlaneOrigin + ReflectedOffset;
+    
+    // NOTE(Dima): Reflecting cameras forward
+    OppositeCameraForward = Reflect(OppositeCameraForward, 
+                                    ReflectionPlane.ABC);
+    
+    m44 OppositeView = LookAt(OppositeCameraP,
+                              OppositeCameraP + OppositeCameraForward,
+                              V3_Down(),
+                              true);
+    
+    Water->ReflectionPass = AddRenderPass();
+    SetPerspectivePassData(Water->ReflectionPass, 
+                           OppositeCameraP,
+                           OppositeView,
+                           MainRenderPass->Width,
+                           MainRenderPass->Height,
+                           MainRenderPass->Far,
+                           MainRenderPass->Near,
+                           MainRenderPass->FOVDegrees);
+    SetClippingPlane(Water->ReflectionPass, ReflectionPlane);
 }
 
 INTERNAL_FUNCTION void RenderPushDeallocateHandle(renderer_handle* Handle)
@@ -724,17 +862,23 @@ INTERNAL_FUNCTION void RenderPushDeallocateHandle(renderer_handle* Handle)
     Entry->Handle = Handle;
 }
 
-INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions)
+INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
+                                   f32 Time)
 {
     render_commands* Commands = Global_RenderCommands;
     
     Commands->RenderPassCount = 0;
     Commands->WindowDimensions = WindowDimensions;
+    Commands->Time = Time;
     
     // NOTE(Dima): Init sky
     Commands->SkyColor = Commands->DefaultSkyColor;
     Commands->SkyType = Commands->DefaultSkyType;
     Commands->Sky = 0;
+    
+    // NOTE(Dima): Init other things
+    Commands->WaterIsSet = false;
+    Commands->Water = {};
     
     // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();
@@ -754,14 +898,9 @@ INTERNAL_FUNCTION void EndRender()
     
     ResetRectBuffer(&Commands->Rects2D);
     Commands->Sky = 0;
+    Commands->ClearCommand.Set = false;
     
     DLIST_REMOVE_ENTIRE_LIST(&Commands->ImageUse, &Commands->ImageFree, Next, Prev);
-}
-
-INTERNAL_FUNCTION inline void SetBackfaceCulling(b32 Value)
-{
-    Global_RenderCommands->BackfaceCullingChanged = (Value != Global_RenderCommands->BackfaceCulling);
-    Global_RenderCommands->BackfaceCulling = Value;
 }
 
 INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensions)
@@ -780,12 +919,9 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensi
     DLIST_REFLECT_PTRS(Global_RenderCommands->ImageUse, Next, Prev);
     DLIST_REFLECT_PTRS(Global_RenderCommands->ImageFree, Next, Prev);
     
-    InitLighting(&Global_RenderCommands->Lighting);
+    InitLighting(&Global_RenderCommands->Lighting, Arena);
     InitPostprocessing(&Global_RenderCommands->PostProcessing);
     
     Global_RenderCommands->DefaultSkyColor = V3(0.1f, 0.7f, 0.8f);
     Global_RenderCommands->DefaultSkyType = RenderSky_SolidColor;
-    
-    // NOTE(Dima): Init some settings
-    SetBackfaceCulling(false);
 }

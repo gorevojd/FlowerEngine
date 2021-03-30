@@ -1,6 +1,18 @@
 #ifndef PRJ_MINECRAFT_H
 #define PRJ_MINECRAFT_H
 
+/*
+
+ Vertex structure:
+6, 8, 6 bits - for x y z
+
+Per-face structure
+3 bits - normal
+8 bits - bitmap ID
+1 bit - if geometry is floating
+
+*/
+
 #define MINC_CHUNK_WIDTH 32
 #define MINC_CHUNK_HEIGHT 128
 
@@ -147,6 +159,7 @@ enum minc_biome_type
 {
     MincBiome_Desert,
     MincBiome_Standard,
+    MincBiome_Standard2,
     MincBiome_SnowTaiga,
     
     MincBiome_Count,

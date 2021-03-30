@@ -22,9 +22,14 @@ vec3 NormalTypes[6] = vec3[6](
 uniform mat4 ViewProjection;
 uniform mat4 Projection;
 uniform mat4 View;
+uniform float Time;
 
 uniform vec3 ChunkAt;
 uniform usamplerBuffer PerFaceData;
+
+uniform bool HasClippingPlane;
+uniform vec4 ClippingPlane;
+out float gl_ClipDistance[1];
 
 void main()
 {
@@ -71,12 +76,33 @@ void main()
 		VsOut.TexCoords = EndUV;
 	}
 
+	//Geometry is floating
+	uint IsFloatingGeometry = (PerFaceEntry >> 11u) & 1u;
+	
+
 	//Calculating vertex clip space P
 	vec3 VertP = ChunkAt + vec3(float(InChunkX), float(InChunkY), float(InChunkZ));
-	vec4 CalculatedP = vec4(VertP, 1.0f);
+
+	vec3 AddOffset = vec3(0.0);	
+	if(IsFloatingGeometry == 1u)
+	{
+		int TriangleIndex = InFaceID / 3;
+		int InTriangleIndex = InFaceID % 3;
+
+		float WaveTime = Time;
+		AddOffset = vec3(
+			cos(WaveTime * 0.5 + VertP.x * 2.0 + VertP.y * 2.3f + VertP.z * 1.8f),
+			sin(WaveTime * 0.4 + VertP.x * 2.2 + VertP.y * 2.1f + VertP.z * 1.7f),
+			cos(WaveTime * 0.45 + VertP.x * 1.85 + VertP.y * 2.25f + VertP.z * 2.1f)
+		) * 0.1;
+	}
+
+	VertP += AddOffset;
+	vec4 CalculatedP = vec4(VertP, 1.0);
 
 	gl_Position = CalculatedP * ViewProjection;
 
 	VsOut.FragP = VertP;
-	VsOut.Color = vec3(1.0f);
+	VsOut.Color = vec3(1.0);
+	gl_ClipDistance[0] = dot(CalculatedP, ClippingPlane);
 }

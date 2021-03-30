@@ -8,7 +8,10 @@ uniform mat4 View;
 
 void main()
 {
-	gl_Position = vec4(InPosition, 1.0f) * View * Projection;
+	vec4 Pos = vec4(InPosition, 1.0f) * View * Projection;
+	Pos = Pos.xyww;
+	Pos.z -= 0.000001;
+	gl_Position = Pos;
 
 	SampleDir = InPosition;
 }

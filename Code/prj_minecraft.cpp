@@ -197,8 +197,8 @@ INTERNAL_FUNCTION void InitMinecraftBiomes(minecraft* Mine)
     
     minc_biome* Desert = CreateDefaultBiome(Mine, MincBiome_Desert, 10);
     Desert->NoiseFrequency = 1024.0f;
-    Desert->NoiseScale = 10.0f;
-    Desert->BaseHeight = 50.0f;
+    Desert->NoiseScale = 16.0f;
+    Desert->BaseHeight = 40.0f;
     Desert->LayerBlocks[0] = MincBlock_Sand;
     Desert->LayerBlocks[1] = MincBlock_Sand;
     Desert->LayerBlocks[2] = MincBlock_Ground;
@@ -206,15 +206,22 @@ INTERNAL_FUNCTION void InitMinecraftBiomes(minecraft* Mine)
     Desert->HasTrees = false;
     
     minc_biome* Standard = CreateDefaultBiome(Mine, MincBiome_Standard, 20);
-    Standard->NoiseFrequency = 700.0f;
-    Standard->NoiseScale = 20.0f;
-    Standard->BaseHeight = 50.0f;
+    Standard->NoiseFrequency = 300.0f;
+    Standard->NoiseScale = 16.0f;
+    Standard->BaseHeight = 40.0f;
     Standard->TreeCrownBlock = MincBlock_TreeLeaves;
     Standard->TreeTrunkBlock = MincBlock_TreeWoodBirch;
     
-    minc_biome* SnowTaiga = CreateDefaultBiome(Mine, MincBiome_SnowTaiga, 20);
+    minc_biome* Standard2 = CreateDefaultBiome(Mine, MincBiome_Standard2, 28);
+    Standard2->NoiseFrequency = 800.0f;
+    Standard2->NoiseScale = 15.0f;
+    Standard2->BaseHeight = 27.0f;
+    Standard2->TreeCrownBlock = MincBlock_TreeLeaves;
+    Standard2->TreeTrunkBlock = MincBlock_TreeWoodBirch;
+    
+    minc_biome* SnowTaiga = CreateDefaultBiome(Mine, MincBiome_SnowTaiga, 40);
     SnowTaiga->NoiseFrequency = 256.0f;
-    SnowTaiga->NoiseScale = 40.0f;
+    SnowTaiga->NoiseScale = 45.0f;
     SnowTaiga->BaseHeight = 60.0f;
     SnowTaiga->LayerBlocks[0] = MincBlock_SnowGround;
     SnowTaiga->TreeDensity = 0.004f;
@@ -300,6 +307,8 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                 b32 IsOuterZ = (z == 0) || (z == MINC_CHUNK_WIDTH - 1);
                 
                 b32 BlockIsOuter = IsOuterX || IsOuterY || IsOuterZ;
+                b32 BlockIsLeaves = ((BlockType == MincBlock_TreeLeaves) || 
+                                     (BlockType == MincBlock_TreeLeavesSnow));
                 
                 if(BlockType != MincBlock_Empty)
                 {
@@ -456,6 +465,7 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                                 // NOTE(Dima): Generating and Setting per face data
                                 u32 PerFace = NormalDir;
                                 PerFace |= ((TexIndex & 255) << 3);
+                                PerFace |= (BlockIsLeaves & 1) << 11;
                                 
                                 Mesh->PerFaceData[Mesh->FaceCount++] = PerFace;
                             }
@@ -638,9 +648,9 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMapsWork)
             int TargetIndex = z * MINC_CHUNK_WIDTH + x;
             
             // NOTE(Dima): Generating and finding biome
-            f32 BiomeNoiseInit = stb_perlin_noise3((ChunkWorldP.x + x) / 256.0f, 
+            f32 BiomeNoiseInit = stb_perlin_noise3((ChunkWorldP.x + x) / 512.0f, 
                                                    0.0f, 
-                                                   (ChunkWorldP.z + z) / 256.0f,
+                                                   (ChunkWorldP.z + z) / 512.0f,
                                                    0, 0, 0);
             f32 BiomeNoise = BiomeNoiseInit * 0.5f + 0.5f;
             
@@ -846,7 +856,23 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
             // NOTE(Dima): Setting block type at height
             int CurrentHeight = Meta->HeightMap[IndexInMap];
             
-            if(Biome->HasTrees)
+            if(CurrentHeight < 35)
+            {
+                int GroundLayerHeight = RandomBetweenU32(&Random, 5, 7);
+                MincSetColumn(Chunk, 
+                              CurrentHeight - (GroundLayerHeight - 1), 
+                              CurrentHeight,
+                              x, z,
+                              MincBlock_Sand);
+                
+                // NOTE(Dima): Setting stones
+                CurrentHeight -= GroundLayerHeight;
+                MincSetColumn(Chunk,
+                              0, CurrentHeight,
+                              x, z,
+                              Biome->LayerBlocks[3]);
+            }
+            else if(Biome->HasTrees)
             {
                 f32 RandomVal = RandomUnilateral(&Random);
                 
@@ -872,9 +898,15 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
                             if(TargetX >= 0 && TargetX < MINC_CHUNK_WIDTH &&
                                TargetZ >= 0 && TargetZ < MINC_CHUNK_WIDTH)
                             {
+                                int AdditionalH = 0;
+                                if(dx == 0 && dz == 0)
+                                {
+                                    AdditionalH = 1;
+                                }
+                                
                                 MincSetColumn(Chunk,
-                                              CurrentHeight + TrunkHeight,
-                                              CurrentHeight + TrunkHeight + CrownHeight - 1,
+                                              CurrentHeight + TrunkHeight - 1 + AdditionalH,
+                                              CurrentHeight + TrunkHeight + CrownHeight - 2,
                                               TargetX, TargetZ,
                                               Biome->TreeCrownBlock);
                             }
@@ -885,29 +917,25 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
                         }
                     }
                 }
-            }
-            else
-            {
                 
+                Chunk->Blocks[MincGetBlockIndex(x, CurrentHeight, z)] = Biome->LayerBlocks[0];
+                
+                // NOTE(Dima): 
+                --CurrentHeight;
+                int GroundLayerHeight = RandomBetweenU32(&Random, 5, 7);
+                MincSetColumn(Chunk, 
+                              CurrentHeight - (GroundLayerHeight - 1), 
+                              CurrentHeight,
+                              x, z,
+                              Biome->LayerBlocks[1]);
+                
+                // NOTE(Dima): Setting stones
+                CurrentHeight -= GroundLayerHeight;
+                MincSetColumn(Chunk,
+                              0, CurrentHeight,
+                              x, z,
+                              Biome->LayerBlocks[3]);
             }
-            
-            Chunk->Blocks[MincGetBlockIndex(x, CurrentHeight, z)] = Biome->LayerBlocks[0];
-            
-            // NOTE(Dima): 
-            --CurrentHeight;
-            int GroundLayerHeight = RandomBetweenU32(&Random, 5, 7);
-            MincSetColumn(Chunk, 
-                          CurrentHeight - (GroundLayerHeight - 1), 
-                          CurrentHeight,
-                          x, z,
-                          Biome->LayerBlocks[1]);
-            
-            // NOTE(Dima): Setting stones
-            CurrentHeight -= GroundLayerHeight;
-            MincSetColumn(Chunk,
-                          0, CurrentHeight,
-                          x, z,
-                          Biome->LayerBlocks[3]);
         }
     }
     
@@ -1642,10 +1670,11 @@ INTERNAL_FUNCTION void MincInitChunksSidesPool(minecraft* Mine)
     }
 }
 
+
 INTERNAL_FUNCTION void CreateMinecraft(memory_arena* Arena, minecraft* Mine)
 {
     Mine->Arena = Arena;
-    Mine->ChunksViewDistance = 30;
+    Mine->ChunksViewDistance = 20;
     
     InitMinecraftBlockTextures(Mine);
     InitMinecraftTextureOffsets(Mine);

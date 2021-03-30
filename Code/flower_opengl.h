@@ -11,12 +11,35 @@ inline b32 OpenGLAttribIsValid(GLint Attrib)
     return(Result);
 }
 
-#define OPENGL_LOAD_ATTRIB(name) Result.##name##Attr = glGetAttribLocation(Result.ID, "In"#name)
-#define OPENGL_LOAD_UNIFORM(name) Result.##name##Loc = glGetUniformLocation(Result.ID, #name)
+#define OPENGL_LOAD_ATTRIB(name) Result->##name##Attr = glGetAttribLocation(Result->ID, "In"#name)
+#define OPENGL_LOAD_UNIFORM(name) Result->##name##Loc = glGetUniformLocation(Result->ID, #name)
+
+struct uniform_name_entry
+{
+    const char* Name;
+    u32 NameHash;
+    GLint Location;
+    
+    uniform_name_entry* NextInHash;
+};
+
+enum opengl_shader_type
+{
+    OpenGL_Shader_Default,
+    OpenGL_Shader_Compute,
+};
 
 struct opengl_shader
 {
-    GLuint ID;
+    memory_arena* Arena;
+    u32 ID;
+    u32 Type;
+    
+    opengl_shader* NextInList;
+    
+    const char* PathV;
+    const char* PathF;
+    const char* PathG;
     
     char Name[64];
     
@@ -60,6 +83,10 @@ struct opengl_shader
     GLint RectsTypesLoc;
     GLint IsBatchLoc;
     
+    // NOTE(Dima): This map will cache all locations that were queried
+#define UNIFORM_NAME_TABLE_SIZE 64
+    uniform_name_entry* U2Loc[UNIFORM_NAME_TABLE_SIZE];
+    
     void Use()
     {
         glUseProgram(this->ID);
@@ -68,13 +95,47 @@ struct opengl_shader
     // NOTE(Dima): Uniform Functions
     GLint GetLocation(const char* UniformName)
     {
-        GLint Location = glGetUniformLocation(this->ID, UniformName);
+        GLint Location;
         
-        if(Location == -1)
+        u32 Hash = StringHashFNV((char*)UniformName);
+        u32 IndexInTable = Hash % UNIFORM_NAME_TABLE_SIZE;
+        uniform_name_entry* FindAt = U2Loc[IndexInTable];
+        
+        uniform_name_entry* Uniform = 0;
+        while(FindAt != 0)
         {
-            printf("Shader: \"%s\": Uniform \"%s\" is either not loaded or doesn't exist at all!\n", 
-                   Name,
-                   UniformName);
+            if(FindAt->NameHash == Hash)
+            {
+                if(StringsAreEqual((char*)UniformName, (char*)FindAt->Name))
+                {
+                    Uniform = FindAt;
+                    break;
+                }
+            }
+            
+            FindAt = FindAt->NextInHash;
+        }
+        
+        if(Uniform)
+        {
+            Location = Uniform->Location;
+        }
+        else
+        {
+            Location = glGetUniformLocation(this->ID, UniformName);
+            if(Location == -1)
+            {
+                printf("Shader: \"%s\": Uniform \"%s\" is either not loaded, does not exit, or not used!\n", 
+                       Name,
+                       UniformName);
+            }
+            
+            uniform_name_entry* New = PushStruct(Arena, uniform_name_entry);
+            New->NextInHash = U2Loc[IndexInTable];
+            New->Name = UniformName;
+            New->NameHash = Hash;
+            New->Location = Location;
+            U2Loc[IndexInTable] = New;
         }
         
         return(Location);
@@ -101,6 +162,13 @@ struct opengl_shader
         glUniform1f(Location, Value);
     }
     
+    void SetFloatArray(const char* UniformName, float* Values, int Count)
+    {
+        GLint Location = GetLocation(UniformName);
+        
+        glUniform1fv(Location, Count, (const GLfloat*)Values);
+    }
+    
     void SetVec2(const char* UniformName, v2 Value)
     {
         GLint Location = GetLocation(UniformName);
@@ -113,6 +181,13 @@ struct opengl_shader
         GLint Location = GetLocation(UniformName);
         
         glUniform2f(Location, X, Y);
+    }
+    
+    void SetVec2Array(const char* UniformName, v2* Array, int Count)
+    {
+        GLint Location = GetLocation(UniformName);
+        
+        glUniform2fv(Location, Count, (const GLfloat*)Array);
     }
     
     void SetVec3(const char* UniformName, v3 Value)
@@ -180,6 +255,16 @@ struct opengl_shader
         glUniform1i(Location, Slot);
     }
     
+    
+    void SetTexture2DArray(const char* UniformName, GLuint Texture, int Slot)
+    {
+        GLint Location = GetLocation(UniformName);
+        
+        glActiveTexture(GL_TEXTURE0 + Slot);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, Texture);
+        glUniform1i(Location, Slot);
+    }
+    
     void SetTextureBuffer(const char* UniformName, GLuint Texture, int Slot)
     {
         GLint Location = GetLocation(UniformName);
@@ -194,9 +279,17 @@ struct opengl_framebuffer
 {
     u32 Framebuffer;
     u32 Texture;
+    u32 DepthTexture;
     
     int Width;
     int Height;
+};
+
+struct opengl_array_object
+{
+    u32 VAO;
+    u32 VBO;
+    u32 EBO;
 };
 
 struct opengl_pp_framebuffer
@@ -209,6 +302,9 @@ struct opengl_pp_framebuffer
 struct opengl_g_buffer
 {
     u32 Framebuffer;
+    
+    int Width;
+    int Height;
     
     u32 ColorSpec;
     u32 Normal;
@@ -230,30 +326,41 @@ struct opengl_ssao
 
 struct opengl_state
 {
-    opengl_shader StdShader;
-    opengl_shader UIRectShader;
-    opengl_shader VoxelShader;
-    opengl_shader SSAOShader;
-    opengl_shader SSAOBlurShader;
-    opengl_shader LightingShader;
-    opengl_shader BoxBlurShader;
-    opengl_shader DilationShader;
-    opengl_shader PosterizeShader;
-    opengl_shader DepthOfFieldShader;
-    opengl_shader SkyShader;
+    memory_arena* Arena;
+    opengl_shader* ShaderList;
+    
+    opengl_shader* StdShader;
+    opengl_shader* StdShadowShader;
+    opengl_shader* UIRectShader;
+    opengl_shader* VoxelShader;
+    opengl_shader* VoxelShadowShader;
+    opengl_shader* SSAOShader;
+    opengl_shader* SSAOBlurShader;
+    opengl_shader* LightingShader;
+    opengl_shader* BoxBlurShader;
+    opengl_shader* DilationShader;
+    opengl_shader* PosterizeShader;
+    opengl_shader* DepthOfFieldShader;
+    opengl_shader* SkyShader;
+    opengl_shader* RenderDepthShader;
+    opengl_shader* VarianceShadowBlurShader;
+    opengl_shader* RenderWaterShader;
     
     opengl_g_buffer GBuffer;
     opengl_ssao SSAO;
+    u32 PoissonSamplesRotationTex;
     
     // NOTE(Dima): Screen quad
-    u32 ScreenQuadVAO;
-    u32 ScreenQuadVBO;
+    opengl_array_object ScreenQuad;
     
     // NOTE(Dima): Skybox cube
-    u32 SkyboxCubeVAO;
-    u32 SkyboxCubeVBO;
+    opengl_array_object SkyboxCube;
     
+    opengl_framebuffer ShadowMap;
+    int InitCascadesCount;
     opengl_pp_framebuffer PostProcFramebufferPool[4];
+    
+    int MaxCombinedTextureUnits;
 };
 
 #endif

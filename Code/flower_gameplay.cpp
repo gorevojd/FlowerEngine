@@ -22,7 +22,7 @@ void UpdateCameraRotation(game_camera* Camera,
                           float dYaw,
                           float dRoll)
 {
-    float LockEdge = 89.0f;
+    float LockEdge = 85.0f;
     
     Camera->EulerAngles.Pitch += dPitch;
     Camera->EulerAngles.Yaw += dYaw;
@@ -144,23 +144,20 @@ void ShowLabel3D(game_camera* Camera,
                         Color);
 }
 
-INTERNAL_FUNCTION render_pass* SetMatrices(game_camera* Camera)
+INTERNAL_FUNCTION void SetMatrices(game_camera* Camera, 
+                                   render_pass* RenderPass)
 {
     window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
     
     m44 View = GetViewMatrix(Camera);
-    m44 Projection = PerspectiveProjection(WndDims->Width, 
-                                           WndDims->Height,
-                                           Camera->FarClipPlane, 
-                                           Camera->NearClipPlane);
     
-    render_pass* RenderPass = AddRenderPass(View,
-                                            Projection,
-                                            Camera->P,
-                                            Camera->FarClipPlane,
-                                            Camera->NearClipPlane);
-    
-    return(RenderPass);
+    SetPerspectivePassData(RenderPass,
+                           Camera->P,
+                           View, 
+                           WndDims->Width,
+                           WndDims->Height,
+                           Camera->FarClipPlane,
+                           Camera->NearClipPlane);
 }
 
 // NOTE(Dima): Object pool stuff

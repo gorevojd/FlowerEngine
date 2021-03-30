@@ -183,13 +183,11 @@ extern "C" __declspec(dllexport) GAME_INIT(GameInit)
     
     InitGameObjectPool(Game, Arena);
     
-#if 1
     //Game->CurrentSceneIndex = FindSceneByName("RubiksCube");
     //Game->CurrentSceneIndex = FindSceneByName("TestGame");
     Game->CurrentSceneIndex = FindSceneByName("Minecraft");
-#else
-    Game->CurrentSceneIndex = FindSceneByName("GraphShow");
-#endif
+    //Game->CurrentSceneIndex = FindSceneByName("GraphShow");
+    
     Game->NextSceneIndex = Game->CurrentSceneIndex;
 }
 
@@ -221,7 +219,8 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     UIBeginFrame(Game->WindowDimensions);
     
     // NOTE(Dima): Updating game
-    BeginRender(Game->WindowDimensions);
+    BeginRender(Game->WindowDimensions,
+                Global_Time->Time);
     
     scene* Scene = Game->Scenes + Game->CurrentSceneIndex;
     if(Scene->Update)
@@ -300,8 +299,12 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     Platform.Render(Global_RenderCommands);
     EndRender();
     
-    // NOTE(Dima): Swapping buffers
-    Platform.SwapBuffers(Global_RenderCommands);
+    {
+        BLOCK_TIMING("Swapping buffers");
+        
+        // NOTE(Dima): Swapping buffers
+        Platform.SwapBuffers(Global_RenderCommands);
+    }
     
     Game->GameCodeWasJustReloaded = false;
 }

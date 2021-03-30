@@ -26,7 +26,7 @@ SCENE_INIT(TestGame)
     quat InitRot = LookRotation(V3_Back(), V3_Up());
     State->Camera.EulerAngles = QuatToEuler(InitRot);
     
-    InitCamera(&State->Camera, Camera_FlyAround);
+    InitCamera(&State->Camera, Camera_FlyAround, 0.5f, 500.0f);
     
     State->Bear1 = CreateModelGameObject(Scene->Game, &Global_Assets->Bear);
     State->Bear2 = CreateModelGameObject(Scene->Game, &Global_Assets->Bear);
@@ -78,11 +78,17 @@ SCENE_UPDATE(TestGame)
         case TestGame_Animals:
         {
             
-            
+#if 0            
             PushMesh(&Global_Assets->Plane,
                      &Global_Assets->GroundMaterial,
                      ScalingMatrix(10.0f),
                      V3(1.0f));
+#else
+            PushMesh(&Global_Assets->Plane,
+                     0, ScalingMatrix(10.0f), 
+                     V3(0.0f, 0.3f, 1.0f));
+#endif
+            
         }break;
         
         case TestGame_CubeField:
@@ -128,12 +134,48 @@ SCENE_UPDATE(TestGame)
         }break;
     }
     
+    render_pass* RenderPass = AddRenderPass();
+    
+    PushClear(V3(1.0f, 0.0f, 1.0f));
+    PushSky(&Global_Assets->Sky);
     
     UpdateGameObjects(Scene->Game);
     
-    SetMatrices(&State->Camera);
+    // NOTE(Dima): Updating cubes
+    v3 RotAxis = NOZ(V3(Cos(Global_Time->Time),
+                        Sin(Global_Time->Time * 1.1f),
+                        Cos(Global_Time->Time * 1.05f + 3123.0f)));
     
-#if 1
+    quat Rot = AxisAngle(RotAxis, 0.0f);
+    
+    f32 RotCubeY = Cos(Global_Time->Time) * 0.9f;
+    
+    PushMesh(&Global_Assets->Cube, 
+             0,
+             QuaternionToMatrix4(Rot) * TranslationMatrix(V3(-2.5f, RotCubeY, 0.0f)), 
+             V3(1.0f, 1.0f, 0.0f));
+    
+    PushMesh(&Global_Assets->Cube, 
+             0,
+             QuaternionToMatrix4(Rot) * TranslationMatrix(V3(-4.0f, 0.45f, 0.0f)), 
+             V3(1.0f, 0.5f, 0.0f));
+    
+    // NOTE(Dima): SEtting camera matrices
+    SetMatrices(&State->Camera, RenderPass);
+    
+    directional_light* DirLit = &Global_RenderCommands->Lighting.DirLit;
+    
+#if 0    
+    DirLit->Dir = Lerp(NOZ(V3(-0.5f, -0.5f, -10.8f)), 
+                       NOZ(V3(-0.5f, -0.5f, -0.8f)), 
+                       Cos(Global_Time->Time) * 0.5f + 0.5f);
+#else
+    DirLit->Dir = NOZ(V3(-0.5f, -0.5f, -0.8f)); 
+#endif
+    
+    UpdateShadowCascades(RenderPass);
+    
+#if 0
     // NOTE(Dima): SSAO samples
     for(int i = 0; i < Global_RenderCommands->PostProcessing.SSAO_Params.KernelSize; i++)
     {
@@ -145,7 +187,6 @@ SCENE_UPDATE(TestGame)
                  ScalingMatrix(0.05f) * TranslationMatrix(Pos));
     }
 #endif
-    
 }
 
 

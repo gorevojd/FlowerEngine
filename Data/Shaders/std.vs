@@ -30,6 +30,10 @@ uniform samplerBuffer SkinningMatrices;
 uniform int SkinningMatricesCount;
 uniform bool MeshIsSkinned;
 
+uniform bool HasClippingPlane;
+uniform vec4 ClippingPlane;
+out float gl_ClipDistance[1];
+
 mat4 ExtractMatrixForBoneID(int BoneID)
 {
 	int InstanceOffset = gl_InstanceID * SkinningMatricesCount * 4;
@@ -98,4 +102,5 @@ void main()
 	VsOut.TexCoords = vec2(InTexCoords.x, 1.0f - InTexCoords.y);
 	VsOut.Normal = CalculatedN * mat3(transpose(inverse(Model))); 
 	VsOut.FragP = WorldSpaceVertex.xyz;
+	gl_ClipDistance[0] = dot(CalculatedP, ClippingPlane);
 }

@@ -227,12 +227,18 @@ SCENE_UPDATE(RubiksCube)
     
     UpdateCamera(&State->Camera);
     
+    
+    // NOTE(Dima): Rendering
+    render_pass* RenderPass = AddRenderPass();
+    
     for(int i = 0;
         i < State->NumCubes;
         i++)
     {
         ModeUpdateCube(State, i);
     }
+    
+    
     
 #if 0    
     ShowSides(&State->Cubes[0], V2(10), 240);
@@ -245,5 +251,5 @@ SCENE_UPDATE(RubiksCube)
     PushImage(&Global_Assets->FontsAtlas, V2(0.0f), 1300);
 #endif
     
-    SetMatrices(&State->Camera);
+    SetMatrices(&State->Camera, RenderPass);
 }

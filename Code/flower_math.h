@@ -181,84 +181,91 @@ inline f32 PingPong(f32 Value, f32 MaxValue)
     return(Result);
 }
 
+inline f32 PingPong01(f32 Value)
+{
+    f32 Result = PingPong(Value, 1.0f);
+    
+    return(Result);
+}
+
 inline f32 Clamp01(f32 Val) {
-	if (Val < 0.0f) {
-		Val = 0.0f;
-	}
+    if (Val < 0.0f) {
+        Val = 0.0f;
+    }
     
-	if (Val > 1.0f) {
-		Val = 1.0f;
-	}
+    if (Val > 1.0f) {
+        Val = 1.0f;
+    }
     
-	return(Val);
+    return(Val);
 }
 
 inline f32 Clamp(f32 Val, f32 Min, f32 Max) {
-	if (Val < Min) {
-		Val = Min;
-	}
+    if (Val < Min) {
+        Val = Min;
+    }
     
-	if (Val > Max) {
-		Val = Max;
-	}
+    if (Val > Max) {
+        Val = Max;
+    }
     
-	return(Val);
+    return(Val);
 }
 
 inline int Clamp(int Val, int Min, int Max) {
-	if (Val < Min) {
-		Val = Min;
-	}
+    if (Val < Min) {
+        Val = Min;
+    }
     
-	if (Val > Max) {
-		Val = Max;
-	}
+    if (Val > Max) {
+        Val = Max;
+    }
     
-	return(Val);
+    return(Val);
 }
 
 
 // NOTE(Dima): Constructors
 inline v2 V2(f32 Value)
 {
-	v2 Res;
+    v2 Res;
     
-	Res.x = Value;
-	Res.y = Value;
+    Res.x = Value;
+    Res.y = Value;
     
-	return(Res);
+    return(Res);
 }
 
 inline v2 V2(f32 x, f32 y) 
 {
-	v2 Res;
+    v2 Res;
     
-	Res.x = x;
-	Res.y = y;
+    Res.x = x;
+    Res.y = y;
     
-	return(Res);
+    return(Res);
 }
 
 inline v3 V3(v2 xy, f32 z) 
 {
-	v3 Res;
+    v3 Res;
     
-	Res.x = xy.x;
-	Res.y = xy.y;
-	Res.z = z;
+    Res.x = xy.x;
+    Res.y = xy.y;
+    Res.z = z;
     
-	return(Res);
+    return(Res);
 }
 
 inline v3 V3(f32 x, f32 y, f32 z) 
 {
-	v3 Res;
+    v3 Res;
     
-	Res.x = x;
-	Res.y = y;
-	Res.z = z;
+    Res.x = x;
+    Res.y = y;
+    Res.z = z;
     
-	return(Res);
+    return(Res);
 }
 
 inline v3 V3(f32 Value)
@@ -893,19 +900,15 @@ inline quat &operator-=(quat& A, quat B) { return(A = A - B); }
 inline quat &operator*=(quat& A, f32 S) { return(A = A * S); }
 inline quat &operator/=(quat& A, f32 S) { return(A = A / S); }
 
-inline v3 operator*(v3 A, m33 B){
+inline v3 operator*(v3 A, const m33& B)
+{
     v3 Result = Mul(A, B);
     
     return(Result);
 }
 
-inline v4 operator*(v4 A, m44 B){
-    v4 Result = Mul(A, B);
-    
-    return(Result);
-}
-
-inline m44 operator*(m44 A, m44 B){
+inline m44 operator*(const m44& A, const m44& B)
+{
     m44 Result = Mul(A, B);
     
     return(Result);
@@ -997,17 +1000,36 @@ inline quat Slerp(quat A, quat B, f32 t){
 }
 
 // NOTE(Dima): Matrices operations
-inline m44 LookAt(v3 Pos, v3 TargetPos, v3 WorldUp)
+inline m44 LookAt(v3 Pos, v3 TargetPos, v3 WorldUp, 
+                  b32 InvertX = false)
 {
     m44 Result;
     
     v3 Fwd = TargetPos - Pos;
     Fwd = NOZ(Fwd);
     
-    v3 Left = Normalize(Cross(WorldUp, Fwd));
-    v3 Up = Normalize(Cross(Fwd, Left));
-    
     v3 Eye = Pos;
+    v3 Left;
+    v3 Up;
+    
+    if(std::abs(Dot(Fwd, WorldUp)) < 0.9999999f)
+    {
+        if(InvertX)
+        {
+            Left = Normalize(Cross(Fwd, WorldUp));
+            Up = Normalize(Cross(Left, Fwd));
+        }
+        else
+        {
+            Left = Normalize(Cross(WorldUp, Fwd));
+            Up = Normalize(Cross(Fwd, Left));
+        }
+    }
+    else
+    {
+        Left = V3_Left();
+        Up = Normalize(Cross(Fwd, Left));
+    }
     
     Result.e[0] = Left.x;
     Result.e[1] = Up.x;
@@ -1133,6 +1155,109 @@ inline m44 InverseScalingMatrix(f32 Scaling)
     return(Result);
 }
 
+inline f32 Determinant3(f32 a1, f32 a2, f32 a3,
+                        f32 b1, f32 b2, f32 b3,
+                        f32 c1, f32 c2, f32 c3)
+{
+    f32 Result = 
+        a1 * b2 * c3 + 
+        a2 * b3 * c1 + 
+        a3 * b1 * c2 -
+        a3 * b2 * c1 -
+        a2 * b1 * c3 - 
+        c2 * b3 * a1;
+    
+    return(Result);
+}
+
+inline m44 InverseMatrix4(const m44& M)
+{
+    m44 R = IdentityMatrix4();
+    
+    f32 Dets[16];
+    
+    // NOTE(Dima): Row 1
+    Dets[0] = Determinant3(M.e[5], M.e[6], M.e[7],
+                           M.e[9], M.e[10], M.e[11],
+                           M.e[13], M.e[14], M.e[15]);
+    Dets[1] = Determinant3(M.e[4], M.e[6], M.e[7],
+                           M.e[8], M.e[10], M.e[11],
+                           M.e[12], M.e[14], M.e[15]);
+    Dets[2] = Determinant3(M.e[4], M.e[5], M.e[7],
+                           M.e[8], M.e[9], M.e[11],
+                           M.e[12], M.e[13], M.e[15]);
+    Dets[3] = Determinant3(M.e[4], M.e[5], M.e[6],
+                           M.e[8], M.e[9], M.e[10],
+                           M.e[12], M.e[13], M.e[14]);
+    
+    // NOTE(Dima): Row 2
+    Dets[4] = Determinant3(M.e[1], M.e[2], M.e[3],
+                           M.e[9], M.e[10], M.e[11],
+                           M.e[13], M.e[14], M.e[15]);
+    Dets[5] = Determinant3(M.e[0], M.e[2], M.e[3],
+                           M.e[8], M.e[10], M.e[11],
+                           M.e[12], M.e[14], M.e[15]);
+    Dets[6] = Determinant3(M.e[0], M.e[1], M.e[3],
+                           M.e[8], M.e[9], M.e[11],
+                           M.e[12], M.e[13], M.e[15]);
+    Dets[7] = Determinant3(M.e[0], M.e[1], M.e[2],
+                           M.e[8], M.e[9], M.e[10],
+                           M.e[12], M.e[13], M.e[14]);
+    
+    // NOTE(Dima): Row 3
+    Dets[8] = Determinant3(M.e[1], M.e[2], M.e[3],
+                           M.e[5], M.e[6], M.e[7],
+                           M.e[13], M.e[14], M.e[15]);
+    Dets[9] = Determinant3(M.e[0], M.e[2], M.e[3],
+                           M.e[4], M.e[6], M.e[7],
+                           M.e[12], M.e[14], M.e[15]);
+    Dets[10] = Determinant3(M.e[0], M.e[1], M.e[3],
+                            M.e[4], M.e[5], M.e[7],
+                            M.e[12], M.e[13], M.e[15]);
+    Dets[11] = Determinant3(M.e[0], M.e[1], M.e[2],
+                            M.e[4], M.e[5], M.e[6],
+                            M.e[12], M.e[13], M.e[14]);
+    
+    // NOTE(Dima): Row 3
+    Dets[12] = Determinant3(M.e[1], M.e[2], M.e[3],
+                            M.e[5], M.e[6], M.e[7],
+                            M.e[9], M.e[10], M.e[11]);
+    Dets[13] = Determinant3(M.e[0], M.e[2], M.e[3],
+                            M.e[4], M.e[6], M.e[7],
+                            M.e[8], M.e[10], M.e[11]);
+    Dets[14] = Determinant3(M.e[0], M.e[1], M.e[3],
+                            M.e[4], M.e[5], M.e[7],
+                            M.e[8], M.e[9], M.e[11]);
+    Dets[15] = Determinant3(M.e[0], M.e[1], M.e[2],
+                            M.e[4], M.e[5], M.e[6],
+                            M.e[8], M.e[9], M.e[10]);
+    
+    f32 Det = 
+        Dets[0] * M.e[0] - Dets[1] * M.e[1] +
+        Dets[2] * M.e[2] - Dets[3] * M.e[3];
+    
+    if(std::abs(Det) > 0.000000001f)
+    {
+        f32 InvDet = 1.0f / Det;
+        
+        for(int Index = 0; Index < 16; Index++)
+        {
+            int i = Index % 4;
+            int j = Index / 4;
+            
+            int SrcIndex = i * 4 + j;
+            if((i + j) & 1)
+            {
+                Dets[SrcIndex] *= -1.0f;
+            }
+            
+            R.e[Index] = InvDet * Dets[SrcIndex];
+        }
+    }
+    
+    return(R);
+}
+
 inline m33 Transpose(const m33& M)
 {
     m33 Result = {};
@@ -1195,11 +1320,12 @@ inline m44 PerspectiveProjection(int Width, int Height,
     m44 Result = {};
     
     f32 AspectRatio = (f32)Width / (f32)Height;
+    f32 OneOverFarMinusNear = 1.0f / (Far - Near);
     
     f32 S = 1.0f / Tan(FOVDegrees * 0.5f * F_DEG2RAD);
     f32 A = -S / AspectRatio;
     f32 B = S;
-    f32 OneOverFarMinusNear = 1.0f / (Far - Near);
+    
     Result.e[0] = A;
     Result.e[5] = B;
     
@@ -1209,6 +1335,7 @@ inline m44 PerspectiveProjection(int Width, int Height,
     
     return(Result);
 }
+
 
 inline m44 OrthographicProjection(int Width, int Height)
 {
@@ -1224,6 +1351,21 @@ inline m44 OrthographicProjection(int Width, int Height)
     Result.e[10] = 1.0f;
     Result.e[12] = -1.0f;
     Result.e[13] = 1.0f;
+    Result.e[15] = 1.0f;
+    
+    return(Result);
+}
+
+inline m44 OrthographicProjection(f32 RadiusW,
+                                  f32 RadiusH,
+                                  f32 Far, f32 Near)
+{
+    m44 Result = {};
+    
+    Result.e[0] = 1.0f / RadiusW;
+    Result.e[5] = 1.0f / RadiusH;
+    Result.e[10] = 2.0f / (Far - Near);
+    Result.e[14] = -(Far + Near) / (Far - Near);
     Result.e[15] = 1.0f;
     
     return(Result);
@@ -1558,56 +1700,56 @@ inline v4 ColorCyan()
 }
 
 inline v4 ColorFrom255(int R, int G, int B) {
-	f32 OneOver255 = 1.0f / 255.0f;
-	v4 Res = V4(R, G, B, 1.0f);
-	Res.r *= OneOver255;
-	Res.g *= OneOver255;
-	Res.b *= OneOver255;
+    f32 OneOver255 = 1.0f / 255.0f;
+    v4 Res = V4(R, G, B, 1.0f);
+    Res.r *= OneOver255;
+    Res.g *= OneOver255;
+    Res.b *= OneOver255;
     
     Res.r = Clamp01(Res.r);
     Res.g = Clamp01(Res.g);
     Res.b = Clamp01(Res.b);
     
-	return(Res);
+    return(Res);
 }
 
 inline int IntFromHexCharForColors(char C) {
-	int Res = 0;
+    int Res = 0;
     
-	if (C >= 'a' && C <= 'f') {
-		C += 'A' - 'a';
-	}
+    if (C >= 'a' && C <= 'f') {
+        C += 'A' - 'a';
+    }
     
-	if (C >= '0' && C <= '9') {
-		Res = C - '0';
-	}
+    if (C >= '0' && C <= '9') {
+        Res = C - '0';
+    }
     
-	if (C >= 'A' && C <= 'F') {
-		Res = C + 10 - 'A';
-	}
+    if (C >= 'A' && C <= 'F') {
+        Res = C + 10 - 'A';
+    }
     
-	return(Res);
+    return(Res);
 }
 
 inline v4 ColorFromHex(char* str) {
-	f32 OneOver255 = 1.0f / 255.0f;
+    f32 OneOver255 = 1.0f / 255.0f;
     
-	v4 Res;
+    v4 Res;
     
-	Assert(str[0] == '#');
+    Assert(str[0] == '#');
     
-	int R, G, B;
-	R = IntFromHexCharForColors(str[1]) * 16 + IntFromHexCharForColors(str[2]);
-	G = IntFromHexCharForColors(str[3]) * 16 + IntFromHexCharForColors(str[4]);
-	B = IntFromHexCharForColors(str[5]) * 16 + IntFromHexCharForColors(str[6]);
+    int R, G, B;
+    R = IntFromHexCharForColors(str[1]) * 16 + IntFromHexCharForColors(str[2]);
+    G = IntFromHexCharForColors(str[3]) * 16 + IntFromHexCharForColors(str[4]);
+    B = IntFromHexCharForColors(str[5]) * 16 + IntFromHexCharForColors(str[6]);
     
-	Res = V4(R, G, B, 1.0f);
+    Res = V4(R, G, B, 1.0f);
     
-	Res.r *= OneOver255;
-	Res.g *= OneOver255;
-	Res.b *= OneOver255;
+    Res.r *= OneOver255;
+    Res.g *= OneOver255;
+    Res.b *= OneOver255;
     
-	return(Res);
+    return(Res);
 }
 
 inline v4 PremultiplyAlpha(v4 Color)
@@ -1855,18 +1997,18 @@ inline v2 Perp(v2 Direction)
 
 inline v3 LineEquationFrom2Points(v2 P1, v2 P2) 
 {
-	v3 Result;
+    v3 Result;
     
-	Result.A = P2.y - P1.y;
-	Result.B = P1.x - P2.x;
-	Result.C = P1.y * P2.x - P1.x * P2.y;
+    Result.A = P2.y - P1.y;
+    Result.B = P1.x - P2.x;
+    Result.C = P1.y * P2.x - P1.x * P2.y;
     
-	//NOTE(dima): Normalizing line equation
-	f32 PlaneNormalSq = Result.A * Result.A + Result.B * Result.B;
+    //NOTE(dima): Normalizing line equation
+    f32 PlaneNormalSq = Result.A * Result.A + Result.B * Result.B;
     
-	Result *= RSqrt(PlaneNormalSq);
+    Result *= RSqrt(PlaneNormalSq);
     
-	return(Result);
+    return(Result);
 }
 
 /*Plane math*/
@@ -1888,6 +2030,13 @@ inline float PlanePointTest(v4 Plane, v3 Point)
     float Res = Dot(Plane.ABC, Point) + Plane.D;
     
     return(Res);
+}
+
+inline v3 Reflect(v3 Value, v3 Normal)
+{
+    v3 Result = Value - 2.0f * Dot(Normal, Value) * Normal;
+    
+    return(Result);
 }
 
 #endif

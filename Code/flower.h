@@ -6,6 +6,10 @@
 #include <algorithm>
 #include <atomic>
 #include <intrin.h>
+#include <string>
+#include <unordered_map>
+
+using namespace std;
 
 #include "flower_defines.h"
 #include "flower_math.h"

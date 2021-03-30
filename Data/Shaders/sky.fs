@@ -1,7 +1,7 @@
 #version 330 core
 
 in vec3 SampleDir;
-out vec3 OutColor;
+layout (location = 0) out vec3 OutColor;
 
 uniform int SkyType;
 uniform samplerCube Sky;

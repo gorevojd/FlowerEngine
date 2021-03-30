@@ -14,7 +14,6 @@ uniform sampler2D SSAONoiseTex;
 uniform vec3 SSAOKernel[128];
 uniform int SSAOKernelSamplesCount;
 uniform float SSAOKernelRadius;
-uniform float SSAOContribution;
 uniform float SSAORangeCheck;
 
 float GetLinearizedDepth(vec2 UV)
@@ -34,11 +33,21 @@ float GetLinearizedDepth(float SampleDepth)
 	return(LinearDepth);
 }
 
+vec3 GetViewSpaceP(sampler2D TextureDepth, vec2 UV)
+{
+	float SampleDepth = texture2D(TextureDepth, UV).r;
+	float LinearDepth = GetLinearizedDepth(SampleDepth);
+	vec2 ViewSpaceXY = LinearDepth * (UV * 2.0 - vec2(1.0)) / PerspProjCoefs.xy;
+	vec3 Result = vec3(ViewSpaceXY, LinearDepth);
+
+	return(Result);
+}
+
 void main()
 {
 	float SampleDepth = texture2D(DepthTex, FragUV).r;
 
-	if(SampleDepth < 0.9999)
+	if(SampleDepth < 0.9999999)
 	{	
 		float LinearDepth = GetLinearizedDepth(SampleDepth);
 		float ViewSpaceX = LinearDepth * ((gl_FragCoord.x * 2.0f) / WH.x - 1.0f) / PerspProjCoefs.x;
@@ -79,7 +88,7 @@ void main()
 			}
 		}
 	
-		OutOcclusion = 1.0f - clamp(SSAOContribution * (Occlusion / SSAOKernelSamplesCount), 0, 1);
+		OutOcclusion = 1.0 - Occlusion / SSAOKernelSamplesCount;
 	}
 	else
 	{

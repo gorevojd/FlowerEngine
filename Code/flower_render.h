@@ -57,6 +57,8 @@ enum render_command_clear_flags
 
 struct render_command_clear
 {
+    b32 Set;
+    
     v3 C;
     u32 Flags;
 };
@@ -167,12 +169,42 @@ struct render_pass
     m44 View;
     m44 Projection;
     m44 ViewProjection;
+    
+    v3 CameraLeft;
+    v3 CameraUp;
+    v3 CameraFront;
     v3 CameraP;
     
     f32 Far;
     f32 Near;
+    f32 FOVDegrees;
+    f32 Width;
+    f32 Height;
+    f32 AspectRatio;
     
     v4 FrustumPlanes[6];
+    
+    b32 IsShadowPass;
+    
+    b32 ClippingPlaneIsSet;
+    v4 ClippingPlane;
+};
+
+struct render_water_params
+{
+    f32 Height;
+    
+    v4 Color;
+};
+
+struct render_water
+{
+    render_pass* ReflectionPass;
+    render_pass* RefractionPass;
+    
+    v4 PlaneEquation;
+    
+    render_water_params Params;
 };
 
 inline b32 IsFrustumCulled(render_pass* Pass, culling_info* Culling)
@@ -227,19 +259,24 @@ struct render_commands
     window_dimensions WindowDimensions;
     image* FontAtlas;
     image* VoxelAtlas;
+    
+    render_water Water;
+    b32 WaterIsSet;
+    
+    // NOTE(Dima): Sky stuff
     cubemap* Sky;
     int SkyType;
     int DefaultSkyType;
     v3 DefaultSkyColor;
     v3 SkyColor;
+    f32 Time;
+    
+    // NOTE(Dima): Clear command stuff
+    render_command_clear ClearCommand;
     
     // NOTE(Dima): Instance table
 #define RENDER_INSTANCE_TABLE_SIZE 256
     render_mesh_instance* InstanceTable[RENDER_INSTANCE_TABLE_SIZE];
-    
-    // NOTE(Dima): Settings
-    b32 BackfaceCulling;
-    b32 BackfaceCullingChanged;
     
     lighting Lighting;
     postprocessing PostProcessing;

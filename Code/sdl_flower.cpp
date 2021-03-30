@@ -1171,7 +1171,7 @@ int main(int ArgsCount, char** Args)
     
     App->OpenGLContext = SDL_GL_CreateContext(App->Window);
     
-    OpenGLInit(Game->RenderCommands);
+    OpenGLInit(Game->RenderCommands, &GameArena);
     
     Global_Time->Time = 0.0f;
     Global_Time->DeltaTime = 0.001f;
