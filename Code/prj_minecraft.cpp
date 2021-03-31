@@ -1674,7 +1674,7 @@ INTERNAL_FUNCTION void MincInitChunksSidesPool(minecraft* Mine)
 INTERNAL_FUNCTION void CreateMinecraft(memory_arena* Arena, minecraft* Mine)
 {
     Mine->Arena = Arena;
-    Mine->ChunksViewDistance = 20;
+    Mine->ChunksViewDistance = 30;
     
     InitMinecraftBlockTextures(Mine);
     InitMinecraftTextureOffsets(Mine);

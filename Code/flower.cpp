@@ -244,6 +244,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         if(GetKeyDown(Key_O))
         {
             Global_RenderCommands->PostProcessing.SSAO_Params.Enabled = !Global_RenderCommands->PostProcessing.SSAO_Params.Enabled;
+            Global_RenderCommands->Lighting.DirLit.CalculateShadows = !Global_RenderCommands->Lighting.DirLit.CalculateShadows;
         }
         
         if(GetKeyDown(Key_N))

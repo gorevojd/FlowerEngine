@@ -76,92 +76,58 @@ float ShadowCalculation(vec3 WorldP, vec3 WorldN, float LinearDepth)
 	
 	vec3 ShadowTexSize = textureSize(LightDepthTex, 0);
 
-	if(CalculateDirLightShadow)
+	int SampleLayerIndex = 0;
+	for(int CascadeIndex = 0;
+		CascadeIndex < CascadeCount;
+		CascadeIndex++)
 	{
-		int SampleLayerIndex = 0;
-		for(int CascadeIndex = 0;
-			CascadeIndex < CascadeCount;
-			CascadeIndex++)
-		{
-			if(LinearDepth < CascadeDistances[CascadeIndex])
-			{		
-				SampleLayerIndex = CascadeIndex;
-				break;
-			}
+		if(LinearDepth < CascadeDistances[CascadeIndex])
+		{		
+			SampleLayerIndex = CascadeIndex;
+			break;
 		}
+	}
 
-		vec4 FragLitProjected = vec4(WorldP, 1.0) * CascadeLightProjections[SampleLayerIndex];
-		FragLitProjected /= FragLitProjected.w;
-		FragLitProjected.xyz = FragLitProjected.xyz * 0.5 + 0.5;
+	vec4 FragLitProjected = vec4(WorldP, 1.0) * CascadeLightProjections[SampleLayerIndex];
+	FragLitProjected /= FragLitProjected.w;
+	FragLitProjected.xyz = FragLitProjected.xyz * 0.5 + 0.5;
 
-		float FragDepth = FragLitProjected.z;
-	
-		//float Bias = 0.001;
-		float Bias = max(0.0015, 0.01 * (1.0 - dot(WorldN, -DirectionalLightDirection)));	
+	float FragDepth = FragLitProjected.z;
 
-		vec2 TexelSize = vec2(1.0) / ShadowTexSize.xy;		
-		vec3 SampleDepthUV = vec3(FragLitProjected.xy, SampleLayerIndex);
+	float Bias = max(0.0015, 0.01 * (1.0 - dot(WorldN, -DirectionalLightDirection)));	
 
-		float M1 = texture(LightDepthTex, SampleDepthUV).r;
-		float M2 = texture(LightDepthTex, SampleDepthUV).g;
-		float ClosestDepth = M1;
+	vec2 TexelSize = vec2(1.0) / ShadowTexSize.xy;		
+	vec3 SampleDepthUV = vec3(FragLitProjected.xy, SampleLayerIndex);
 
-		float p = step(FragDepth, M1);
-		float Nu = M1;
-		float SigmaSquared = max(M2 - M1 * M1, 0.0000002);
-		float Temp = FragDepth - Nu;
-		float PMaxT = SigmaSquared / (SigmaSquared + Temp * Temp);
-		PMaxT = clamp(max(p, PMaxT), 0, 1);
-		PMaxT = ReduceLightBleeding(PMaxT, 0.2);
+	float M1 = texture(LightDepthTex, SampleDepthUV).r;
+	float M2 = texture(LightDepthTex, SampleDepthUV).g;
+	float ClosestDepth = M1;
 
-		Shadow = 1.0 - PMaxT;
+	float p = step(FragDepth, M1);
+	float Nu = M1;
+	float SigmaSquared = max(M2 - M1 * M1, 0.0000002);
+	float Temp = FragDepth - Nu;
+	float PMaxT = SigmaSquared / (SigmaSquared + Temp * Temp);
+	PMaxT = clamp(max(p, PMaxT), 0, 1);
+	PMaxT = ReduceLightBleeding(PMaxT, 0.2);
+
+	Shadow = 1.0 - PMaxT;
 
 #if 0
-		if(FragDepth - Bias > ClosestDepth)
-		{
-			Shadow = 1.0f;
-		}
+	if(FragDepth - Bias > ClosestDepth)
+	{
+		Shadow = 1.0f;
+	}
 #endif
 
 #if 0
 #if 0
-		for(int j = -1; j <= 1; j++)
+	for(int j = -1; j <= 1; j++)
+	{
+		for(int i = -1; i <= 1; i++)
 		{
-			for(int i = -1; i <= 1; i++)
-			{
-				vec2 SampleOffset = vec2(i, j) * TexelSize;
+			vec2 SampleOffset = vec2(i, j) * TexelSize;
 
-				vec3 NewSampleCoord = vec3(FragLitProjected.xy + SampleOffset, SampleLayerIndex);
-				float pcfDepth = texture(LightDepthTex, NewSampleCoord).r;
-				if(FragDepth - Bias > pcfDepth)
-				{
-					Shadow += 1.0 * ShadowStrength;
-				}
-			}
-		}
-		Shadow /= 9.0;
-#else
-		vec2 DimScaleRotations = ShadowTexSize.xy / vec2(4.0);
-
-		for(int i = 0; i < PoissonSamples.length(); i++)
-		{
-			// Reading random rotation vector
-			vec2 SampleRandRotationUV = FragLitProjected.xy * DimScaleRotations;
-
-			vec2 SampleOffset = PoissonSamples[i] * TexelSize;
-
-			// Applying random rotation vector
-			if(ShouldRotateSamples)
-			{
-				float RandomRotation = texture2D(PoissonSamplesRotations, SampleRandRotationUV).r;
-				float s = sin(RandomRotation);
-				float c = cos(RandomRotation);
-
-				SampleOffset.x = dot(SampleOffset, vec2(c, s));
-				SampleOffset.y = dot(SampleOffset, vec2(-s, c));
-			}
-
-			// Using rotated offset to fetch shadow sample
 			vec3 NewSampleCoord = vec3(FragLitProjected.xy + SampleOffset, SampleLayerIndex);
 			float pcfDepth = texture(LightDepthTex, NewSampleCoord).r;
 			if(FragDepth - Bias > pcfDepth)
@@ -169,10 +135,40 @@ float ShadowCalculation(vec3 WorldP, vec3 WorldN, float LinearDepth)
 				Shadow += 1.0 * ShadowStrength;
 			}
 		}
-		Shadow /= 12.0f;
-#endif
-#endif
 	}
+	Shadow /= 9.0;
+#else
+	vec2 DimScaleRotations = ShadowTexSize.xy / vec2(4.0);
+
+	for(int i = 0; i < PoissonSamples.length(); i++)
+	{
+		// Reading random rotation vector
+		vec2 SampleRandRotationUV = FragLitProjected.xy * DimScaleRotations;
+
+		vec2 SampleOffset = PoissonSamples[i] * TexelSize;
+
+		// Applying random rotation vector
+		if(ShouldRotateSamples)
+		{
+			float RandomRotation = texture2D(PoissonSamplesRotations, SampleRandRotationUV).r;
+			float s = sin(RandomRotation);
+			float c = cos(RandomRotation);
+
+			SampleOffset.x = dot(SampleOffset, vec2(c, s));
+			SampleOffset.y = dot(SampleOffset, vec2(-s, c));
+		}
+
+		// Using rotated offset to fetch shadow sample
+		vec3 NewSampleCoord = vec3(FragLitProjected.xy + SampleOffset, SampleLayerIndex);
+		float pcfDepth = texture(LightDepthTex, NewSampleCoord).r;
+		if(FragDepth - Bias > pcfDepth)
+		{
+			Shadow += 1.0 * ShadowStrength;
+		}
+	}
+	Shadow /= 12.0f;
+#endif
+#endif
 
 	return(Shadow);
 }
@@ -189,14 +185,18 @@ void main()
 	float LinearDepth = GetLinearizedDepth(SampleDepth);
 
 	float TotalShadow = 0.0f;
-	TotalShadow += ShadowCalculation(WorldP, WorldN, LinearDepth);
+	if(CalculateDirLightShadow)
+	{
+		TotalShadow = ShadowCalculation(WorldP, WorldN, LinearDepth);
+	}
+	
 	if(SSAOEnabled)
 	{
 		float SampleOcclusion = (1.0 - texture2D(SSAOTex, FragUV).r) * SSAOContribution;
 
 		TotalShadow += SampleOcclusion;
 	}
-	
+
 	TotalShadow = clamp(1.0 - TotalShadow, 0, 1);
 
 	vec3 ResultColor = vec3(0.0);

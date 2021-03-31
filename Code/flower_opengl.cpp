@@ -792,11 +792,8 @@ INTERNAL_FUNCTION void OpenGL_SSAO_DoPass(render_commands* Commands,
     
     // NOTE(Dima): Do pass
     glBindFramebuffer(GL_FRAMEBUFFER, SSAO->Framebuffer);
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
     
     Shader->Use();
-    
     Shader->SetTexture2D("DepthTex", GBuf->Depth, 0);
     Shader->SetTexture2D("NormalTex", GBuf->Normal, 1);
     Shader->SetTexture2D("SSAONoiseTex", SSAO->NoiseTex, 2);
@@ -819,12 +816,9 @@ INTERNAL_FUNCTION void OpenGL_SSAO_DoPass(render_commands* Commands,
     
     glBindVertexArray(OpenGL->ScreenQuad.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
     
+    // NOTE(Dima): SSAO Blur pass
     glBindFramebuffer(GL_FRAMEBUFFER, SSAO->BlurFramebuffer);
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    
     Shader = OpenGL->SSAOBlurShader;
     Shader->Use();
     Shader->SetTexture2D("OcclusionTex", SSAO->FramebufferTexture, 0);
@@ -832,7 +826,6 @@ INTERNAL_FUNCTION void OpenGL_SSAO_DoPass(render_commands* Commands,
     
     glBindVertexArray(OpenGL->ScreenQuad.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
 }
 
 INTERNAL_FUNCTION void OpenGL_SSAO_Init(render_commands* Commands,
@@ -1580,11 +1573,6 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(render_commands* Commands,
         glDrawElements(GL_TRIANGLES, Mesh->IndexCount, GL_UNSIGNED_INT, 0);
     }
     
-    glUseProgram(0);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    
     OpenGLDeleteHandle(&SkinningMatricesTexBuf);
     
     if(UseInstancing)
@@ -1719,9 +1707,6 @@ INTERNAL_FUNCTION void OpenGLRenderVoxelMesh(render_commands* Commands,
     
     glDrawArrays(GL_TRIANGLES, 0, Mesh->VerticesCount);
     
-    glUseProgram(0);
-    glBindVertexArray(0);
-    
     if(RenderPass->ClippingPlaneIsSet)
     {
         glDisable(GL_CLIP_DISTANCE0);
@@ -1783,9 +1768,6 @@ INTERNAL_FUNCTION void OpenGLRenderImage(render_commands* Commands,
     
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     
-    glUseProgram(0);
-    
-    glBindVertexArray(0);
     
     // NOTE(Dima): Free everything we need
     glDeleteVertexArrays(1, &VAO);
@@ -1968,6 +1950,8 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
     
     if(Lighting->DirLit.CalculateShadows)
     {
+        glEnable(GL_DEPTH_TEST);
+        
         glBindFramebuffer(GL_FRAMEBUFFER, OpenGL->ShadowMap.Framebuffer);
         glViewport(0, 0,
                    OpenGL->ShadowMap.Width,
@@ -2028,65 +2012,7 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
                 glEnable(GL_DEPTH_TEST);
             }
         }
-        
-#if 0        
-        for(int TextureIndex = 0;
-            TextureIndex < OpenGL->InitCascadesCount;
-            TextureIndex++)
-        {
-            opengl_framebuffer* Src = &OpenGL->ShadowMap;
-            opengl_framebuffer* Dst = &OpenGL->TempShadowMapForCopy;
-            
-            // NOTE(Dima): Binding framebuffers for copy
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, 
-                              Src->Framebuffer);
-            glFramebufferTextureLayer(GL_READ_FRAMEBUFFER,
-                                      GL_COLOR_ATTACHMENT0,
-                                      OpenGL->ShadowMap.Texture,
-                                      0, 
-                                      TextureIndex);
-            
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 
-                              Dst->Framebuffer);
-            
-            // NOTE(Dima): Copying framebuffers
-            glBlitFramebuffer(0, 0,
-                              Src->Width, Src->Height,
-                              0, 0,
-                              Dst->Width, Dst->Height,
-                              GL_COLOR_BUFFER_BIT,
-                              GL_NEAREST);
-            
-            
-            // NOTE(Dima): Now bind buffer to store the blurred result
-            glBindFramebuffer(GL_FRAMEBUFFER, 
-                              Src->Framebuffer);
-            glViewport(0, 0,
-                       Src->Width,
-                       Src->Height);
-            
-            glFramebufferTextureLayer(GL_FRAMEBUFFER,
-                                      GL_COLOR_ATTACHMENT0,
-                                      OpenGL->ShadowMap.Texture,
-                                      0, 
-                                      TextureIndex);
-            
-            opengl_shader* BlurShader = OpenGL->VarianceShadowBlurShader;
-            BlurShader->Use();
-            BlurShader->SetTexture2D("DepthTexture", 
-                                     OpenGL->TempShadowMapForCopy.Texture, 0);
-            BlurShader->SetInt("BlurRadius", 
-                               Lighting->VarianceShadowMapBlurRadius);
-            
-            glBindVertexArray(OpenGL->ScreenQuad.VAO);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            glBindVertexArray(0);
-        }
-#endif
-        
     }
-    
-    glEnable(GL_DEPTH_TEST);
 }
 
 INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* Commands,
@@ -2102,6 +2028,7 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* 
     
     opengl_pp_framebuffer* Result = OpenGL_BeginPP(Commands);
     OpenGL_BindPP(Result);
+    
     
     // NOTE(Dima): LIGHTING PASS. Preparing GBuffer
     LitShader->Use();
@@ -2137,33 +2064,34 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* 
                                 SSAO->BlurFramebufferTexture, 4);
     }
     
+    
     // NOTE(Dima): Uniform lighting variables
     LitShader->SetVec3("CameraP", RenderPass->CameraP);
     LitShader->SetFloat("AmbientPercentage", Lighting->AmbientPercentage);
     LitShader->SetFloat("ShadowStrength", Lighting->ShadowStrength);
     
+    
     LitShader->SetVec3("DirectionalLightDirection", Lighting->DirLit.Dir);
     LitShader->SetVec3("DirectionalLightColor", Lighting->DirLit.C);
     LitShader->SetBool("CalculateDirLightShadow", Lighting->DirLit.CalculateShadows);
-    if(Lighting->DirLit.CalculateShadows)
+    LitShader->SetTexture2DArray("LightDepthTex", OpenGL->ShadowMap.Texture, 5);
+    
+    f32 Distances[8];
+    m44 LitProjections[8];
+    for(int CascadeIndex = 0;
+        CascadeIndex < Lighting->CascadeCount;
+        CascadeIndex++)
     {
-        LitShader->SetTexture2DArray("LightDepthTex", OpenGL->ShadowMap.Texture, 5);
+        shadow_cascade_info* Cascade = &Lighting->Cascades[CascadeIndex];
         
-        f32 Distances[8];
-        m44 LitProjections[8];
-        for(int CascadeIndex = 0;
-            CascadeIndex < Lighting->CascadeCount;
-            CascadeIndex++)
-        {
-            shadow_cascade_info* Cascade = &Lighting->Cascades[CascadeIndex];
-            
-            Distances[CascadeIndex] = Cascade->SourceFarPlane;
-            LitProjections[CascadeIndex] = Cascade->RenderPass->ViewProjection;
-        }
-        LitShader->SetFloatArray("CascadeDistances", Distances, Lighting->CascadeCount);
-        LitShader->SetMat4Array("CascadeLightProjections", LitProjections, Lighting->CascadeCount);
-        LitShader->SetInt("CascadeCount", Lighting->CascadeCount);
+        Distances[CascadeIndex] = Cascade->SourceFarPlane;
+        LitProjections[CascadeIndex] = Cascade->RenderPass->ViewProjection;
     }
+    
+    LitShader->SetFloatArray("CascadeDistances", Distances, Lighting->CascadeCount);
+    LitShader->SetMat4Array("CascadeLightProjections", LitProjections, Lighting->CascadeCount);
+    LitShader->SetInt("CascadeCount", Lighting->CascadeCount);
+    
     LitShader->SetVec2Array("PoissonSamples", 
                             Lighting->PCF_PoissonSamples.Samples,
                             Lighting->PCF_PoissonSamples.Count);
@@ -2173,15 +2101,10 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* 
     LitShader->SetBool("ShouldRotateSamples", 
                        Lighting->PCF_PoissonSamples.ShouldRotateSamples);
     
-    LitShader->SetBool("HasClippingPlane", RenderPass->ClippingPlaneIsSet);
-    if(RenderPass->ClippingPlaneIsSet)
-    {
-        LitShader->SetVec4("ClippingPlane", RenderPass->ClippingPlane);
-    }
-    
     glBindVertexArray(OpenGL->ScreenQuad.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+    
+    OpenGLCheckError(__FILE__, __LINE__);
     
     return(Result);
 }
@@ -2192,6 +2115,8 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_RenderPassToGBuffer(render_comma
     opengl_state* OpenGL = GetOpenGL(Commands);
     postprocessing* PP = &Commands->PostProcessing;
     
+    OpenGLCheckError(__FILE__, __LINE__);
+    
     // NOTE(Dima): Rendering to GBuffer
     glBindFramebuffer(GL_FRAMEBUFFER, OpenGL->GBuffer.Framebuffer);
     glViewport(0, 0,
@@ -2200,7 +2125,11 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_RenderPassToGBuffer(render_comma
     
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
+    OpenGLCheckError(__FILE__, __LINE__);
+    
     OpenGLRenderCommands(Commands, Pass);
+    
+    OpenGLCheckError(__FILE__, __LINE__);
     
     if(PP->SSAO_Params.Enabled)
     {
@@ -2209,7 +2138,11 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_RenderPassToGBuffer(render_comma
                            Pass);
     }
     
+    OpenGLCheckError(__FILE__, __LINE__);
+    
     opengl_pp_framebuffer* LightingPass = OpenGL_DoLightingPass(Commands, Pass);
+    
+    OpenGLCheckError(__FILE__, __LINE__);
     
     return(LightingPass);
 }
@@ -2330,7 +2263,6 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
     glBindVertexArray(OpenGL->ScreenQuad.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
-    glBindVertexArray(0);
     
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
@@ -2442,11 +2374,17 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     // NOTE(Dima): Combining water and scene render pass results
     if(Commands->WaterIsSet)
     {
+        OpenGLCheckError(__FILE__, __LINE__);
+        
         WaterRenderResult = OpenGL_RenderPassToGBuffer(Commands, WaterPass);
+        
+        OpenGLCheckError(__FILE__, __LINE__);
         
         // NOTE(Dima): Doing scene pass after water pass so that we have fresh positions texture
         // NOTE(Dima): that we need in water rendering next
         SceneRenderResult = OpenGL_RenderPassToGBuffer(Commands, Pass);
+        
+        OpenGLCheckError(__FILE__, __LINE__);
         
         CombineRenderResult = OpenGL_RenderWater(Commands,
                                                  SceneRenderResult,
@@ -2454,6 +2392,8 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
                                                  OpenGL->GBuffer.Positions,
                                                  OpenGL->GBuffer.Depth,
                                                  Pass);
+        
+        OpenGLCheckError(__FILE__, __LINE__);
         
         OpenGL_EndPP(SceneRenderResult);
         OpenGL_EndPP(WaterRenderResult);
@@ -2464,9 +2404,11 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
         
         CombineRenderResult = SceneRenderResult;
     }
+    
 #else
     CombineRenderResult = OpenGL_RenderPassToGBuffer(Commands, WaterPass);
 #endif
+    
     
     // NOTE(Dima): Some post processing
     opengl_pp_framebuffer* LittleBlur = OpenGL_DoBoxBlur(Commands, CombineRenderResult->FB.Texture, 3);
@@ -2493,6 +2435,7 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     OpenGL_EndPP(DepthOfField);
     OpenGL_EndPP(CombineRenderResult);
     
+    OpenGLCheckError(__FILE__, __LINE__);
     
     // NOTE(Dima): Rendering images and UI rect buffer
     glDisable(GL_DEPTH_TEST);

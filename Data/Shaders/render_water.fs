@@ -20,6 +20,8 @@ const float MaxWaterReflection = 0.94;
 const float MinVisibleDepth = 5.0;
 const float MaxVisibleDepth = 25.0;
 
+const vec3 WaterDepthColor = vec3(0.3, 0.6, 1.0);
+
 float GetLinearizedDepth(float SampleDepth)
 {
 	float Zndc = SampleDepth * 2.0 - 1.0;
@@ -47,6 +49,13 @@ vec3 RayPlaneIntersect(vec3 O, vec3 D, vec4 Plane)
 	return(Result);
 }
 
+float RayPlaneIntersectT(vec3 O, vec3 D, vec4 Plane)
+{
+	float t = -(Plane.w + dot(O, Plane.xyz)) / dot(D, Plane.xyz);
+
+	return(t);
+}
+
 void main()
 {
 	vec3 WorldP = texture2D(ScenePositionsTex, FragUV).xyz;
@@ -58,12 +67,11 @@ void main()
 
 	vec3 ViewDirNorm = normalize(-ToCamera);
 
-	if(texture2D(SceneDepthTex, FragUV).r < 0.9999999)
+	if(texture2D(SceneDepthTex, FragUV).r < 0.99999999)
 	{
 		if(dot(vec4(CameraP, 1.0), ClipPlane) > 0)
 		{
 			float PlaneTest = dot(vec4(WorldP, 1.0), ClipPlane);
-
 			if(PlaneTest < 0)
 			{
 				vec3 OnWater = RayPlaneIntersect(CameraP, ViewDirNorm, ClipPlane);
@@ -73,7 +81,7 @@ void main()
 				vec3 UnderwaterColor = SceneC * WaterColor;
 				
 				float tColor = smoothstep(MinVisibleDepth, MaxVisibleDepth, InWaterDist);
-				UnderwaterColor = mix(UnderwaterColor, vec3(0.3, 0.6, 1.0), tColor);
+				UnderwaterColor = mix(UnderwaterColor, WaterDepthColor, tColor);
 
 				float FresnelEffect = 1.0 - clamp(dot(-ViewDirNorm, ClipPlane.xyz), 0, 1);
 				float Reflectivity = mix(MinWaterReflection, MaxWaterReflection, FresnelEffect);
@@ -86,8 +94,8 @@ void main()
 		}
 		else
 		{
-			ResultColor = SceneC * WaterColor;
-		}	
+			ResultColor = SceneC * WaterDepthColor;
+		}
 	}
 
 	Color = ResultColor;
