@@ -13,7 +13,7 @@ SCENE_INIT(Minecraft)
     
     InitCamera(&State->Camera, Camera_FlyAround, 0.5f, 1500.0f);
     
-    CreateMinecraft(Scene->Game->Arena, &State->Minecraft);
+    CreateMinecraft(Scene->Game->Arena, &State->Minecraft, MincVertexLayout_XZY128);
 }
 
 SCENE_UPDATE(Minecraft)
@@ -51,12 +51,9 @@ SCENE_UPDATE(Minecraft)
 #endif
     
     // NOTE(Dima): Updating camera
-    UpdateCamera(&State->Camera, SpeedMultiplier);
+    UpdateCamera(&State->Camera, RenderPass, SpeedMultiplier);
     UpdateMinecraft(&State->Minecraft, State->Camera.P);
     UpdateShadowCascades(RenderPass);
-    
-    SetMatrices(&State->Camera, RenderPass);
-    
     
     render_water_params WaterParams = DefaultWaterParams();
     WaterParams.Height = 35.5f;

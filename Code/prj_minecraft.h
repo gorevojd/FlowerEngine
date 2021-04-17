@@ -4,7 +4,7 @@
 /*
 
  Vertex structure:
-6, 8, 6 bits - for x y z
+7, 8, 7 bits - for x y z
 
 Per-face structure
 3 bits - normal
@@ -13,11 +13,80 @@ Per-face structure
 
 */
 
-#define MINC_CHUNK_WIDTH 32
-#define MINC_CHUNK_HEIGHT 128
+struct minc_vertex_layout
+{
+    int XShift;
+    int YShift;
+    int ZShift;
+    
+    u32 XMask;
+    u32 YMask;
+    u32 ZMask;
+    
+    int XLen;
+    int YLen;
+    int ZLen;
+    
+    int MaxNumBlocksInChunk;
+    int MaxNumVertsInChunk;
+    
+    int CountOfChunkSides;
+};
 
-#define MINC_CHUNK_COUNT (MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH * MINC_CHUNK_HEIGHT)
-#define MINC_MAX_VERTS_COUNT (MINC_CHUNK_COUNT / 2 * 6 * 6)
+inline minc_vertex_layout CreateVertexLayoutInternal(int BitsPerX,
+                                                     int BitsPerY,
+                                                     int BitsPerZ)
+{
+    minc_vertex_layout Result = {};
+    
+    Result.XMask = (1 << BitsPerX) - 1;
+    Result.YMask = (1 << BitsPerY) - 1;
+    Result.ZMask = (1 << BitsPerZ) - 1;
+    
+    Result.XShift = 0;
+    Result.ZShift = BitsPerX;
+    Result.YShift = BitsPerX + BitsPerZ;
+    
+    Result.XLen = 1 << (BitsPerX - 1);
+    Result.YLen = 1 << (BitsPerY - 1);
+    Result.ZLen = 1 << (BitsPerZ - 1);
+    
+    Assert(Result.XLen == Result.ZLen);
+    
+    Result.MaxNumBlocksInChunk = Result.XLen * Result.YLen * Result.ZLen;
+    Result.MaxNumVertsInChunk = Result.MaxNumBlocksInChunk / 2 * 6 * 6;
+    
+    // NOTE(Dima): Counting size of chunk sides pool
+    int CountBlocksPerSide = FlowerMax(Result.XLen, Result.ZLen) * Result.YLen;
+    int MegabytesPerSidesPool = 20;
+    Result.CountOfChunkSides = Megabytes(MegabytesPerSidesPool) / (CountBlocksPerSide * sizeof(u8));
+    
+    return(Result);
+}
+
+inline minc_vertex_layout CreateVertexLayout(int ChunkLenXPow2,
+                                             int ChunkLenYPow2,
+                                             int ChunkLenZPow2)
+{
+    minc_vertex_layout Result = CreateVertexLayoutInternal(ChunkLenXPow2 + 1,
+                                                           ChunkLenYPow2 + 1,
+                                                           ChunkLenZPow2 + 1);
+    
+    return(Result);
+}
+
+
+enum minc_vertex_layout_type
+{
+    // NOTE(Dima): Do not change order of theese!
+    MincVertexLayout_XZY128,
+    MincVertexLayout_XZ128_Y64,
+    MincVertexLayout_XZ64_Y128,
+    MincVertexLayout_XZ32_Y128,
+    MincVertexLayout_XZ16_Y256,
+    
+    MincVertexLayout_Count,
+};
 
 #define MINC_ATLAS_TEXTURE_INDEX(x, y) (y * 16 + x)
 enum minc_atlas_texture
@@ -196,8 +265,8 @@ struct minc_biome
 struct minc_chunk_meta
 {
     // NOTE(Dima): Generate biome map and height map
-    u8 BiomeMap[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
-    u16 HeightMap[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
+    u8* BiomeMap; //[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
+    u16*  HeightMap; //[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
     
     int CoordX;
     int CoordZ;
@@ -230,11 +299,13 @@ enum minc_chunk_state
 
 struct minc_chunk
 {
+    minc_vertex_layout VertexLayout;
+    
     int CoordX;
     int CoordY;
     int CoordZ;
     
-    u8 Blocks[MINC_CHUNK_COUNT];
+    u8* Blocks; //[MINC_CHUNK_COUNT];
     
     voxel_mesh Mesh;
     
@@ -250,7 +321,10 @@ struct minc_chunk
 
 struct minc_chunk_side
 {
-    u8 Blocks[MINC_CHUNK_WIDTH * MINC_CHUNK_HEIGHT];
+    u8* Blocks; //[MINC_CHUNK_WIDTH * MINC_CHUNK_HEIGHT];
+    
+    int Width;
+    int Height;
     
     minc_chunk_side* NextInList;
 };
@@ -268,6 +342,9 @@ struct minecraft
 {
     memory_arena* Arena;
     
+    minc_vertex_layout VertexLayout;
+    render_voxel_mesh_layout RenderVoxelMeshLayout;
+    
     minc_chunk Chunks[10][10];
     
 #define MINC_META_TABLE_SIZE 2048
@@ -283,6 +360,8 @@ struct minecraft
     
     minc_temp_mesh* TempMeshLists[5];
     minc_chunk_side* ChunkSidePool;
+    int TempMeshVertsCounts[5];
+    int TempMeshCounts[5];
     
     int ChunksViewDistance;
 };

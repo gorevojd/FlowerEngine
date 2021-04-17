@@ -45,14 +45,18 @@ inline void PushMesh(mesh* Mesh,
 }
 
 inline void PushVoxelChunkMesh(voxel_mesh* Mesh,
-                               v3 ChunkAt, 
+                               v3 ChunkAt,
+                               render_voxel_mesh_layout Layout,
                                culling_info CullingInfo = DefaultCullingInfo())
 {
     render_command_voxel_mesh* Entry = PushRenderCommand(RenderCommand_VoxelChunkMesh, render_command_voxel_mesh);
     
+    Assert(Mesh);
+    
     Entry->Mesh = Mesh;
     Entry->ChunkAt = ChunkAt;
     Entry->CullingInfo = CullingInfo;
+    Entry->Layout = Layout;
 }
 
 INTERNAL_FUNCTION inline u32 GetMeshHash(mesh* Mesh)
@@ -884,11 +888,6 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
     ResetMeshInstanceTable();
 }
 
-INTERNAL_FUNCTION void PreRender()
-{
-    
-}
-
 INTERNAL_FUNCTION void EndRender()
 {
     render_commands* Commands = Global_RenderCommands;
@@ -901,6 +900,16 @@ INTERNAL_FUNCTION void EndRender()
     Commands->ClearCommand.Set = false;
     
     DLIST_REMOVE_ENTIRE_LIST(&Commands->ImageUse, &Commands->ImageFree, Next, Prev);
+}
+
+INTERNAL_FUNCTION void Render()
+{
+    render_commands* Commands = Global_RenderCommands;
+    
+    // NOTE(Dima): Render
+    Platform.Render(Commands);
+    
+    EndRender();
 }
 
 INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensions)
@@ -924,4 +933,7 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensi
     
     Global_RenderCommands->DefaultSkyColor = V3(0.1f, 0.7f, 0.8f);
     Global_RenderCommands->DefaultSkyType = RenderSky_SolidColor;
+    
+    Global_RenderCommands->VoxelTempData = 0;
+    Global_RenderCommands->PrevVoxelDataSize = 0;
 }

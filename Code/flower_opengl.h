@@ -204,6 +204,20 @@ struct opengl_shader
         glUniform3f(Location, x, y, z);
     }
     
+    void SetIVec3(const char* UniformName, int x, int y, int z)
+    {
+        GLint Location = GetLocation(UniformName);
+        
+        glUniform3i(Location, x, y, z);
+    }
+    
+    void SetUIVec3(const char* UniformName, u32 x, u32 y, u32 z)
+    {
+        GLint Location = GetLocation(UniformName);
+        
+        glUniform3ui(Location, x, y, z);
+    }
+    
     void SetVec3Array(const char* UniformName, v3* Array, int Count)
     {
         GLint Location = GetLocation(UniformName);

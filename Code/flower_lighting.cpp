@@ -80,7 +80,7 @@ INTERNAL_FUNCTION void InitLighting(lighting* Lighting, memory_arena* Arena)
     Lighting->ShadowMapRes = 2048;
     Lighting->CascadeSafeDistance = 15.0f;
     Lighting->BlurVarianceShadowMaps = true;
-    Lighting->VarianceShadowMapBlurRadius = 1;
+    Lighting->VarianceShadowMapBlurRadius = 2;
     
     GeneratePCF_PoissonSamples(Lighting, 12, 2.0f, true);
 }

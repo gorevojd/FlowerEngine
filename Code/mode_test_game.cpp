@@ -64,8 +64,12 @@ SCENE_UPDATE(TestGame)
         SpeedMultiplier *= 5.0f;
     }
     
+    
+    render_pass* RenderPass = AddRenderPass();
+    
     // NOTE(Dima): Updating camera
-    UpdateCamera(&State->Camera, SpeedMultiplier);
+    UpdateCamera(&State->Camera, RenderPass, SpeedMultiplier);
+    
     
     // NOTE(Dima): Updating game mode
     if(GetKeyDown(Key_M))
@@ -133,8 +137,6 @@ SCENE_UPDATE(TestGame)
             }
         }break;
     }
-    
-    render_pass* RenderPass = AddRenderPass();
     
     PushClear(V3(1.0f, 0.0f, 1.0f));
     PushSky(&Global_Assets->Sky);

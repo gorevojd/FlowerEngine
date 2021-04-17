@@ -1590,7 +1590,6 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(render_commands* Commands,
         glDisable(GL_CLIP_DISTANCE0);
     }
 }
-
 INTERNAL_FUNCTION void OpenGLRenderVoxelMesh(render_commands* Commands, 
                                              opengl_shader* Shader,
                                              render_pass* RenderPass,
@@ -1666,24 +1665,6 @@ INTERNAL_FUNCTION void OpenGLRenderVoxelMesh(render_commands* Commands,
     glBindBuffer(GL_ARRAY_BUFFER, Mesh->Handle.Mesh.BufferObject);
     
     // NOTE(Dima): Uniform voxel atlas
-#if 0    
-    glUniformMatrix4fv(Shader->ViewProjectionLoc, 1, GL_TRUE, RenderPass->ViewProjection.e);
-    glUniformMatrix4fv(Shader->ProjectionLoc, 1, GL_TRUE, RenderPass->Projection.e);
-    glUniformMatrix4fv(Shader->ViewLoc, 1, GL_TRUE, RenderPass->View.e);
-    
-    // NOTE(Dima): Uniform chunk location
-    glUniform3f(Shader->ChunkAtLoc, 
-                Command->ChunkAt.x,
-                Command->ChunkAt.y,
-                Command->ChunkAt.z);
-    
-    // NOTE(Dima): Uniform voxel atlas
-    GLuint AtlasTexture = OpenGLInitImage(VoxelAtlas);
-    
-    glActiveTexture(GL_TEXTURE0 + VOXEL_MESH_ATLAS_TEXTURE_UNIT);
-    glBindTexture(GL_TEXTURE_2D, AtlasTexture);
-    glUniform1i(Shader->TextureAtlasLoc, VOXEL_MESH_ATLAS_TEXTURE_UNIT);
-#else
     GLuint AtlasTexture = OpenGLInitImage(VoxelAtlas);
     Shader->SetTexture2D("TextureAtlas", AtlasTexture, VOXEL_MESH_ATLAS_TEXTURE_UNIT);
     Shader->SetMat4("ViewProjection", RenderPass->ViewProjection.e);
@@ -1691,7 +1672,14 @@ INTERNAL_FUNCTION void OpenGLRenderVoxelMesh(render_commands* Commands,
     Shader->SetMat4("View", RenderPass->View.e);
     Shader->SetVec3("ChunkAt", Command->ChunkAt);
     Shader->SetFloat("Time", Commands->Time);
-#endif
+    Shader->SetUIVec3("VL_Shift", 
+                      Command->Layout.VL_ShiftX,
+                      Command->Layout.VL_ShiftY,
+                      Command->Layout.VL_ShiftZ);
+    Shader->SetUIVec3("VL_Mask",
+                      Command->Layout.VL_MaskX,
+                      Command->Layout.VL_MaskY,
+                      Command->Layout.VL_MaskZ);
     
     Shader->SetBool("HasClippingPlane", RenderPass->ClippingPlaneIsSet);
     if(RenderPass->ClippingPlaneIsSet)
@@ -1867,6 +1855,11 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pa
         OpenGL_ProcessClearCommand(Commands);
     }
     
+    // NOTE(Dima): Preinit temp voxel buffer
+    int VoxelVertsCount = 0;
+    int VoxelFaceCount = 0;
+    int VoxelChunkCount = 0;
+    
     // NOTE(Dima): Looping through all commands
     for(int CommandIndex = 0;
         CommandIndex < Commands->CommandCount;
@@ -1915,6 +1908,8 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pa
                 render_command_voxel_mesh* MeshCommand = GetRenderCommand(Commands, CommandIndex,
                                                                           render_command_voxel_mesh);
                 
+                voxel_mesh* Mesh = MeshCommand->Mesh;
+                
                 b32 IsCulled = IsFrustumCulled(RenderPass, &MeshCommand->CullingInfo);
                 
                 if(!IsCulled)
@@ -1931,6 +1926,7 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pa
     
     if(RenderPass->IsShadowPass)
     {
+        
     }
     else
     {
@@ -2115,8 +2111,6 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_RenderPassToGBuffer(render_comma
     opengl_state* OpenGL = GetOpenGL(Commands);
     postprocessing* PP = &Commands->PostProcessing;
     
-    OpenGLCheckError(__FILE__, __LINE__);
-    
     // NOTE(Dima): Rendering to GBuffer
     glBindFramebuffer(GL_FRAMEBUFFER, OpenGL->GBuffer.Framebuffer);
     glViewport(0, 0,
@@ -2125,11 +2119,7 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_RenderPassToGBuffer(render_comma
     
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    OpenGLCheckError(__FILE__, __LINE__);
-    
     OpenGLRenderCommands(Commands, Pass);
-    
-    OpenGLCheckError(__FILE__, __LINE__);
     
     if(PP->SSAO_Params.Enabled)
     {
@@ -2138,11 +2128,7 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_RenderPassToGBuffer(render_comma
                            Pass);
     }
     
-    OpenGLCheckError(__FILE__, __LINE__);
-    
     opengl_pp_framebuffer* LightingPass = OpenGL_DoLightingPass(Commands, Pass);
-    
-    OpenGLCheckError(__FILE__, __LINE__);
     
     return(LightingPass);
 }

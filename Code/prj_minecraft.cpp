@@ -241,11 +241,12 @@ INTERNAL_FUNCTION void InitMinecraftBiomes(minecraft* Mine)
     }
 }
 
-#define GET_BLOCK_INDEX_IN_CHUNK(x, y, z) (y * (MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH) + z * MINC_CHUNK_WIDTH + x)
+#define GET_BLOCK_INDEX_IN_CHUNK(chunk, x, y, z) \
+(y * (chunk->VertexLayout.XLen * chunk->VertexLayout.ZLen) + z * chunk->VertexLayout.XLen + x)
 
-INTERNAL_FUNCTION inline int MincGetBlockIndex(int X, int Y, int Z)
+INTERNAL_FUNCTION inline int MincGetBlockIndex(minc_chunk* Chunk, int X, int Y, int Z)
 {
-    int Result = GET_BLOCK_INDEX_IN_CHUNK(X, Y, Z);
+    int Result = GET_BLOCK_INDEX_IN_CHUNK(Chunk, X, Y, Z);
     
     return(Result);
 }
@@ -253,7 +254,7 @@ INTERNAL_FUNCTION inline int MincGetBlockIndex(int X, int Y, int Z)
 INTERNAL_FUNCTION inline u8 GetBlockInChunk(minc_chunk* Chunk,
                                             int X, int Y, int Z)
 {
-    int Index = GET_BLOCK_INDEX_IN_CHUNK(X, Y, Z);
+    int Index = GET_BLOCK_INDEX_IN_CHUNK(Chunk, X, Y, Z);
     
     u8 Result = Chunk->Blocks[Index];
     
@@ -263,7 +264,7 @@ INTERNAL_FUNCTION inline u8 GetBlockInChunk(minc_chunk* Chunk,
 INTERNAL_FUNCTION inline u8 GetBlockInChunkSide(minc_chunk_side* Side,
                                                 int X, int Y)
 {
-    u8 Result = Side->Blocks[Y * MINC_CHUNK_WIDTH + X];
+    u8 Result = Side->Blocks[Y * Side->Width + X];
     
     return(Result);
 }
@@ -282,6 +283,7 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                                         minc_generate_chunks Chunks)
 {
     minc_chunk* Chunk = Chunks.Dst;
+    minc_vertex_layout* VL = &Minecraft->VertexLayout;
     
     Mesh->VerticesCount = 0;
     Mesh->FaceCount = 0;
@@ -290,21 +292,21 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
     int TotalFaceCount = 0;
     
     f32 MaxY = -1;
-    f32 MinY = MINC_CHUNK_HEIGHT + 1;
+    f32 MinY = VL->YLen + 1;
     
-    for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+    for(int y = 0; y < VL->YLen; y++)
     {
-        for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+        for(int z = 0; z < VL->ZLen; z++)
         {
-            for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+            for(int x = 0; x < VL->XLen; x++)
             {
-                int BlockIndex = GET_BLOCK_INDEX_IN_CHUNK(x, y, z);
+                int BlockIndex = GET_BLOCK_INDEX_IN_CHUNK(Chunk, x, y, z);
                 
                 u8 BlockType = Chunk->Blocks[BlockIndex];
                 
-                b32 IsOuterX = (x == 0) || (x == MINC_CHUNK_WIDTH - 1);
-                b32 IsOuterY = (y == 0) || (y == MINC_CHUNK_HEIGHT - 1);
-                b32 IsOuterZ = (z == 0) || (z == MINC_CHUNK_WIDTH - 1);
+                b32 IsOuterX = (x == 0) || (x == VL->XLen - 1);
+                b32 IsOuterY = (y == 0) || (y == VL->YLen - 1);
+                b32 IsOuterZ = (z == 0) || (z == VL->ZLen - 1);
                 
                 b32 BlockIsOuter = IsOuterX || IsOuterY || IsOuterZ;
                 b32 BlockIsLeaves = ((BlockType == MincBlock_TreeLeaves) || 
@@ -324,7 +326,7 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                         {
                             case MincFaceNormal_Left:
                             {
-                                if(x + 1 < MINC_CHUNK_WIDTH)
+                                if(x + 1 < VL->XLen)
                                 {
                                     NeighbourBlock = GetBlockInChunk(Chunk, x + 1, y, z);
                                 }
@@ -354,7 +356,7 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                             
                             case MincFaceNormal_Front:
                             {
-                                if(z + 1 < MINC_CHUNK_WIDTH)
+                                if(z + 1 < VL->ZLen)
                                 {
                                     NeighbourBlock = GetBlockInChunk(Chunk, x, y, z + 1);
                                 }
@@ -384,7 +386,7 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                             
                             case MincFaceNormal_Up:
                             {
-                                if(y + 1 < MINC_CHUNK_HEIGHT)
+                                if(y + 1 < VL->YLen)
                                 {
                                     NeighbourBlock = GetBlockInChunk(Chunk, x, y + 1, z);
                                 }
@@ -441,9 +443,9 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
                                     int VertexY = y + Offset->y;
                                     int VertexZ = z + Offset->z;
                                     
-                                    Vertex |= (VertexX & 63);
-                                    Vertex |= (VertexZ & 63) << 6;
-                                    Vertex |= (VertexY & 255) << 12;
+                                    Vertex |= (VertexX & VL->XMask) << VL->XShift;
+                                    Vertex |= (VertexY & VL->YMask) << VL->YShift;
+                                    Vertex |= (VertexZ & VL->ZMask) << VL->ZShift;
                                     
                                     Mesh->Vertices[Mesh->VerticesCount++] = Vertex;
                                     
@@ -487,17 +489,18 @@ INTERNAL_FUNCTION b32 GenerateChunkMesh(minecraft* Minecraft,
     }
     
     // NOTE(Dima): Getting mesh bounding box
-    v3 ChunkWorldP = V3(Chunk->CoordX * MINC_CHUNK_WIDTH,
+    v3 ChunkWorldP = V3(Chunk->CoordX * VL->XLen,
                         0.0f,
-                        Chunk->CoordZ * MINC_CHUNK_WIDTH);
+                        Chunk->CoordZ * VL->ZLen);
     
     
     f32 YRad = std::abs(MaxY - MinY) * 0.5f;
-    f32 SideRad = (f32)MINC_CHUNK_WIDTH * 0.5f;
-    Chunk->BoundingSphereR = Sqrt(YRad * YRad + 2.0f * SideRad * SideRad);
-    Chunk->BoundingSphereCenter = V3(((f32)Chunk->CoordX + 0.5f) * (f32)MINC_CHUNK_WIDTH,
+    f32 SideRadX = (f32)VL->XLen * 0.5f;
+    f32 SideRadZ = (f32)VL->ZLen * 0.5f;
+    Chunk->BoundingSphereR = Sqrt(YRad * YRad + SideRadX * SideRadX + SideRadZ * SideRadZ);
+    Chunk->BoundingSphereCenter = V3(((f32)Chunk->CoordX + 0.5f) * (f32)VL->XLen,
                                      MinY + (MaxY - MinY) * 0.5f,
-                                     ((f32)Chunk->CoordZ + 0.5f) * (f32)MINC_CHUNK_WIDTH);
+                                     ((f32)Chunk->CoordZ + 0.5f) * (f32)VL->ZLen);
     Chunk->BoundingSphereGenerated = true;
     
     return(Result);
@@ -544,20 +547,20 @@ INTERNAL_FUNCTION void MincCopyTempMeshToMesh(voxel_mesh* Mesh, minc_temp_mesh* 
 }
 
 
-INTERNAL_FUNCTION inline void MincSetColumn(minc_chunk* Blocks,
+INTERNAL_FUNCTION inline void MincSetColumn(minc_chunk* Chunk,
                                             int MinIndex,
                                             int MaxIndex,
                                             int X, int Z,
                                             u8 Block)
 {
-    int Min = Clamp(MinIndex, 0, MINC_CHUNK_HEIGHT);
-    int Max = Clamp(MaxIndex, 0, MINC_CHUNK_HEIGHT);
+    int Min = Clamp(MinIndex, 0, Chunk->VertexLayout.YLen);
+    int Max = Clamp(MaxIndex, 0, Chunk->VertexLayout.YLen);
     
     for(int Index = Min;
         Index <= Max;
         Index++)
     {
-        Blocks->Blocks[MincGetBlockIndex(X, Index, Z)] = Block;
+        Chunk->Blocks[MincGetBlockIndex(Chunk, X, Index, Z)] = Block;
     }
 }
 
@@ -607,16 +610,6 @@ INTERNAL_FUNCTION inline minc_chunk_meta* MincFindChunkMeta(minecraft* Mine,
     return(Meta);
 }
 
-INTERNAL_FUNCTION void CopyChunkMeta(minc_chunk_meta* Dst,
-                                     minc_chunk_meta* Src)
-{
-    for(int i = 0; i < MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH; i++)
-    {
-        Dst->BiomeMap[i] = Src->BiomeMap[i];
-        Dst->HeightMap[i] = Src->HeightMap[i];
-    }
-}
-
 struct minc_generate_maps_work
 {
     minc_chunk_meta* Meta;
@@ -637,15 +630,15 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMapsWork)
     u8* BiomeMap = Meta->BiomeMap;
     u16* HeightMap = Meta->HeightMap;
     
-    v3 ChunkWorldP = V3(Work->X * MINC_CHUNK_WIDTH,
+    v3 ChunkWorldP = V3(Work->X * Mine->VertexLayout.XLen,
                         0.0f,
-                        Work->Z * MINC_CHUNK_WIDTH);
+                        Work->Z * Mine->VertexLayout.ZLen);
     
-    for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+    for(int z = 0; z < Mine->VertexLayout.ZLen; z++)
     {
-        for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+        for(int x = 0; x < Mine->VertexLayout.XLen; x++)
         {
-            int TargetIndex = z * MINC_CHUNK_WIDTH + x;
+            int TargetIndex = z * Mine->VertexLayout.XLen + x;
             
             // NOTE(Dima): Generating and finding biome
             f32 BiomeNoiseInit = stb_perlin_noise3((ChunkWorldP.x + x) / 512.0f, 
@@ -686,7 +679,7 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateMapsWork)
             // NOTE(Dima): Generating height and setting it in height map
             f32 ScaledNoise = Noise * CurBiome->NoiseScale;
             int Height = CurBiome->BaseHeight + (int)ScaledNoise;
-            int CurrentHeight = ClampFloat(Height, 0, MINC_CHUNK_HEIGHT - 1);
+            int CurrentHeight = ClampFloat(Height, 0, Mine->VertexLayout.YLen - 1);
             HeightMap[TargetIndex] = CurrentHeight;
         }
     }
@@ -710,13 +703,12 @@ struct minc_fix_gaps_work
 INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
 {
     minc_fix_gaps_work* Work = (minc_fix_gaps_work*)Data;
-    
-    v3 ChunkWorldP = V3(Work->X * MINC_CHUNK_WIDTH,
-                        0.0f,
-                        Work->Z * MINC_CHUNK_WIDTH);
-    
     minc_chunk_meta* Meta = Work->Meta;
     minecraft* Mine = Work->Mine;
+    
+    v3 ChunkWorldP = V3(Work->X * Mine->VertexLayout.XLen,
+                        0.0f,
+                        Work->Z * Mine->VertexLayout.ZLen);
     
     int X = Work->X;
     int Z = Work->Z;
@@ -724,15 +716,16 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
     u8* BiomeMap = Meta->BiomeMap;
     u16* HeightMap = Meta->HeightMap;
     
-    f32 AvgNearHeights[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
-    f32 BiomeNearPerc[MINC_CHUNK_WIDTH * MINC_CHUNK_WIDTH];
+    // TODO(Dima): Get rid of this
+    f32 AvgNearHeights[128 * 128];
+    f32 BiomeNearPerc[128 * 128];
     
     // NOTE(Dima): Fixing biome gaps. First - calc avg biome nearby percentage and avg height
-    for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+    for(int z = 0; z < Mine->VertexLayout.ZLen; z++)
     {
-        for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+        for(int x = 0; x < Mine->VertexLayout.XLen; x++)
         {
-            int IndexInMap = z * MINC_CHUNK_WIDTH + x;
+            int IndexInMap = z * Mine->VertexLayout.XLen + x;
             
             // NOTE(Dima): Lookup into neighbour cells
             int TotalHeightNear = 0.0f;
@@ -749,12 +742,12 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
                 int LookupChunkZ = 1;
                 if(LookupZ < 0)
                 {
-                    LookupZ = MINC_CHUNK_WIDTH + LookupZ;
+                    LookupZ = Mine->VertexLayout.ZLen + LookupZ;
                     LookupChunkZ--;
                 }
-                else if(LookupZ >= MINC_CHUNK_WIDTH)
+                else if(LookupZ >= Mine->VertexLayout.ZLen)
                 {
-                    LookupZ = LookupZ - MINC_CHUNK_WIDTH;
+                    LookupZ = LookupZ - Mine->VertexLayout.ZLen;
                     LookupChunkZ++;
                 }
                 
@@ -764,12 +757,12 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
                     int LookupChunkX = 1;
                     if(LookupX < 0)
                     {
-                        LookupX = MINC_CHUNK_WIDTH + LookupX;
+                        LookupX = Mine->VertexLayout.XLen + LookupX;
                         LookupChunkX--;
                     }
-                    else if(LookupX >= MINC_CHUNK_WIDTH)
+                    else if(LookupX >= Mine->VertexLayout.XLen)
                     {
-                        LookupX = LookupX - MINC_CHUNK_WIDTH;
+                        LookupX = LookupX - Mine->VertexLayout.XLen;
                         LookupChunkX++;
                     }
                     
@@ -777,7 +770,7 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
                     
                     if(Lookup)
                     {
-                        int LookupIndexInMap = LookupZ * MINC_CHUNK_WIDTH + LookupX;
+                        int LookupIndexInMap = LookupZ * Mine->VertexLayout.XLen + LookupX;
                         
                         if(CurBiome == Lookup->BiomeMap[LookupIndexInMap])
                         {
@@ -796,11 +789,11 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincFixBiomeGapsWork)
         }
     }
     
-    for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+    for(int z = 0; z < Mine->VertexLayout.ZLen; z++)
     {
-        for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+        for(int x = 0; x < Mine->VertexLayout.XLen; x++)
         {
-            int IndexInMap = z * MINC_CHUNK_WIDTH + x;
+            int IndexInMap = z * Mine->VertexLayout.XLen + x;
             
             int TargetHeight = HeightMap[IndexInMap];
             if(BiomeNearPerc[IndexInMap] < 0.99f)
@@ -836,7 +829,7 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
     random_generation Random = SeedRandom(Hash32(MincGetKey(Chunk->CoordX, 0, Chunk->CoordZ)));
     
     for(int BlockIndex = 0;
-        BlockIndex < MINC_CHUNK_COUNT;
+        BlockIndex < Minecraft->VertexLayout.MaxNumBlocksInChunk;
         BlockIndex++)
     {
         Chunk->Blocks[BlockIndex] = MincBlock_Empty;
@@ -845,11 +838,11 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
     // NOTE(Dima): Heightmaps and all other stuff should be generated
     Assert(Meta);
     
-    for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+    for(int z = 0; z < Minecraft->VertexLayout.ZLen; z++)
     {
-        for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+        for(int x = 0; x < Minecraft->VertexLayout.XLen; x++)
         {
-            int IndexInMap = z * MINC_CHUNK_WIDTH + x;
+            int IndexInMap = z * Minecraft->VertexLayout.XLen + x;
             
             minc_biome* Biome = Minecraft->Biomes + Meta->BiomeMap[IndexInMap];
             
@@ -895,8 +888,8 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
                             int TargetX = x + dx;
                             int TargetZ = z + dz;
                             
-                            if(TargetX >= 0 && TargetX < MINC_CHUNK_WIDTH &&
-                               TargetZ >= 0 && TargetZ < MINC_CHUNK_WIDTH)
+                            if(TargetX >= 0 && TargetX < Minecraft->VertexLayout.XLen &&
+                               TargetZ >= 0 && TargetZ < Minecraft->VertexLayout.ZLen)
                             {
                                 int AdditionalH = 0;
                                 if(dx == 0 && dz == 0)
@@ -918,7 +911,7 @@ INTERNAL_FUNCTION PLATFORM_CALLBACK(MincGenerateChunkWork)
                     }
                 }
                 
-                Chunk->Blocks[MincGetBlockIndex(x, CurrentHeight, z)] = Biome->LayerBlocks[0];
+                Chunk->Blocks[MincGetBlockIndex(Chunk, x, CurrentHeight, z)] = Biome->LayerBlocks[0];
                 
                 // NOTE(Dima): 
                 --CurrentHeight;
@@ -1016,7 +1009,6 @@ INTERNAL_FUNCTION inline void MincGetGeneratedChunk(minecraft* Mine,
                 
                 if(!JustCountChunks)
                 {
-                    
                     Result = GetFreeChunkSide(Mine);
                     
                     if(Result)
@@ -1026,11 +1018,11 @@ INTERNAL_FUNCTION inline void MincGetGeneratedChunk(minecraft* Mine,
                         {
                             case MincFaceNormal_Left:
                             {
-                                for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+                                for(int y = 0; y < Mine->VertexLayout.YLen; y++)
                                 {
-                                    for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+                                    for(int z = 0; z < Mine->VertexLayout.ZLen; z++)
                                     {
-                                        int DstIndex = y * MINC_CHUNK_WIDTH + z;
+                                        int DstIndex = y * Mine->VertexLayout.ZLen + z;
                                         
                                         Result->Blocks[DstIndex] = GetBlockInChunk(Src, 0, y, z);
                                     }
@@ -1039,25 +1031,25 @@ INTERNAL_FUNCTION inline void MincGetGeneratedChunk(minecraft* Mine,
                             
                             case MincFaceNormal_Right:
                             {
-                                for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+                                for(int y = 0; y < Mine->VertexLayout.YLen; y++)
                                 {
-                                    for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+                                    for(int z = 0; z < Mine->VertexLayout.ZLen; z++)
                                     {
-                                        int DstIndex = y * MINC_CHUNK_WIDTH + z;
+                                        int DstIndex = y * Mine->VertexLayout.ZLen + z;
                                         
                                         Result->Blocks[DstIndex] = GetBlockInChunk(Src, 
-                                                                                   MINC_CHUNK_WIDTH - 1, y, z);
+                                                                                   Mine->VertexLayout.XLen- 1, y, z);
                                     }
                                 }
                             }break;
                             
                             case MincFaceNormal_Front:
                             {
-                                for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+                                for(int y = 0; y < Mine->VertexLayout.YLen; y++)
                                 {
-                                    for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+                                    for(int x = 0; x < Mine->VertexLayout.XLen; x++)
                                     {
-                                        int DstIndex = y * MINC_CHUNK_WIDTH + x;
+                                        int DstIndex = y * Mine->VertexLayout.XLen + x;
                                         
                                         Result->Blocks[DstIndex] = GetBlockInChunk(Src, x, y, 0);
                                     }
@@ -1066,26 +1058,26 @@ INTERNAL_FUNCTION inline void MincGetGeneratedChunk(minecraft* Mine,
                             
                             case MincFaceNormal_Back:
                             {
-                                for(int y = 0; y < MINC_CHUNK_HEIGHT; y++)
+                                for(int y = 0; y < Mine->VertexLayout.YLen; y++)
                                 {
-                                    for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+                                    for(int x = 0; x < Mine->VertexLayout.XLen; x++)
                                     {
-                                        int DstIndex = y * MINC_CHUNK_WIDTH + x;
+                                        int DstIndex = y * Mine->VertexLayout.XLen + x;
                                         
                                         Result->Blocks[DstIndex] = GetBlockInChunk(Src, 
                                                                                    x, y, 
-                                                                                   MINC_CHUNK_WIDTH - 1);
+                                                                                   Mine->VertexLayout.ZLen- 1);
                                     }
                                 }
                             }break;
                             
                             case MincFaceNormal_Up:
                             {
-                                for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+                                for(int z = 0; z < Mine->VertexLayout.ZLen; z++)
                                 {
-                                    for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+                                    for(int x = 0; x < Mine->VertexLayout.XLen; x++)
                                     {
-                                        int DstIndex = z * MINC_CHUNK_WIDTH + x;
+                                        int DstIndex = z * Mine->VertexLayout.XLen + x;
                                         
                                         Result->Blocks[DstIndex] = GetBlockInChunk(Src, x, 0, z);
                                     }
@@ -1094,13 +1086,13 @@ INTERNAL_FUNCTION inline void MincGetGeneratedChunk(minecraft* Mine,
                             
                             case MincFaceNormal_Down:
                             {
-                                for(int z = 0; z < MINC_CHUNK_WIDTH; z++)
+                                for(int z = 0; z < Mine->VertexLayout.ZLen; z++)
                                 {
-                                    for(int x = 0; x < MINC_CHUNK_WIDTH; x++)
+                                    for(int x = 0; x < Mine->VertexLayout.XLen; x++)
                                     {
-                                        int DstIndex = z * MINC_CHUNK_WIDTH + x;
+                                        int DstIndex = z * Mine->VertexLayout.XLen + x;
                                         
-                                        Result->Blocks[DstIndex] = GetBlockInChunk(Src, x, MINC_CHUNK_HEIGHT - 1, z);
+                                        Result->Blocks[DstIndex] = GetBlockInChunk(Src, x, Mine->VertexLayout.YLen - 1, z);
                                     }
                                 }
                             }break;
@@ -1209,26 +1201,6 @@ INTERNAL_FUNCTION void MincReturnUsedChunkSides(minecraft* Mine, minc_generate_c
     }
 }
 
-
-
-GLOBAL_VARIABLE int Minc_MaxVertCount[] = 
-{
-    25002,
-    50004,
-    100008,
-    500004,
-    MINC_MAX_VERTS_COUNT,
-};
-
-GLOBAL_VARIABLE int Minc_TempMeshCountInList[] =
-{
-    80,
-    40,
-    20,
-    10,
-    2,
-};
-
 INTERNAL_FUNCTION minc_temp_mesh* GetFreeTempMesh(minecraft* Mine, int VerticesCount)
 {
     minc_temp_mesh* Result = 0;
@@ -1257,7 +1229,7 @@ INTERNAL_FUNCTION void ReturnFreeTempMesh(minecraft* Mine, minc_temp_mesh* Mesh)
 {
     
     int TargetListIndex = Mesh->TempMeshListIndex;
-    Assert(Mesh->MaxVerticesCount == Minc_MaxVertCount[TargetListIndex]);
+    Assert(Mesh->MaxVerticesCount == Mine->TempMeshVertsCounts[TargetListIndex]);
     
     // NOTE(Dima): Storing back into singly linked list
     Mesh->NextInList = Mine->TempMeshLists[TargetListIndex];
@@ -1311,9 +1283,9 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
 {
     minc_chunk_meta_slot* ChunkMetaSlot = MincFindSlot(Minecraft, X, Z);
     
-    v3 ChunkWorldP = V3(X * MINC_CHUNK_WIDTH,
+    v3 ChunkWorldP = V3(X * Minecraft->VertexLayout.XLen,
                         0.0f,
-                        Z * MINC_CHUNK_WIDTH);
+                        Z * Minecraft->VertexLayout.ZLen);
     
     if(ChunkMetaSlot)
     {
@@ -1374,10 +1346,12 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                 
                 ChunkMetaSlot->Chunk = (minc_chunk*)malloc(sizeof(minc_chunk));
                 Chunk = ChunkMetaSlot->Chunk;
-                memset(Chunk->Blocks, 0, MINC_CHUNK_COUNT);
+                Chunk->Blocks = (u8*)malloc(Minecraft->VertexLayout.MaxNumBlocksInChunk * sizeof(u8));
+                memset(Chunk->Blocks, 0, Minecraft->VertexLayout.MaxNumBlocksInChunk);
                 Chunk->Mesh.Free = 0;
                 Chunk->ExpectedVerticesCount = 0;
                 Chunk->BoundingSphereGenerated = false;
+                Chunk->VertexLayout = Minecraft->VertexLayout;
                 
                 // NOTE(Dima): Setting chunk
                 Chunk->CoordX = X;
@@ -1400,7 +1374,7 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
             
             case MincChunk_ReadyToGenerateMesh:
             {
-                Assert(Chunk->ExpectedVerticesCount <= MINC_MAX_VERTS_COUNT);
+                Assert(Chunk->ExpectedVerticesCount <= Minecraft->VertexLayout.MaxNumVertsInChunk);
                 
                 minc_temp_mesh* TempMesh = GetFreeTempMesh(Minecraft, Chunk->ExpectedVerticesCount);
                 if(TempMesh)
@@ -1523,6 +1497,12 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                     
                     if(ChunkMetaSlot->Meta->State.compare_exchange_weak(CompareState, DesiredState))
                     {
+                        if(Chunk->Blocks)
+                        {
+                            free(Chunk->Blocks);
+                        }
+                        Chunk->Blocks = 0;
+                        
                         free(Chunk);
                         
                         // NOTE(Dima): Remove this chunk from map
@@ -1559,6 +1539,7 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                         // NOTE(Dima): Render chunk
                         PushVoxelChunkMesh(&Chunk->Mesh, 
                                            ChunkWorldP, 
+                                           Minecraft->RenderVoxelMeshLayout,
                                            CullingInfo(Chunk->BoundingSphereCenter,
                                                        Chunk->BoundingSphereR,
                                                        true));
@@ -1572,6 +1553,7 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
 INTERNAL_FUNCTION void MincTryInitChunk(minecraft* Minecraft, 
                                         int X, int Z)
 {
+    minc_vertex_layout* VL = &Minecraft->VertexLayout;
     minc_chunk_meta_slot* ChunkMetaSlot = MincFindSlot(Minecraft, X, Z);
     
     if(!ChunkMetaSlot)
@@ -1602,6 +1584,8 @@ INTERNAL_FUNCTION void MincTryInitChunk(minecraft* Minecraft,
         minc_chunk_meta* ChunkMeta = PushStructSafe(Minecraft->Arena, minc_chunk_meta);
         ChunkMeta->CoordX = X;
         ChunkMeta->CoordZ = Z;
+        ChunkMeta->BiomeMap = (u8*)malloc(sizeof(u8) * VL->XLen * VL->ZLen);
+        ChunkMeta->HeightMap = (u16*)malloc(sizeof(u16) * VL->XLen * VL->ZLen);
         
         // NOTE(Dima): Setting data
         NewMetaSlot->Meta = ChunkMeta;
@@ -1618,6 +1602,8 @@ INTERNAL_FUNCTION void MincInitTempMeshList(minecraft* Mine,
                                             int MeshesCount)
 {
     Mine->TempMeshLists[ListIndex] = 0;
+    Mine->TempMeshVertsCounts[ListIndex] = MaxVertsCount;
+    Mine->TempMeshCounts[ListIndex] = MeshesCount;
     
     for(int MeshIndex = 0;
         MeshIndex < MeshesCount;
@@ -1639,22 +1625,60 @@ INTERNAL_FUNCTION void MincInitTempMeshList(minecraft* Mine,
 
 INTERNAL_FUNCTION void MincInitTempMeshLists(minecraft* Mine)
 {
+    minc_vertex_layout* VL = &Mine->VertexLayout;
+    
+    int InitVerts[] = 
+    {
+        25002,
+        50004,
+        100008,
+        500004,
+        128 * 32 * 32 * 6 * 6 / 2,
+    };
+    
+    int InitCounts[] =
+    {
+        80,
+        40,
+        20,
+        10,
+        2,
+    };
+    
+    int InitRelativeCountBlocks = 128 * 32 * 32;
+    int CurrentBlocksCount = VL->MaxNumBlocksInChunk;
+    
+    int Divisor = CurrentBlocksCount / InitRelativeCountBlocks;
+    
     for(int ListIndex = 0;
         ListIndex < ARC(Mine->TempMeshLists);
         ListIndex++)
     {
+        int VertCount = InitVerts[ListIndex] * Divisor;
+        
+        int FromEndIndex = (5 - ListIndex);
+        int TempMeshCount = FlowerMax(InitCounts[ListIndex] / Divisor, 2 << FromEndIndex);
+        
         MincInitTempMeshList(Mine, ListIndex,
-                             Minc_MaxVertCount[ListIndex], 
-                             Minc_TempMeshCountInList[ListIndex]);
+                             VertCount, 
+                             TempMeshCount);
     }
 }
 
 INTERNAL_FUNCTION void MincInitChunksSidesPool(minecraft* Mine)
 {
-    // NOTE(Dima): 5000 of theese will take take ~20mb.
-    int PoolSize = 5000;
+    minc_vertex_layout* VertLayout = &Mine->VertexLayout;
+    
+    // NOTE(Dima): theese will take take ~20mb.
+    int PoolSize = VertLayout->CountOfChunkSides;
+    
+    int Width = FlowerMax(VertLayout->XLen, VertLayout->ZLen);
+    int Height = VertLayout->YLen;
+    int CountBlocksPerSide = Width * Height;
     
     minc_chunk_side* Pool = PushArray(Mine->Arena, minc_chunk_side, PoolSize);
+    u8* Blocks = PushArray(Mine->Arena, u8, 
+                           PoolSize * CountBlocksPerSide);
     
     Mine->ChunkSidePool = 0;
     
@@ -1665,17 +1689,66 @@ INTERNAL_FUNCTION void MincInitChunksSidesPool(minecraft* Mine)
         minc_chunk_side* Entry = &Pool[EntryIndex];
         
         // NOTE(Dima): Inserting to list
+        Entry->Blocks = Blocks + EntryIndex * CountBlocksPerSide;
+        Entry->Width = Width;
+        Entry->Height = Height;
         Entry->NextInList = Mine->ChunkSidePool;
         Mine->ChunkSidePool = Entry;
     }
 }
 
+INTERNAL_FUNCTION void InitMinecraftVertexLayout(minecraft* Mine, 
+                                                 u32 VertexLayoutType)
+{
+    switch(VertexLayoutType)
+    {
+        case MincVertexLayout_XZY128:
+        {
+            Mine->VertexLayout = CreateVertexLayout(7, 7, 7);
+        }break;
+        
+        case MincVertexLayout_XZ128_Y64:
+        {
+            Mine->VertexLayout = CreateVertexLayout(7, 6, 7);
+        }break;
+        
+        case MincVertexLayout_XZ64_Y128:
+        {
+            Mine->VertexLayout = CreateVertexLayout(6, 7, 6);
+        }break;
+        
+        case MincVertexLayout_XZ32_Y128:
+        {
+            Mine->VertexLayout = CreateVertexLayout(5, 7, 5);
+        }break;
+        
+        case MincVertexLayout_XZ16_Y256:
+        {
+            Mine->VertexLayout = CreateVertexLayout(4, 8, 4);
+        }break;
+    }
+    
+    Mine->RenderVoxelMeshLayout = {};
+    
+    render_voxel_mesh_layout* RVML = &Mine->RenderVoxelMeshLayout;
+    minc_vertex_layout* VL = &Mine->VertexLayout;
+    
+    RVML->VL_ShiftX = VL->XShift;
+    RVML->VL_ShiftY = VL->YShift;
+    RVML->VL_ShiftZ = VL->ZShift;
+    RVML->VL_MaskX = VL->XMask;
+    RVML->VL_MaskY = VL->YMask;
+    RVML->VL_MaskZ = VL->ZMask;
+}
 
-INTERNAL_FUNCTION void CreateMinecraft(memory_arena* Arena, minecraft* Mine)
+INTERNAL_FUNCTION void CreateMinecraft(memory_arena* Arena, 
+                                       minecraft* Mine,
+                                       u32 VertexLayoutType)
 {
     Mine->Arena = Arena;
-    Mine->ChunksViewDistance = 30;
+    Mine->ChunksViewDistance = 8;
     
+    InitMinecraftVertexLayout(Mine, VertexLayoutType);
     InitMinecraftBlockTextures(Mine);
     InitMinecraftTextureOffsets(Mine);
     InitMinecraftBiomes(Mine);
@@ -1697,8 +1770,8 @@ INTERNAL_FUNCTION void UpdateMinecraft(minecraft* Mine, v3 PlayerP)
 {
     int vd = Mine->ChunksViewDistance;
     
-    int PlayerChunkX = Floor(PlayerP.x / (f32)MINC_CHUNK_WIDTH);
-    int PlayerChunkZ = Floor(PlayerP.z / (f32)MINC_CHUNK_WIDTH);
+    int PlayerChunkX = Floor(PlayerP.x / (f32)Mine->VertexLayout.XLen);
+    int PlayerChunkZ = Floor(PlayerP.z / (f32)Mine->VertexLayout.ZLen);
     
     // NOTE(Dima): Iterating to remove unseen
     for(int i = 0; i < MINC_META_TABLE_SIZE; i++)

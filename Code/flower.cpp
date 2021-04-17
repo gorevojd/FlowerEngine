@@ -296,9 +296,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     Commands->FontAtlas = &Global_Assets->FontsAtlas;
     Commands->VoxelAtlas = &Global_Assets->VoxelAtlas;
     
-    PreRender();
-    Platform.Render(Global_RenderCommands);
-    EndRender();
+    Render();
     
     {
         BLOCK_TIMING("Swapping buffers");

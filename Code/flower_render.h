@@ -100,12 +100,24 @@ struct render_command_instanced_mesh
     int MaxInstanceCount;
 };
 
+struct render_voxel_mesh_layout
+{
+    int VL_ShiftX;
+    int VL_ShiftY;
+    int VL_ShiftZ;
+    
+    int VL_MaskX;
+    int VL_MaskY;
+    int VL_MaskZ;
+};
+
 struct render_command_voxel_mesh
 {
     voxel_mesh* Mesh;
     
     v3 ChunkAt;
     
+    render_voxel_mesh_layout Layout;
     culling_info CullingInfo;
 };
 
@@ -273,6 +285,14 @@ struct render_commands
     
     // NOTE(Dima): Clear command stuff
     render_command_clear ClearCommand;
+    
+    u8* VoxelTempData;
+    mi PrevVoxelDataSize;
+    
+    u32* VoxelVerts;
+    u32* VoxelFaces;
+    u16* FaceToChunk;
+    v3* VoxelChunksP;
     
     // NOTE(Dima): Instance table
 #define RENDER_INSTANCE_TABLE_SIZE 256

@@ -225,11 +225,11 @@ SCENE_UPDATE(RubiksCube)
     }
     State->Camera.State = CameraStates[CameraBehaviourIndex];
     
-    UpdateCamera(&State->Camera);
-    
     
     // NOTE(Dima): Rendering
     render_pass* RenderPass = AddRenderPass();
+    
+    UpdateCamera(&State->Camera, RenderPass);
     
     for(int i = 0;
         i < State->NumCubes;

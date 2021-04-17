@@ -64,7 +64,46 @@ INTERNAL_FUNCTION inline void MoveCameraToViewTarget(game_camera* Camera)
     Camera->ViewRadius = Lerp(Camera->ViewRadius, Camera->ViewTargetRadius, 5.0f * Global_Time->DeltaTime);
 }
 
-void UpdateCamera(game_camera* Camera, f32 CamSpeed = 1.0f)
+// NOTE(Dima): Look at matrix
+m44 GetViewMatrix(game_camera* Camera)
+{
+    m44 Result = LookAt(Camera->P, Camera->P + Camera->Transform.Rows[2], V3_Up());
+    
+    return(Result);
+}
+
+void ShowLabel3D(game_camera* Camera,
+                 char* Text,
+                 v3 P,
+                 f32 UnitHeight = 0.2f,
+                 v4 Color = ColorWhite())
+{
+    v3 Normal = -Camera->Transform.Rows[2];
+    
+    PrintTextCentered3D(Text, P,
+                        Normal,
+                        UnitHeight,
+                        Color);
+}
+
+INTERNAL_FUNCTION void SetMatrices(game_camera* Camera, 
+                                   render_pass* RenderPass)
+{
+    window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
+    
+    m44 View = GetViewMatrix(Camera);
+    
+    SetPerspectivePassData(RenderPass,
+                           Camera->P,
+                           View, 
+                           WndDims->Width,
+                           WndDims->Height,
+                           Camera->FarClipPlane,
+                           Camera->NearClipPlane);
+}
+
+
+void UpdateCamera(game_camera* Camera, render_pass* RenderPass, f32 CamSpeed = 1.0f)
 {
     f32 MouseDeltaX = 0.0f;
     f32 MouseDeltaY = 0.0f;
@@ -120,45 +159,10 @@ void UpdateCamera(game_camera* Camera, f32 CamSpeed = 1.0f)
         
         Camera->P = Camera->ViewCenterP - CamFront * Camera->ViewRadius;
     }
-};
-
-// NOTE(Dima): Look at matrix
-m44 GetViewMatrix(game_camera* Camera)
-{
-    m44 Result = LookAt(Camera->P, Camera->P + Camera->Transform.Rows[2], V3_Up());
     
-    return(Result);
+    SetMatrices(Camera, RenderPass);
 }
 
-void ShowLabel3D(game_camera* Camera,
-                 char* Text,
-                 v3 P,
-                 f32 UnitHeight = 0.2f,
-                 v4 Color = ColorWhite())
-{
-    v3 Normal = -Camera->Transform.Rows[2];
-    
-    PrintTextCentered3D(Text, P,
-                        Normal,
-                        UnitHeight,
-                        Color);
-}
-
-INTERNAL_FUNCTION void SetMatrices(game_camera* Camera, 
-                                   render_pass* RenderPass)
-{
-    window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
-    
-    m44 View = GetViewMatrix(Camera);
-    
-    SetPerspectivePassData(RenderPass,
-                           Camera->P,
-                           View, 
-                           WndDims->Width,
-                           WndDims->Height,
-                           Camera->FarClipPlane,
-                           Camera->NearClipPlane);
-}
 
 // NOTE(Dima): Object pool stuff
 inline game_object* AllocateGameObject(game* Game)

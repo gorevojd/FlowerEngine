@@ -24,6 +24,8 @@ uniform mat4 Projection;
 uniform mat4 View;
 uniform float Time;
 
+uniform uvec3 VL_Shift;
+uniform uvec3 VL_Mask;
 uniform vec3 ChunkAt;
 uniform usamplerBuffer PerFaceData;
 
@@ -34,9 +36,9 @@ out float gl_ClipDistance[1];
 void main()
 {
 	//Extracting vertex data
-	uint InChunkX = InPosition & 63u;
-	uint InChunkZ = (InPosition >> 6u) & 63u;
-	uint InChunkY = (InPosition >> 12u) & 255u;
+	uint InChunkX = (InPosition >> VL_Shift.x) & VL_Mask.x;
+	uint InChunkZ = (InPosition >> VL_Shift.z) & VL_Mask.z;
+	uint InChunkY = (InPosition >> VL_Shift.y) & VL_Mask.y;
 
 	//Extracting per face data
 	uint PerFaceEntry = texelFetch(PerFaceData, gl_VertexID / 6).r;

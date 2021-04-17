@@ -63,8 +63,8 @@ inline pp_depth_of_field_params PP_DepthOfFieldDefaultParams()
     //Result.MaxDistance = 280.0f;
     
 #if 1    
-    Result.MinDistance = 600.0f;
-    Result.MaxDistance = 800.0f;
+    Result.MinDistance = 300.0f;
+    Result.MaxDistance = 1200.0f;
 #else
     Result.MinDistance = 50;
     Result.MaxDistance = 100;
