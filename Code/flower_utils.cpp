@@ -3,6 +3,9 @@
 #include <map>
 #include <algorithm>
 
+#include "flower_util_hashmap.h"
+#include "flower_util_list.h"
+
 struct helper_byte_buffer
 {
     void* Data;

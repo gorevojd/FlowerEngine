@@ -9,30 +9,50 @@
 #define RENDER_DEFAULT_2D_LINE_DASH_SPACING 8.0f
 #define RENDER_MAX_BONES 256
 
-struct culling_info
+enum class culling_mode : u32
 {
-    b32 Enabled;
-    
-    v3 BoundSphereP;
-    f32 BoundSphereR;
+    AABB,
+    Sphere,
 };
 
-inline culling_info DefaultCullingInfo()
+struct culling_info
+{
+    culling_mode Mode;
+    
+    union
+    {
+        struct 
+        {
+            v3 Sphere_Center;
+            f32 Sphere_Radius;
+        };
+        
+        struct 
+        {
+            v3 AABB_Center;
+            v3 AABB_Radius;
+        };
+    };
+};
+
+inline culling_info CullingInfoSphere(v3 Center, f32 Rad)
 {
     culling_info Result = {};
     
-    Result.Enabled = false;
+    Result.Mode = culling_mode::Sphere;
+    Result.Sphere_Center = Center;
+    Result.Sphere_Radius = Rad;
     
     return(Result);
 }
 
-inline culling_info CullingInfo(v3 Center, f32 Rad, b32 Enabled)
+inline culling_info CullingInfoAABB(v3 Center, v3 HalfDim)
 {
     culling_info Result = {};
     
-    Result.BoundSphereP = Center;
-    Result.BoundSphereR = Rad;
-    Result.Enabled = Enabled;
+    Result.Mode = culling_mode::AABB;
+    Result.AABB_Center = Center;
+    Result.AABB_Radius = HalfDim;
     
     return(Result);
 }
@@ -219,21 +239,48 @@ struct render_water
     render_water_params Params;
 };
 
-inline b32 IsFrustumCulled(render_pass* Pass, culling_info* Culling)
+inline b32 IsSphereCulledByFrustum(v4 Planes[6], v3 Center, f32 Rad)
 {
     b32 Result = false;
     
-    if(Culling->Enabled)
+    for(int i = 0; i < 6; i++)
     {
-        for(int i = 0; i < 6; i++)
+        f32 PlaneTest = PlanePointTest(Planes[i], Center);
+        if(PlaneTest + Rad < 0.0f)
         {
-            f32 PlaneTest = PlanePointTest(Pass->FrustumPlanes[i], Culling->BoundSphereP);
-            if(PlaneTest + Culling->BoundSphereR < 0.0f)
+            // NOTE(Dima): It means that culling happened on one of sides and object will not be visible
+            Result = true;
+            break;
+        }
+    }
+    
+    return(Result);
+}
+
+inline b32 IsFrustumCulled(render_pass* Pass, culling_info* Culling, b32 CullingEnabled)
+{
+    b32 Result = false;
+    
+    if(CullingEnabled)
+    {
+        switch(Culling->Mode)
+        {
+            case culling_mode::Sphere:
             {
-                // NOTE(Dima): It means that culling happened on one of sides and object will not be visible
-                Result = true;
-                break;
-            }
+                Result = IsSphereCulledByFrustum(Pass->FrustumPlanes,
+                                                 Culling->Sphere_Center,
+                                                 Culling->Sphere_Radius); 
+            }break;
+            
+            case culling_mode::AABB:
+            {
+                v3 C = Culling->AABB_Center;
+                v3 HalfDim = Culling->AABB_Radius;
+                
+                Result = IsSphereCulledByFrustum(Pass->FrustumPlanes,
+                                                 C,
+                                                 Length(HalfDim));
+            }break;
         }
     }
     
@@ -245,6 +292,26 @@ enum render_sky_type
     RenderSky_SolidColor,
     RenderSky_Gradient,
     RenderSky_Skybox,
+};
+
+struct material_command_entry
+{
+    render_command_header Header;
+    
+    material_command_entry* Next;
+};
+
+struct material_commands
+{
+    u32 MaterialID;
+    
+    material_command_entry* FirstEntry;
+};
+
+struct sorted_by_material_commands
+{
+    material_commands MaterialCommands[128];
+    int Count;
 };
 
 struct render_commands
@@ -261,6 +328,10 @@ struct render_commands
 #define MAX_RENDER_COMMANDS_COUNT 200000
     render_command_header CommandHeaders[MAX_RENDER_COMMANDS_COUNT];
     int CommandCount;
+    
+    sorted_by_material_commands SortedMaterialsOpaque;
+    sorted_by_material_commands SortedMaterialsTransparent;
+    material_command_entry* FirstFreeCommandEntry;
     
     render_pass RenderPasses[128];
     int RenderPassCount;
@@ -293,6 +364,8 @@ struct render_commands
     u32* VoxelFaces;
     u16* FaceToChunk;
     v3* VoxelChunksP;
+    
+    b32 CullingEnabled;
     
     // NOTE(Dima): Instance table
 #define RENDER_INSTANCE_TABLE_SIZE 256

@@ -25,10 +25,10 @@ struct shadow_cascade_info
 
 GLOBAL_VARIABLE int DefaultCascadeDistances[]
 {
-    15, 
-    60,
-    200,
-    800,
+    10, 
+    30,
+    100,
+    300,
 };
 
 struct pcf_poisson_samples

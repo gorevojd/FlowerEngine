@@ -240,11 +240,16 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     
     if(GetKey(Key_LeftShift) && GetKey(Key_LeftControl))
     {
-        
+        // NOTE(Dima): Shadows enable/disable
         if(GetKeyDown(Key_O))
         {
-            Global_RenderCommands->PostProcessing.SSAO_Params.Enabled = !Global_RenderCommands->PostProcessing.SSAO_Params.Enabled;
             Global_RenderCommands->Lighting.DirLit.CalculateShadows = !Global_RenderCommands->Lighting.DirLit.CalculateShadows;
+        }
+        
+        // NOTE(Dima): SSAO enable/disable
+        if(GetKeyDown(Key_I))
+        {
+            Global_RenderCommands->PostProcessing.SSAO_Params.Enabled = !Global_RenderCommands->PostProcessing.SSAO_Params.Enabled;
         }
         
         if(GetKeyDown(Key_N))

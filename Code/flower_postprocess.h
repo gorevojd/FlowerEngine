@@ -1,12 +1,21 @@
 #ifndef FLOWER_POSTPROCESS_H
 #define FLOWER_POSTPROCESS_H
 
+enum pp_resolution
+{
+    PostProcessResolution_Normal,
+    PostProcessResolution_Half,
+    PostProcessResolution_Quater,
+};
+
 struct pp_dilation_params
 {
     int Size;
     
     f32 MinThreshold;
     f32 MaxThreshold;
+    
+    pp_resolution Resolution;
 };
 
 struct pp_depth_of_field_params
@@ -26,6 +35,7 @@ struct pp_ssao_params
     int BlurRadius;
     
     b32 Enabled;
+    pp_resolution Resolution;
 };
 
 inline pp_ssao_params PP_SSAO_DefaultParams()
@@ -40,6 +50,7 @@ inline pp_ssao_params PP_SSAO_DefaultParams()
     Result.BlurRadius = 1;
     
     Result.Enabled = true;
+    Result.Resolution = PostProcessResolution_Half;
     
     return(Result);
 }
@@ -51,6 +62,7 @@ inline pp_dilation_params PP_DilationDefaultParams()
     Result.Size = 2;
     Result.MinThreshold = 0.1f;
     Result.MaxThreshold = 0.3f;
+    Result.Resolution = PostProcessResolution_Half;
     
     return(Result);
 }

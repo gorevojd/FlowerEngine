@@ -65,26 +65,6 @@ INTERNAL_FUNCTION void GeneratePCF_PoissonSamples(lighting* Lighting,
     PCF_Samples->ShouldRotateSamples = ShouldRotateSamples;
 }
 
-INTERNAL_FUNCTION void InitLighting(lighting* Lighting, memory_arena* Arena)
-{
-    Lighting->Arena = Arena;
-    
-    Lighting->AmbientPercentage = 0.25f;
-    Lighting->ShadowStrength = 0.65f;
-    Lighting->DirLit.Dir = NOZ(V3(-0.5f, -0.5f, -10.8f));
-    //Lighting->DirLit.Dir = NOZ(V3(0.0f, -1.0f, 0.0f));
-    Lighting->DirLit.C = V3(1.0f, 1.0f, 1.0f);
-    Lighting->DirLit.CalculateShadows = true;
-    
-    Lighting->CascadeCount = 4;
-    Lighting->ShadowMapRes = 2048;
-    Lighting->CascadeSafeDistance = 15.0f;
-    Lighting->BlurVarianceShadowMaps = true;
-    Lighting->VarianceShadowMapBlurRadius = 2;
-    
-    GeneratePCF_PoissonSamples(Lighting, 12, 2.0f, true);
-}
-
 shadow_cascade_info* GetDirLitCascades(lighting* Lighting,
                                        render_pass* MainRenderPass,
                                        int* OutCascadesCount,
@@ -100,9 +80,17 @@ shadow_cascade_info* GetDirLitCascades(lighting* Lighting,
         *OutCascadesCount = CascadeCount;
     }
     
-    if(UseDefaultCascades)
+    
+    if (CascadeCount > 1)
     {
-        Assert(CascadeCount == 4);
+        if(UseDefaultCascades)
+        {
+            Assert(CascadeCount == 4);
+        }
+    }
+    else
+    {
+        
     }
     
     f32 PrevCascade = 0;
@@ -115,15 +103,23 @@ shadow_cascade_info* GetDirLitCascades(lighting* Lighting,
         f32 TargetNear = PrevCascade;
         f32 TargetFar = DefaultCascadeDistances[CascadeIndex];
         
-        // NOTE(Dima): Target Near plane
-        if(CascadeIndex == 0)
+        if (CascadeCount > 1)
+        {
+            // NOTE(Dima): Target Near plane
+            if(CascadeIndex == 0)
+            {
+                TargetNear = MainRenderPass->Near;
+            }
+            
+            // NOTE(Dima): Target Far plane
+            if(CascadeIndex == CascadeCount - 1)
+            {
+                TargetFar = MainRenderPass->Far;
+            }
+        }
+        else
         {
             TargetNear = MainRenderPass->Near;
-        }
-        
-        // NOTE(Dima): Target Far plane
-        if(CascadeIndex == CascadeCount - 1)
-        {
             TargetFar = MainRenderPass->Far;
         }
         
@@ -273,4 +269,25 @@ shadow_cascade_info* GetDirLitCascades(lighting* Lighting,
     }
     
     return(Lighting->Cascades);
+}
+
+
+INTERNAL_FUNCTION void InitLighting(lighting* Lighting, memory_arena* Arena)
+{
+    Lighting->Arena = Arena;
+    
+    Lighting->AmbientPercentage = 0.25f;
+    Lighting->ShadowStrength = 0.65f;
+    Lighting->DirLit.Dir = NOZ(V3(-0.5f, -0.5f, -10.8f));
+    //Lighting->DirLit.Dir = NOZ(V3(0.0f, -1.0f, 0.0f));
+    Lighting->DirLit.C = V3(1.0f, 1.0f, 1.0f);
+    Lighting->DirLit.CalculateShadows = true;
+    
+    Lighting->CascadeCount = 4;
+    Lighting->ShadowMapRes = 1024;
+    Lighting->CascadeSafeDistance = 20.0f;
+    Lighting->BlurVarianceShadowMaps = true;
+    Lighting->VarianceShadowMapBlurRadius = 2;
+    
+    GeneratePCF_PoissonSamples(Lighting, 12, 2.0f, true);
 }

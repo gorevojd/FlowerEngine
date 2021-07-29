@@ -15,6 +15,7 @@ enum asset_type
     Asset_Animation,
     Asset_Material,
     Asset_Model,
+    Asset_Cubemap,
     
     Asset_Count,
 };
@@ -46,7 +47,8 @@ struct asset_system
     memory_arena* Arena;
     
     std::unordered_map<std::string, asset_id>* NameToAssetID;
-    std::vector<asset> Assets;
+    asset Assets[2048];
+    int NumAssets;
     
     image FontsAtlas;
     v2 FontAtlasAtP;

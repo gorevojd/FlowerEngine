@@ -8,7 +8,6 @@ uniform sampler2D NormalTex;
 uniform sampler2D ColorSpecTex;
 uniform sampler2D SSAOTex;
 uniform sampler2D PositionsTex;
-uniform sampler2D SkyTexture;
 uniform vec4 PerspProjCoefs;
 uniform vec2 WH;
 
@@ -113,100 +112,45 @@ float ShadowCalculation(vec3 WorldP, vec3 WorldN, float LinearDepth)
 
 	Shadow = 1.0 - PMaxT;
 
-#if 0
-	if(FragDepth - Bias > ClosestDepth)
-	{
-		Shadow = 1.0f;
-	}
-#endif
-
-#if 0
-#if 0
-	for(int j = -1; j <= 1; j++)
-	{
-		for(int i = -1; i <= 1; i++)
-		{
-			vec2 SampleOffset = vec2(i, j) * TexelSize;
-
-			vec3 NewSampleCoord = vec3(FragLitProjected.xy + SampleOffset, SampleLayerIndex);
-			float pcfDepth = texture(LightDepthTex, NewSampleCoord).r;
-			if(FragDepth - Bias > pcfDepth)
-			{
-				Shadow += 1.0 * ShadowStrength;
-			}
-		}
-	}
-	Shadow /= 9.0;
-#else
-	vec2 DimScaleRotations = ShadowTexSize.xy / vec2(4.0);
-
-	for(int i = 0; i < PoissonSamples.length(); i++)
-	{
-		// Reading random rotation vector
-		vec2 SampleRandRotationUV = FragLitProjected.xy * DimScaleRotations;
-
-		vec2 SampleOffset = PoissonSamples[i] * TexelSize;
-
-		// Applying random rotation vector
-		if(ShouldRotateSamples)
-		{
-			float RandomRotation = texture2D(PoissonSamplesRotations, SampleRandRotationUV).r;
-			float s = sin(RandomRotation);
-			float c = cos(RandomRotation);
-
-			SampleOffset.x = dot(SampleOffset, vec2(c, s));
-			SampleOffset.y = dot(SampleOffset, vec2(-s, c));
-		}
-
-		// Using rotated offset to fetch shadow sample
-		vec3 NewSampleCoord = vec3(FragLitProjected.xy + SampleOffset, SampleLayerIndex);
-		float pcfDepth = texture(LightDepthTex, NewSampleCoord).r;
-		if(FragDepth - Bias > pcfDepth)
-		{
-			Shadow += 1.0 * ShadowStrength;
-		}
-	}
-	Shadow /= 12.0f;
-#endif
-#endif
-
 	return(Shadow);
 }
 
 void main()
-{
-	
+{	
 	vec2 PixelDelta = vec2(1.0) / WH;
 
 	vec4 SampleColorSpec = texture2D(ColorSpecTex, FragUV);
-	vec3 WorldP = texture2D(PositionsTex, FragUV).xyz;
-	vec3 WorldN = texture2D(NormalTex, FragUV).xyz;
 	float SampleDepth = texture2D(DepthTex, FragUV).r;
-	float LinearDepth = GetLinearizedDepth(SampleDepth);
 
-	float TotalShadow = 0.0f;
-	if(CalculateDirLightShadow)
+	vec3 ResultColor;
+	if(SampleDepth < 0.9999999)
 	{
-		TotalShadow = ShadowCalculation(WorldP, WorldN, LinearDepth);
+		vec3 WorldN = texture2D(NormalTex, FragUV).xyz;
+		vec3 WorldP = texture2D(PositionsTex, FragUV).xyz;
+		
+		float TotalShadow = 0.0f;
+		if(CalculateDirLightShadow)
+		{
+			float LinearDepth = GetLinearizedDepth(SampleDepth);
+			
+			TotalShadow = ShadowCalculation(WorldP, WorldN, LinearDepth);
+		}
+		
+		if(SSAOEnabled)
+		{
+			float SampleOcclusion = (1.0 - texture2D(SSAOTex, FragUV).r) * SSAOContribution;
+
+			TotalShadow += SampleOcclusion;
+		}
+
+		TotalShadow = clamp(1.0 - TotalShadow, 0, 1);
+
+		ResultColor += SampleColorSpec.rgb * AmbientPercentage;
+		ResultColor += CalcDirLit(SampleColorSpec.rgb, WorldN) * TotalShadow;
 	}
-	
-	if(SSAOEnabled)
+	else
 	{
-		float SampleOcclusion = (1.0 - texture2D(SSAOTex, FragUV).r) * SSAOContribution;
-
-		TotalShadow += SampleOcclusion;
-	}
-
-	TotalShadow = clamp(1.0 - TotalShadow, 0, 1);
-
-	vec3 ResultColor = vec3(0.0);
-	ResultColor += SampleColorSpec.rgb * AmbientPercentage;
-	ResultColor += CalcDirLit(SampleColorSpec.rgb, WorldN) * TotalShadow;
-	
-	vec3 SkyColor = texture2D(SkyTexture, FragUV).rgb;
-	if(SampleDepth > 0.999999)
-	{
-		ResultColor = SkyColor;
+		ResultColor = SampleColorSpec.rgb;
 	}
 	
 	Color = vec4(ResultColor, 1.0);

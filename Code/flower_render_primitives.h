@@ -174,6 +174,9 @@ struct cubemap
 
 struct material
 {
+    char Name[64];
+    u32 ID;
+    
     image* Diffuse;
 };
 

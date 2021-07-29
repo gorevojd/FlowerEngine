@@ -1540,9 +1540,8 @@ INTERNAL_FUNCTION void UpdateChunkAtIndex(minecraft* Minecraft,
                         PushVoxelChunkMesh(&Chunk->Mesh, 
                                            ChunkWorldP, 
                                            Minecraft->RenderVoxelMeshLayout,
-                                           CullingInfo(Chunk->BoundingSphereCenter,
-                                                       Chunk->BoundingSphereR,
-                                                       true));
+                                           CullingInfoSphere(Chunk->BoundingSphereCenter,
+                                                             Chunk->BoundingSphereR));
                     }
                 }
             }
@@ -1746,7 +1745,7 @@ INTERNAL_FUNCTION void CreateMinecraft(memory_arena* Arena,
                                        u32 VertexLayoutType)
 {
     Mine->Arena = Arena;
-    Mine->ChunksViewDistance = 8;
+    Mine->ChunksViewDistance = 10;
     
     InitMinecraftVertexLayout(Mine, VertexLayoutType);
     InitMinecraftBlockTextures(Mine);

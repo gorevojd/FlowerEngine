@@ -1,7 +1,7 @@
 @echo off
 
 set DISABLED_WARNS=/wd4530 /wd4577 /wd4005
-SET COMP_OPTS=/Od /MP /Zi /Oi /FC /MP /EHa- /Gm- /GR- /nologo %DISABLED_WARNS%
+SET COMP_OPTS=/O2 /MP /Zi /Oi /FC /MP /EHa- /Gm- /GR- /nologo %DISABLED_WARNS%
 SET LINKER_OPTS=/SUBSYSTEM:CONSOLE /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib shell32.lib
 SET LINKER_OPTS=opengl32.lib %LINKER_OPTS%
 

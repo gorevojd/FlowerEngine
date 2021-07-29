@@ -47,7 +47,7 @@ inline void PushMesh(mesh* Mesh,
 inline void PushVoxelChunkMesh(voxel_mesh* Mesh,
                                v3 ChunkAt,
                                render_voxel_mesh_layout Layout,
-                               culling_info CullingInfo = DefaultCullingInfo())
+                               culling_info CullingInfo = {})
 {
     render_command_voxel_mesh* Entry = PushRenderCommand(RenderCommand_VoxelChunkMesh, render_command_voxel_mesh);
     
@@ -803,8 +803,8 @@ INTERNAL_FUNCTION inline render_water_params DefaultWaterParams()
     return(Result);
 }
 
-INTERNAL_FUNCTION void  PushWater(render_water_params Params,
-                                  render_pass* MainRenderPass)
+INTERNAL_FUNCTION void PushWater(render_water_params Params,
+                                 render_pass* MainRenderPass)
 {
     render_water* Water = &Global_RenderCommands->Water;
     Global_RenderCommands->WaterIsSet = true;
@@ -866,6 +866,60 @@ INTERNAL_FUNCTION void RenderPushDeallocateHandle(renderer_handle* Handle)
     Entry->Handle = Handle;
 }
 
+INTERNAL_FUNCTION inline material_command_entry* AllocateMaterialCommandEntry()
+{
+    if(Global_RenderCommands->FirstFreeCommandEntry == 0)
+    {
+        int CountToAlloc = 1024;
+        material_command_entry* NewEntries = PushArray(&Global_RenderCommands->CommandsBuffer, 
+                                                       material_command_entry, CountToAlloc);
+        
+        for(int EntryIndex = 0;
+            EntryIndex < CountToAlloc;
+            EntryIndex++)
+        {
+            NewEntries[EntryIndex].Next = Global_RenderCommands->FirstFreeCommandEntry;
+            
+            Global_RenderCommands->FirstFreeCommandEntry = &NewEntries[EntryIndex];
+        }
+    }
+    
+    material_command_entry* Result = Global_RenderCommands->FirstFreeCommandEntry;
+    
+    Global_RenderCommands->FirstFreeCommandEntry = Global_RenderCommands->FirstFreeCommandEntry->Next;
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void ResetSortedMaterialCommands(sorted_by_material_commands* SortedCommands)
+{
+    for(int EntryIndex = 0;
+        EntryIndex < SortedCommands->Count;
+        EntryIndex++)
+    {
+        material_commands* Commands = &SortedCommands->MaterialCommands[EntryIndex];
+        
+        Commands->FirstEntry = 0;
+    }
+}
+
+INTERNAL_FUNCTION void SortByMaterials()
+{
+    
+}
+
+INTERNAL_FUNCTION void SortByDistanceFrontToBack()
+{
+    
+}
+
+INTERNAL_FUNCTION void SortCommands()
+{
+    
+    // NOTE(Dima): Then sort by distance
+    
+}
+
 INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
                                    f32 Time)
 {
@@ -883,6 +937,12 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
     // NOTE(Dima): Init other things
     Commands->WaterIsSet = false;
     Commands->Water = {};
+    
+    // NOTE(Dima): Resetting sorted material commands
+    ResetSortedMaterialCommands(&Global_RenderCommands->SortedMaterialsOpaque);
+    ResetSortedMaterialCommands(&Global_RenderCommands->SortedMaterialsTransparent);
+    
+    Commands->FirstFreeCommandEntry = 0;
     
     // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();
@@ -936,4 +996,6 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensi
     
     Global_RenderCommands->VoxelTempData = 0;
     Global_RenderCommands->PrevVoxelDataSize = 0;
+    
+    Global_RenderCommands->CullingEnabled = true;
 }

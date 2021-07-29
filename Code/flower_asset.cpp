@@ -72,15 +72,15 @@ INTERNAL_FUNCTION void AddFontToAtlas(font* Font)
 
 INTERNAL_FUNCTION asset_id AddAsset(const char* GUID, u32 Type, void* Ptr)
 {
-    asset NewAsset = {};
+    asset_id NewAssetID = Global_Assets->NumAssets++;
     
-    CopyStringsSafe(NewAsset.GUID, ArrayCount(NewAsset.GUID), (char*)GUID);
-    NewAsset.Type = Type;
-    NewAsset.Ptr = Ptr;
+    asset* NewAsset = &Global_Assets->Assets[NewAssetID];
+    
+    CopyStringsSafe(NewAsset->GUID, ArrayCount(NewAsset->GUID), (char*)GUID);
+    NewAsset->Type = Type;
+    NewAsset->Ptr = Ptr;
     
     // NOTE(Dima): Inserting to assets array
-    asset_id NewAssetID = Global_Assets->Assets.size();
-    Global_Assets->Assets.push_back(NewAsset);
     
     // NOTE(Dima): Insering to table
     auto NewPair = std::pair<std::string, asset_id>(std::string(GUID), 
@@ -91,6 +91,7 @@ INTERNAL_FUNCTION asset_id AddAsset(const char* GUID, u32 Type, void* Ptr)
     return(NewAssetID);
 }
 
+#if 0
 inline asset_id GetByName(char* AssetName)
 {
     asset_id Result = 0;
@@ -115,6 +116,7 @@ inline void* GetAssetDataByIDInternal(asset_id ID, u32 AssetType)
 
 #define GetAssetDataByID(id, data_type, asset_type) (data_type*)GetAssetByIDInternal(id, asset_type);
 #define GetAsset(guid, data_type, asset_type) GetAssetDataByID(GetByName(guid), asset_type) 
+#endif
 
 #if 0
 struct asset_source
@@ -228,6 +230,8 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     Global_Assets->Arena = Arena;
     
     asset_system* A = Global_Assets;
+    
+    Global_Assets->NameToAssetID = PushNew<std::unordered_map<std::string, asset_id>>(Arena);
     
     // NOTE(Dima): Font atlas initializing
     int FontAtlasSize = 2048;
@@ -358,6 +362,7 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Cube = MakeUnitCube();
     A->Plane = MakePlane();
     
+    
 #if 0    
     A->Sky = LoadCubemap(
                          "../Data/Textures/Cubemaps/skybox/right.jpg",
@@ -457,4 +462,31 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Supra.Materials[0] = &A->PaletteMaterial;
 #endif
     
+    AddAsset("Image_VoxelAtlas", Asset_Image, &A->VoxelAtlas);
+    
+    AddAsset("Font_BerlinSans", Asset_Font, &A->BerlinSans);
+    AddAsset("Font_LiberationMono", Asset_Font, &A->LiberationMono);
+    
+    AddAsset("Mesh_Cube", Asset_Mesh, &A->Cube);
+    AddAsset("Mesh_Plane", Asset_Mesh, &A->Plane);
+    
+    AddAsset("Cubemap_Sky", Asset_Cubemap, &A->Sky);
+    
+    AddAsset("Image_BoxDiffuse", Asset_Image, &A->BoxTexture);
+    AddAsset("Image_PlaneTexture", Asset_Image, &A->PlaneTexture);
+    AddAsset("Image_Palette", Asset_Image, &A->Palette);
+    
+    AddAsset("Image_BearDiffuse", Asset_Image, &A->BearDiffuse);
+    AddAsset("Image_BearNormal", Asset_Image, &A->BearNormal);
+    AddAsset("Image_BearEyesDiffuse", Asset_Image, &A->BearEyesDiffuse);
+    AddAsset("Image_BearEyesShine", Asset_Image, &A->BearEyesShine);
+    
+    AddAsset("Image_FoxDiffuse", Asset_Image, &A->FoxDiffuse);
+    AddAsset("Image_FoxNormal", Asset_Image, &A->FoxNormal);
+    AddAsset("Image_FoxEyesDiffuse", Asset_Image, &A->FoxEyesDiffuse);
+    AddAsset("Image_FoxEyesShine", Asset_Image, &A->FoxEyesShine);
+    
+    AddAsset("Model_Bear", Asset_Model, &A->Bear);
+    AddAsset("Model_Fox", Asset_Model, &A->Fox);
+    AddAsset("Model_Supra", Asset_Model, &A->Supra);
 }

@@ -3,6 +3,7 @@
 
 #include "GL/glew.h"
 #include "flower_render.h"
+#include "flower_util_hashmap.h"
 
 inline b32 OpenGLAttribIsValid(GLint Attrib)
 {
@@ -19,8 +20,6 @@ struct uniform_name_entry
     const char* Name;
     u32 NameHash;
     GLint Location;
-    
-    uniform_name_entry* NextInHash;
 };
 
 enum opengl_shader_type
@@ -84,8 +83,7 @@ struct opengl_shader
     GLint IsBatchLoc;
     
     // NOTE(Dima): This map will cache all locations that were queried
-#define UNIFORM_NAME_TABLE_SIZE 64
-    uniform_name_entry* U2Loc[UNIFORM_NAME_TABLE_SIZE];
+    FlowerHashMap<uniform_name_entry, 256> U2Loc;
     
     void Use()
     {
@@ -98,31 +96,16 @@ struct opengl_shader
         GLint Location;
         
         u32 Hash = StringHashFNV((char*)UniformName);
-        u32 IndexInTable = Hash % UNIFORM_NAME_TABLE_SIZE;
-        uniform_name_entry* FindAt = U2Loc[IndexInTable];
+        uniform_name_entry* Found = U2Loc.find(Hash);
         
-        uniform_name_entry* Uniform = 0;
-        while(FindAt != 0)
+        if (Found)
         {
-            if(FindAt->NameHash == Hash)
-            {
-                if(StringsAreEqual((char*)UniformName, (char*)FindAt->Name))
-                {
-                    Uniform = FindAt;
-                    break;
-                }
-            }
-            
-            FindAt = FindAt->NextInHash;
-        }
-        
-        if(Uniform)
-        {
-            Location = Uniform->Location;
+            Location = Found->Location;
         }
         else
         {
             Location = glGetUniformLocation(this->ID, UniformName);
+            
             if(Location == -1)
             {
                 printf("Shader: \"%s\": Uniform \"%s\" is either not loaded, does not exit, or not used!\n", 
@@ -130,12 +113,12 @@ struct opengl_shader
                        UniformName);
             }
             
-            uniform_name_entry* New = PushStruct(Arena, uniform_name_entry);
-            New->NextInHash = U2Loc[IndexInTable];
-            New->Name = UniformName;
-            New->NameHash = Hash;
-            New->Location = Location;
-            U2Loc[IndexInTable] = New;
+            uniform_name_entry New = {};
+            New.Name = UniformName;
+            New.NameHash = Hash;
+            New.Location = Location;
+            
+            U2Loc.insert(Hash, New);
         }
         
         return(Location);
@@ -313,6 +296,12 @@ struct opengl_pp_framebuffer
     b32 IsInUseNow;
 };
 
+struct opengl_pp_framebuffer_pool
+{
+    opengl_pp_framebuffer* Framebuffers;
+    int Count;
+};
+
 struct opengl_g_buffer
 {
     u32 Framebuffer;
@@ -372,7 +361,11 @@ struct opengl_state
     
     opengl_framebuffer ShadowMap;
     int InitCascadesCount;
-    opengl_pp_framebuffer PostProcFramebufferPool[4];
+    
+    // NOTE(Dima): Framebuffer pools
+    opengl_pp_framebuffer_pool FramebufPoolNormalRes;
+    opengl_pp_framebuffer_pool FramebufPoolHalfRes;
+    opengl_pp_framebuffer_pool FramebufPoolQuaterRes;
     
     int MaxCombinedTextureUnits;
 };
