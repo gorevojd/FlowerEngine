@@ -1,4 +1,4 @@
-#include "prj_rubiks.cpp"
+#include "game/rubiks/prj_rubiks.cpp"
 
 struct rubiks_state
 {

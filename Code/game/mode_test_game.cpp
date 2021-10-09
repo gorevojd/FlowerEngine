@@ -33,18 +33,14 @@ SCENE_INIT(TestGame)
     State->Fox = CreateModelGameObject(Scene->Game, &Global_Assets->Fox);
     State->Supra = CreateModelGameObject(Scene->Game, &Global_Assets->Supra);
     
-    AddComponent(State->Bear1, Component_component_animator);
-    AddComponent(State->Bear2, Component_component_animator);
-    AddComponent(State->Fox, Component_component_animator);
-    
     State->Bear1->P = V3(0.0f, 0.0f, 0.0f);
-    GetComp(State->Bear1, component_animator)->PlayingAnimation = &Global_Assets->BearSuccess;
+    State->Bear1->CompAnimator.PlayingAnimation = &Global_Assets->BearSuccess;
     
     State->Bear2->P = V3(2.0f, 0.0f, 0.0f);
-    GetComp(State->Bear2, component_animator)->PlayingAnimation = &Global_Assets->BearIdle;
+    State->Bear2->CompAnimator.PlayingAnimation = &Global_Assets->BearIdle;
     
     State->Fox->P = V3(4.0f, 0.0f, 0.0f);
-    GetComp(State->Fox, component_animator)->PlayingAnimation = &Global_Assets->FoxTalk;
+    State->Fox->CompAnimator.PlayingAnimation = &Global_Assets->FoxTalk;
     
     State->Supra->P = V3(6.0f, 0.0f, 0.0f);
 }

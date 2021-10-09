@@ -1,0 +1,18 @@
+{
+	"TestGame": {
+		"FileName": "game/mode_test_game.cpp",
+		"Method_OnGUI": true
+	},
+
+	"GraphShow": {
+		"FileName": "game/mode_graph_show.cpp"
+	},
+
+	"RubiksCube": {
+		"FileName": "game/mode_rubiks.cpp"
+	},
+
+	"Minecraft": {
+		"FileName": "game/mode_minecraft.cpp"
+	}
+}

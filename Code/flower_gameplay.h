@@ -29,6 +29,21 @@ struct game_camera
     u32 State;
 };
 
+struct component_model
+{
+    model* Model;
+    m44* NodeToModel;
+    m44* SkinningMatrices;
+    b32 ToModelIsComputed;
+    
+    void* Free;
+};
+
+struct component_animator
+{
+    animation* PlayingAnimation;
+};
+
 enum game_object_type
 {
     GameObject_Root,
@@ -37,7 +52,6 @@ enum game_object_type
     GameObject_Object,
 };
 
-#include "flower_component.h"
 struct game_object
 {
     b32 IsActive;
@@ -58,9 +72,10 @@ struct game_object
     
     char Name[128];
     
-    // NOTE(Dima): Model related stuff
-    u32 ComponentsMask;
-    component Components[8];
+    component_model CompModel;
+    component_animator CompAnimator;
+    
+    
 };
 
 struct game_object_pool

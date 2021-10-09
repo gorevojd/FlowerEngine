@@ -1,4 +1,4 @@
-#include "prj_minecraft.cpp"
+#include "game/minecraft/prj_minecraft.cpp"
 
 struct minecraft_state
 {

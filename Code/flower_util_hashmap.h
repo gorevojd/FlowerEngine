@@ -74,7 +74,7 @@ struct FlowerHashMap
             Entry->NextInList->PrevInList = Entry;
             Entry->PrevInList->NextInList = Entry;
         }
-    }
+    }  
     
     
     flower_hashmap_entry<t>* allocateHashMapEntry()

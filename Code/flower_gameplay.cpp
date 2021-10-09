@@ -1,5 +1,3 @@
-#include "flower_component.cpp"
-
 inline void InitCamera(game_camera* Cam, u32 State,
                        f32 Near = 0.5f,
                        f32 Far = 500.0f)
@@ -289,9 +287,10 @@ void DeleteGameObjectRec(game* Game, game_object* Obj)
         DeallocateGameObject(Game, Obj->ChildSentinel);
     }
     
-    // TODO(Dima): If needed - we can call destructors on object's components here
-    // ....
-    RemoveAllComponents(Obj);
+    if (Obj->CompModel.Free)
+    {
+        free(Obj->CompModel.Free);
+    }
     
     // NOTE(Dima): Deleting this object
     DLIST_REMOVE(Obj, Next, Prev);
@@ -321,14 +320,9 @@ game_object* CreateModelGameObject(game* Game,
                                    model* Model,
                                    char* Name = 0)
 {
-    game_object* Result = CreateGameObject(Game, GameObject_Object, Name);
-    
-    AddComponent(Result, Component_component_model);
-    component_model* ModelComp = GetComp(Result, component_model);
-    ModelComp->Model = Model;
-    
     helper_byte_buffer Help = {};
-    component* Component = AddComponent(Result, Component_component_model);
+    
+    game_object* Result = CreateGameObject(Game, GameObject_Object, Name);
     
     if(Model->Shared.NumNodes)
     {
@@ -342,24 +336,25 @@ game_object* CreateModelGameObject(game* Game,
     
     Help.Generate();
     
+    component_model* ModelComp = (component_model*)&Result->CompModel;
     ModelComp->NodeToModel = (m44*)Help.GetPlace("NodeToModel");
     ModelComp->SkinningMatrices = (m44*)Help.GetPlace("SkinningMatrices");
-    
-    Component->Free = Help.Data;
-    Component->FreeSize = Help.DataSize;
+    ModelComp->Free = Help.Data;
+    ModelComp->Model = Model;
+    ModelComp->ToModelIsComputed = false;
     
     return(Result);
 }
 
 void UpdateModelGameObject(game_object* Object)
 {
-    component_model* CompModel = GetComp(Object, component_model);
+    component_model* CompModel = (component_model*)&Object->CompModel;
     
     m44* SkinningMatrices = 0;
     int SkinningMatricesCount = 0;
     model* Model = CompModel->Model;
     
-    component_animator* AnimatorComp = GetComp(Object, component_animator);
+    component_animator* AnimatorComp = (component_animator*)&Object->CompAnimator;
     animation* Animation = 0;
     
     if(AnimatorComp)

@@ -891,35 +891,6 @@ INTERNAL_FUNCTION inline material_command_entry* AllocateMaterialCommandEntry()
     return(Result);
 }
 
-INTERNAL_FUNCTION void ResetSortedMaterialCommands(sorted_by_material_commands* SortedCommands)
-{
-    for(int EntryIndex = 0;
-        EntryIndex < SortedCommands->Count;
-        EntryIndex++)
-    {
-        material_commands* Commands = &SortedCommands->MaterialCommands[EntryIndex];
-        
-        Commands->FirstEntry = 0;
-    }
-}
-
-INTERNAL_FUNCTION void SortByMaterials()
-{
-    
-}
-
-INTERNAL_FUNCTION void SortByDistanceFrontToBack()
-{
-    
-}
-
-INTERNAL_FUNCTION void SortCommands()
-{
-    
-    // NOTE(Dima): Then sort by distance
-    
-}
-
 INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
                                    f32 Time)
 {
@@ -937,10 +908,6 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
     // NOTE(Dima): Init other things
     Commands->WaterIsSet = false;
     Commands->Water = {};
-    
-    // NOTE(Dima): Resetting sorted material commands
-    ResetSortedMaterialCommands(&Global_RenderCommands->SortedMaterialsOpaque);
-    ResetSortedMaterialCommands(&Global_RenderCommands->SortedMaterialsTransparent);
     
     Commands->FirstFreeCommandEntry = 0;
     

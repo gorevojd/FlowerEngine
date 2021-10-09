@@ -49,7 +49,7 @@ inline void OutputLog(const char* Format, ...)
 #include "flower_debug.cpp"
 
 #include "flower_scene.cpp"
-#include "meta_scenes.cpp"
+#include "game/meta_scenes.cpp"
 
 INTERNAL_FUNCTION inline void InitSceneMethods(game* Game, int SceneIndex)
 {
@@ -184,8 +184,8 @@ extern "C" __declspec(dllexport) GAME_INIT(GameInit)
     InitGameObjectPool(Game, Arena);
     
     //Game->CurrentSceneIndex = FindSceneByName("RubiksCube");
-    //Game->CurrentSceneIndex = FindSceneByName("TestGame");
-    Game->CurrentSceneIndex = FindSceneByName("Minecraft");
+    Game->CurrentSceneIndex = FindSceneByName("TestGame");
+    //Game->CurrentSceneIndex = FindSceneByName("Minecraft");
     //Game->CurrentSceneIndex = FindSceneByName("GraphShow");
     
     Game->NextSceneIndex = Game->CurrentSceneIndex;
