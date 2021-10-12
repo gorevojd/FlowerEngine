@@ -208,6 +208,25 @@ inline void PushSky(v3 Color)
     Global_RenderCommands->SkyType = RenderSky_SolidColor;
 }
 
+inline batch_rect_buffer CreateRectBuffer(int NumRects, u32 BatchRectBufferType)
+{
+    batch_rect_buffer Result = {};
+    
+    Result.MaxRectCount = NumRects;
+    Result.RectCount = 0;
+    
+    memory_arena* Arena = Global_RenderCommands->Arena;
+    
+    Result.Vertices = PushArray(Arena, rect_vertex, NumRects * 4);
+    Result.Indices = PushArray(Arena, u32, NumRects * 6);
+    Result.Colors = PushArray(Arena, u32, NumRects);
+    Result.Types = PushArray(Arena, u8, NumRects);
+    
+    Result.Type = BatchRectBufferType;
+    
+    return (Result);
+}
+
 inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     if(Global_RenderCommands->ImageFree.Next == &Global_RenderCommands->ImageFree)
@@ -226,7 +245,7 @@ inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 
         }
     }
     
-    render_command_image* Entry = Global_RenderCommands->ImageFree.Next;;
+    render_command_image* Entry = Global_RenderCommands->ImageFree.Next;
     
     DLIST_REMOVE(Entry, Next, Prev);
     DLIST_INSERT_BEFORE_SENTINEL(Entry, 
@@ -248,12 +267,12 @@ inline void PushCenteredImage(image* Img, v2 CenterP, f32 Height, v4 C = V4(1.0f
     PushImage(Img, PushP, Height, C);
 }
 
-INTERNAL_FUNCTION inline void PushRectInternal(rect_buffer* RectBuffer,
+INTERNAL_FUNCTION inline void PushRectInternal(batch_rect_buffer* RectBuffer,
                                                rect_vertex Verts[4],
                                                u32 RectType,
                                                v4 C = ColorWhite())
 {
-    Assert(RectBuffer->RectCount < MAX_RECTS_COUNT);
+    Assert(RectBuffer->RectCount < RectBuffer->MaxRectCount);
     
     int VertexAt = RectBuffer->RectCount * 4;
     
@@ -277,7 +296,8 @@ INTERNAL_FUNCTION inline void PushRectInternal(rect_buffer* RectBuffer,
     RectBuffer->RectCount++;
 }
 
-INTERNAL_FUNCTION inline void PushTriangle2D(v2 Point0, 
+INTERNAL_FUNCTION inline void PushTriangle2D(batch_rect_buffer* RectBuffer,
+                                             v2 Point0, 
                                              v2 Point1, 
                                              v2 Point2,
                                              v4 C = ColorWhite())
@@ -288,12 +308,11 @@ INTERNAL_FUNCTION inline void PushTriangle2D(v2 Point0,
     Verts[2] = { Point2, V2(0.0f, 0.0f)};
     Verts[3] = { Point2, V2(0.0f, 0.0f)};
     
-    rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
-    
     PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
 }
 
-INTERNAL_FUNCTION inline void PushQuadrilateral2D(v2 Point0, 
+INTERNAL_FUNCTION inline void PushQuadrilateral2D(batch_rect_buffer* RectBuffer,
+                                                  v2 Point0, 
                                                   v2 Point1, 
                                                   v2 Point2,
                                                   v2 Point3,
@@ -305,12 +324,11 @@ INTERNAL_FUNCTION inline void PushQuadrilateral2D(v2 Point0,
     Verts[2] = { Point2, V2(0.0f, 0.0f)};
     Verts[3] = { Point3, V2(0.0f, 0.0f)};
     
-    rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
-    
     PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
 }
 
-INTERNAL_FUNCTION inline void PushCircleInternal2D(v2 P, 
+INTERNAL_FUNCTION inline void PushCircleInternal2D(batch_rect_buffer* RectBuffer,
+                                                   v2 P, 
                                                    f32 InnerRadius,
                                                    f32 OuterRadius,
                                                    v4 C = ColorWhite(),
@@ -333,7 +351,8 @@ INTERNAL_FUNCTION inline void PushCircleInternal2D(v2 P,
         v2 NextInner = P + NormNext * InnerRadius;
         v2 CurInner = P + NormCurrent * InnerRadius;
         
-        PushQuadrilateral2D( CurOuter,
+        PushQuadrilateral2D(RectBuffer, 
+                            CurOuter,
                             NextOuter, 
                             NextInner,
                             CurInner,
@@ -341,45 +360,53 @@ INTERNAL_FUNCTION inline void PushCircleInternal2D(v2 P,
     }
 }
 
-INTERNAL_FUNCTION inline void PushCircle2D(v2 P, f32 Radius,
+INTERNAL_FUNCTION inline void PushCircle2D(batch_rect_buffer* RectBuffer,
+                                           v2 P, f32 Radius,
                                            v4 C = ColorWhite(),
                                            int Segments = 24)
 {
-    PushCircleInternal2D(P, 0.0f,
+    PushCircleInternal2D(RectBuffer,
+                         P, 0.0f,
                          Radius,
                          C,
                          Segments);
 }
 
-INTERNAL_FUNCTION inline void PushCircleOutline2D(v2 P, 
+INTERNAL_FUNCTION inline void PushCircleOutline2D(batch_rect_buffer* RectBuffer,
+                                                  v2 P, 
                                                   f32 CircleRadius,
                                                   f32 OutlineThickness,
                                                   v4 C = ColorWhite(),
                                                   int Segments = 24)
 {
-    PushCircleInternal2D(P,
+    PushCircleInternal2D(RectBuffer,
+                         P,
                          CircleRadius,
                          CircleRadius + OutlineThickness,
                          C,
                          Segments);
 }
 
-INTERNAL_FUNCTION inline void PushOutlinedCircle2D(v2 P, f32 Radius,
+INTERNAL_FUNCTION inline void PushOutlinedCircle2D(batch_rect_buffer* RectBuffer,
+                                                   v2 P, f32 Radius,
                                                    f32 OutlineThickness,
                                                    v4 CircleC = ColorWhite(),
                                                    v4 OutlineC = ColorGray(0.05f),
                                                    int SegmentsCount = 16)
 {
-    PushCircle2D(P, Radius,
+    PushCircle2D(RectBuffer,
+                 P, Radius,
                  CircleC, SegmentsCount);
     
-    PushCircleOutline2D(P, Radius,
+    PushCircleOutline2D(RectBuffer,
+                        P, Radius,
                         OutlineThickness,
                         OutlineC,
                         SegmentsCount);
 }
 
-INTERNAL_FUNCTION inline void PushRect(rc2 Rect,
+INTERNAL_FUNCTION inline void PushRect(batch_rect_buffer* RectBuffer,
+                                       rc2 Rect,
                                        v4 C = ColorWhite())
 {
     v2 Point1 = Rect.Min;
@@ -387,7 +414,8 @@ INTERNAL_FUNCTION inline void PushRect(rc2 Rect,
     v2 Point3 = Rect.Max;
     v2 Point4 = V2(Rect.Min.x, Rect.Max.y);
     
-    PushQuadrilateral2D(Point1,
+    PushQuadrilateral2D(RectBuffer,
+                        Point1,
                         Point2,
                         Point3,
                         Point4,
@@ -400,10 +428,11 @@ INTERNAL_FUNCTION inline void PushFullscreenRect(v4 C = ColorWhite())
                           V2(Global_RenderCommands->WindowDimensions.Width,
                              Global_RenderCommands->WindowDimensions.Height));
     
-    PushRect(Rect, C);
+    PushRect(&Global_RenderCommands->Rects2D_Window, Rect, C);
 }
 
-INTERNAL_FUNCTION inline void PushRectOutline(rc2 Rect,
+INTERNAL_FUNCTION inline void PushRectOutline(batch_rect_buffer* RectBuffer,
+                                              rc2 Rect,
                                               f32 Thickness,
                                               v4 C = ColorBlack())
 {
@@ -422,21 +451,23 @@ INTERNAL_FUNCTION inline void PushRectOutline(rc2 Rect,
         RectIndex < 4;
         RectIndex++)
     {
-        PushRect(Lines[RectIndex], C);
+        PushRect(RectBuffer, Lines[RectIndex], C);
     }
 }
 
-INTERNAL_FUNCTION inline void PushOutlinedRect(rc2 Rect,
+INTERNAL_FUNCTION inline void PushOutlinedRect(batch_rect_buffer* RectBuffer,
+                                               rc2 Rect,
                                                f32 OutlineThickness,
                                                v4 RectColor = ColorWhite(),
                                                v4 OutlineColor = ColorBlack())
 {
-    PushRect(Rect, RectColor);
+    PushRect(RectBuffer, Rect, RectColor);
     
-    PushRectOutline(Rect, OutlineThickness, OutlineColor);
+    PushRectOutline(RectBuffer, Rect, OutlineThickness, OutlineColor);
 }
 
-INTERNAL_FUNCTION inline void PushLineInternal2D(v2 Begin,
+INTERNAL_FUNCTION inline void PushLineInternal2D(batch_rect_buffer* RectBuffer,
+                                                 v2 Begin,
                                                  v2 End,
                                                  f32 Thickness = RENDER_DEFAULT_2D_LINE_THICKNESS,
                                                  v4 C = ColorWhite(),
@@ -478,8 +509,6 @@ INTERNAL_FUNCTION inline void PushLineInternal2D(v2 Begin,
         Verts[2] = { LineBegin + Offset, V2(0.0f, 0.0f)};
         Verts[3] = { LineBegin - Offset, V2(0.0f, 0.0f)};
         
-        rect_buffer* RectBuffer = &Global_RenderCommands->Rects2D;
-        
         PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
     }
     
@@ -492,7 +521,8 @@ INTERNAL_FUNCTION inline void PushLineInternal2D(v2 Begin,
         v2 Corner2 = LineEnd + ArrowOffset;
         v2 Corner3 = LineEnd - ArrowOffset;
         
-        PushTriangle2D(Corner1,
+        PushTriangle2D(RectBuffer, 
+                       Corner1,
                        Corner2,
                        Corner3,
                        C);
@@ -505,43 +535,51 @@ INTERNAL_FUNCTION inline void PushLineInternal2D(v2 Begin,
         v2 Corner2 = LineBegin + ArrowOffset;
         v2 Corner3 = LineBegin - ArrowOffset;
         
-        PushTriangle2D(Corner1,
+        PushTriangle2D(RectBuffer,
+                       Corner1,
                        Corner2,
                        Corner3,
                        C);
     }
 }
 
-INTERNAL_FUNCTION inline void PushLine2D(v2 Begin,
+INTERNAL_FUNCTION inline void PushLine2D(batch_rect_buffer* RectBuffer,
+                                         v2 Begin,
                                          v2 End,
                                          f32 Thickness = RENDER_DEFAULT_2D_LINE_THICKNESS,
                                          v4 C = ColorWhite())
 {
-    PushLineInternal2D(Begin,
+    PushLineInternal2D(RectBuffer,
+                       Begin,
                        End,
                        Thickness, C);
 }
 
-INTERNAL_FUNCTION inline void PushRoundLine2D(v2 Begin,
+INTERNAL_FUNCTION inline void PushRoundLine2D(batch_rect_buffer* RectBuffer,
+                                              v2 Begin,
                                               v2 End,
                                               f32 Radius,
                                               v4 C = ColorWhite())
 {
-    PushLineInternal2D(Begin,
+    PushLineInternal2D(RectBuffer,
+                       Begin,
                        End,
                        Radius * 2.0f, 
                        C);
     
-    PushCircle2D(Begin, 
+    PushCircle2D(RectBuffer,
+                 Begin, 
                  Radius, C,
                  12);
     
-    PushCircle2D(End, 
+    PushCircle2D(RectBuffer,
+                 End, 
                  Radius, C,
                  12);
 }
 
-INTERNAL_FUNCTION inline void PushDashedLine2D(v2 Begin,
+INTERNAL_FUNCTION inline void PushDashedLine2D(batch_rect_buffer* RectBuffer,
+                                               v2 Begin,
                                                v2 End,
                                                f32 DashMaxLen = RENDER_DEFAULT_2D_LINE_DASH_LENGTH,
                                                f32 SpaceLen = RENDER_DEFAULT_2D_LINE_DASH_SPACING,
@@ -568,7 +606,8 @@ INTERNAL_FUNCTION inline void PushDashedLine2D(v2 Begin,
         v2 CurLineEnd = CurLineStart + OffsetNorm * CurDashLen;
         
         // NOTE(Dima): Pushing line
-        PushLineInternal2D(CurLineStart, 
+        PushLineInternal2D(RectBuffer,
+                           CurLineStart, 
                            CurLineEnd,
                            Thickness,
                            C);
@@ -578,12 +617,14 @@ INTERNAL_FUNCTION inline void PushDashedLine2D(v2 Begin,
     }
 }
 
-INTERNAL_FUNCTION inline void PushArrow2D(v2 Begin,
+INTERNAL_FUNCTION inline void PushArrow2D(batch_rect_buffer* RectBuffer,
+                                          v2 Begin,
                                           v2 End,
                                           f32 Thickness = RENDER_DEFAULT_2D_LINE_THICKNESS,
                                           v4 C = ColorWhite())
 {
-    PushLineInternal2D(Begin,
+    PushLineInternal2D(RectBuffer,
+                       Begin,
                        End,
                        Thickness, C, 
                        true, false);
@@ -591,7 +632,7 @@ INTERNAL_FUNCTION inline void PushArrow2D(v2 Begin,
 }
 
 // TODO(Dima): Perfomance critical function. Maybe think about how can we optimize it even more
-inline void PushGlyph(rect_buffer* RectBuffer,
+inline void PushGlyph(batch_rect_buffer* RectBuffer,
                       glyph* Glyph, 
                       v2 P, f32 Height, 
                       int StyleIndex,
@@ -612,7 +653,7 @@ inline void PushGlyph(rect_buffer* RectBuffer,
     PushRectInternal(RectBuffer, Verts, Rect_Textured, C);
 }
 
-INTERNAL_FUNCTION void ResetRectBuffer(rect_buffer* RectBuffer)
+INTERNAL_FUNCTION void ResetRectBuffer(batch_rect_buffer* RectBuffer)
 {
     RectBuffer->RectCount = 0;
 }
@@ -755,13 +796,13 @@ INTERNAL_FUNCTION void SetOrthographicPassData(render_pass* RenderPass,
                                                v3 CameraP,
                                                const m44& View,
                                                f32 Far, f32 Near,
-                                               f32 RadiusW,
-                                               f32 RadiusH)
+                                               f32 Width, 
+                                               f32 Height)
 {
     RenderPass->CameraP = CameraP;
     RenderPass->View = View;
-    RenderPass->Projection = OrthographicProjection(RadiusW, RadiusH,
-                                                    Far, Near);
+    RenderPass->Projection = OrthographicProjectionUnit(Width, Height,
+                                                        Far, Near);
     RenderPass->ViewProjection = RenderPass->View * RenderPass->Projection;
     
     RenderPass->Far = Far;
@@ -922,16 +963,21 @@ INTERNAL_FUNCTION void EndRender()
     FreeArena(&Commands->CommandsBuffer, true);
     Commands->CommandCount = 0;
     
-    ResetRectBuffer(&Commands->Rects2D);
+    ResetRectBuffer(&Commands->Rects2D_Window);
+    ResetRectBuffer(&Commands->Rects2D_Unit);
+    
     Commands->Sky = 0;
     Commands->ClearCommand.Set = false;
     
     DLIST_REMOVE_ENTIRE_LIST(&Commands->ImageUse, &Commands->ImageFree, Next, Prev);
 }
 
-INTERNAL_FUNCTION void Render()
+INTERNAL_FUNCTION void RenderAll()
 {
     render_commands* Commands = Global_RenderCommands;
+    
+    Commands->ScreenOrthoProjection = OrthographicProjectionUnit(Commands->WindowDimensions.Width, 
+                                                                 Commands->WindowDimensions.Height);
     
     // NOTE(Dima): Render
     Platform.Render(Commands);
@@ -955,6 +1001,7 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensi
     DLIST_REFLECT_PTRS(Global_RenderCommands->ImageUse, Next, Prev);
     DLIST_REFLECT_PTRS(Global_RenderCommands->ImageFree, Next, Prev);
     
+    // NOTE(Dima): Init other stuff
     InitLighting(&Global_RenderCommands->Lighting, Arena);
     InitPostprocessing(&Global_RenderCommands->PostProcessing);
     
@@ -965,4 +1012,8 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensi
     Global_RenderCommands->PrevVoxelDataSize = 0;
     
     Global_RenderCommands->CullingEnabled = true;
+    
+    // NOTE(Dima): Initialize batched rect buffers
+    Global_RenderCommands->Rects2D_Window = CreateRectBuffer(30000, BatchRectBuffer_Window);
+    Global_RenderCommands->Rects2D_Unit = CreateRectBuffer(10000, BatchRectBuffer_Unit);
 }

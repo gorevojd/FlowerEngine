@@ -17,11 +17,16 @@ INTERNAL_FUNCTION inline v2 GetGraphPoint(ui_slider_graph* Graph, f32 UnitValue)
     return(Result);
 }
 
-INTERNAL_FUNCTION v2 AddGraphPoint(ui_graph* Graph, v2 UnitP, float PixelRadius = 10.0f, v4 Color = ColorWhite())
+INTERNAL_FUNCTION v2 AddGraphPoint(ui_graph* Graph, 
+                                   batch_rect_buffer* RectBuffer,
+                                   v2 UnitP, 
+                                   float PixelRadius = 10.0f, 
+                                   v4 Color = ColorWhite())
 {
     v2 TargetP = GetGraphPoint(Graph, UnitP);
     
-    PushOutlinedCircle2D(TargetP,
+    PushOutlinedCircle2D(RectBuffer,
+                         TargetP,
                          PixelRadius,
                          2.0f,
                          Color);
@@ -30,6 +35,7 @@ INTERNAL_FUNCTION v2 AddGraphPoint(ui_graph* Graph, v2 UnitP, float PixelRadius 
 }
 
 INTERNAL_FUNCTION v2 AddGraphPoint(ui_slider_graph* Graph,
+                                   batch_rect_buffer* RectBuffer,
                                    f32 PointRadius,
                                    f32 Value,
                                    v4 Color)
@@ -41,7 +47,8 @@ INTERNAL_FUNCTION v2 AddGraphPoint(ui_slider_graph* Graph,
     
     v2 CircleCenter = V2(TargetX, TargetY);
     
-    PushOutlinedCircle2D(CircleCenter,
+    PushOutlinedCircle2D(RectBuffer,
+                         CircleCenter,
                          PointRadius,
                          4,
                          Color);
@@ -78,6 +85,7 @@ INTERNAL_FUNCTION rc2 AddPointLabel(char* Text,
 }
 
 INTERNAL_FUNCTION void AddHatchToAxis(ui_graph* Graph,
+                                      batch_rect_buffer* RectBuffer,
                                       b32 IsX, 
                                       int UnitIndex)
 {
@@ -93,7 +101,10 @@ INTERNAL_FUNCTION void AddHatchToAxis(ui_graph* Graph,
     v2 HatchBegin = HatchOrigin + HatchPerp * HatchWidth * 0.5f;
     v2 HatchEnd = HatchOrigin - HatchPerp * HatchWidth * 0.5f;
     
-    PushLine2D(HatchBegin, HatchEnd, Graph->AxisThickness, AxisColor);
+    PushLine2D(RectBuffer,
+               HatchBegin, HatchEnd, 
+               Graph->AxisThickness, 
+               AxisColor);
     
     if(Graph->ShowIntLabels)
     {
@@ -119,6 +130,7 @@ INTERNAL_FUNCTION void AddHatchToAxis(ui_graph* Graph,
 }
 
 void AddAxis(ui_graph* Graph,
+             batch_rect_buffer* RectBuffer,
              b32 IsX,
              b32 ShowCenterHatch = false)
 {
@@ -148,7 +160,8 @@ void AddAxis(ui_graph* Graph,
     int UnitMaxInt = std::floor(UnitMax);
     
     // NOTE(Dima): Pushing axis
-    PushArrow2D(Graph->Origin - Axis * LowerUnits,
+    PushArrow2D(RectBuffer,
+                Graph->Origin - Axis * LowerUnits,
                 Graph->Origin + Axis * UpperUnits,
                 Graph->AxisThickness,
                 AxisColor);
@@ -158,19 +171,20 @@ void AddAxis(ui_graph* Graph,
     {
         if(UnitIndex != 0)
         {
-            AddHatchToAxis(Graph, IsX, UnitIndex);
+            AddHatchToAxis(Graph, RectBuffer, IsX, UnitIndex);
         }
         else
         {
             if(ShowCenterHatch)
             {
-                AddHatchToAxis(Graph, IsX, UnitIndex);
+                AddHatchToAxis(Graph, RectBuffer, IsX, UnitIndex);
             }
         }
     }
 }
 
-INTERNAL_FUNCTION ui_graph BeginGraph(v2 Origin, 
+INTERNAL_FUNCTION ui_graph BeginGraph(batch_rect_buffer* RectBuffer,
+                                      v2 Origin, 
                                       v2 UnitMin, v2 UnitMax, 
                                       f32 PixelsPerUnit = 50.0f, 
                                       f32 Thickness = RENDER_DEFAULT_2D_LINE_THICKNESS,
@@ -193,7 +207,7 @@ INTERNAL_FUNCTION ui_graph BeginGraph(v2 Origin,
     
     b32 ShowCenterHatch = !ShowVerticalAxis;
     
-    AddAxis(&Graph, true, ShowCenterHatch);
+    AddAxis(&Graph, RectBuffer, true, ShowCenterHatch);
     
     if(ShowVerticalAxis)
     {
@@ -203,7 +217,11 @@ INTERNAL_FUNCTION ui_graph BeginGraph(v2 Origin,
     return(Graph);
 }
 
-INTERNAL_FUNCTION v2 AddGraphCircle(ui_graph* Graph, v2 UnitP, f32 UnitRadius, v4 Color = ColorWhite())
+INTERNAL_FUNCTION v2 AddGraphCircle(ui_graph* Graph,
+                                    batch_rect_buffer* RectBuffer,
+                                    v2 UnitP, 
+                                    f32 UnitRadius, 
+                                    v4 Color = ColorWhite())
 {
     v2 TargetP = GetGraphPoint(Graph, UnitP);
     
@@ -211,7 +229,8 @@ INTERNAL_FUNCTION v2 AddGraphCircle(ui_graph* Graph, v2 UnitP, f32 UnitRadius, v
     
     f32 HalfThick = RENDER_DEFAULT_2D_LINE_THICKNESS * 0.5f;
     
-    PushCircleInternal2D(TargetP,
+    PushCircleInternal2D(RectBuffer,
+                         TargetP,
                          PixelRadius - HalfThick,
                          PixelRadius + HalfThick,
                          Color,
@@ -261,7 +280,8 @@ INTERNAL_FUNCTION ui_cell_grid_graph CreateCellGridGraph(v2 GraphDim,
     return(Result);
 }
 
-INTERNAL_FUNCTION void ShowCellGrid(ui_cell_grid_graph* Graph, 
+INTERNAL_FUNCTION void ShowCellGrid(ui_cell_grid_graph* Graph,
+                                    batch_rect_buffer* RectBuffer,
                                     f32 LineThickness = 3.0f,
                                     v4 LineColor = ColorGray(0.3f))
 {
@@ -272,7 +292,8 @@ INTERNAL_FUNCTION void ShowCellGrid(ui_cell_grid_graph* Graph,
     {
         f32 CoordX = Graph->Rect.Min.x + x * Graph->CellDim;
         
-        PushLine2D(V2(CoordX, Graph->Rect.Min.y), 
+        PushLine2D(RectBuffer,
+                   V2(CoordX, Graph->Rect.Min.y), 
                    V2(CoordX, Graph->Rect.Max.y),
                    LineThickness, LineColor);
     }
@@ -282,13 +303,16 @@ INTERNAL_FUNCTION void ShowCellGrid(ui_cell_grid_graph* Graph,
     {
         f32 CoordY = Graph->Rect.Min.y + y * Graph->CellDim;
         
-        PushLine2D(V2(Graph->Rect.Min.x, CoordY),
+        PushLine2D(RectBuffer,
+                   V2(Graph->Rect.Min.x, CoordY),
                    V2(Graph->Rect.Max.x, CoordY),
                    LineThickness, LineColor);
     }
     
     // NOTE(Dima): Outer lines
-    PushRectOutline(Graph->Rect, LineThickness, LineColor);
+    PushRectOutline(RectBuffer,
+                    Graph->Rect, 
+                    LineThickness, LineColor);
 }
 
 INTERNAL_FUNCTION rc2 GetCellRect(ui_cell_grid_graph* Graph, int x, int y)

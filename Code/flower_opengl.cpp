@@ -264,52 +264,11 @@ INTERNAL_FUNCTION opengl_shader* OpenGLLoadShader(opengl_state* OpenGL,
     
     CopyStringsSafe(Result->Name, ArrayCount(Result->Name), ShaderName);
     
-#if 0    
-    // NOTE(Dima): Loading attributes
-    OPENGL_LOAD_ATTRIB(Position);
-    OPENGL_LOAD_ATTRIB(TexCoords);
-    OPENGL_LOAD_ATTRIB(Normal);
-    OPENGL_LOAD_ATTRIB(Color);
-    OPENGL_LOAD_ATTRIB(Weights);
-    OPENGL_LOAD_ATTRIB(BoneIDs);
-    OPENGL_LOAD_ATTRIB(PosUV);
-    
-    OPENGL_LOAD_ATTRIB(InstanceModelTran1);
-    OPENGL_LOAD_ATTRIB(InstanceModelTran2);
-    OPENGL_LOAD_ATTRIB(InstanceModelTran3);
-    OPENGL_LOAD_ATTRIB(InstanceModelTran4);
-    
-    // NOTE(Dima): Loading uniforms
-    OPENGL_LOAD_UNIFORM(ViewProjection);
-    OPENGL_LOAD_UNIFORM(Projection);
-    OPENGL_LOAD_UNIFORM(View);
-    OPENGL_LOAD_UNIFORM(Model);
-    OPENGL_LOAD_UNIFORM(SkinningMatrices);
-    OPENGL_LOAD_UNIFORM(SkinningMatricesCount);
-    OPENGL_LOAD_UNIFORM(MeshIsSkinned);
-    OPENGL_LOAD_UNIFORM(UseInstancing);
-    
-    OPENGL_LOAD_UNIFORM(MultColor);
-    OPENGL_LOAD_UNIFORM(TexDiffuse);
-    OPENGL_LOAD_UNIFORM(HasDiffuse);
-    OPENGL_LOAD_UNIFORM(MaterialMissing);
-    
-    // NOTE(Dima): Uniforms for voxel shader
-    OPENGL_LOAD_UNIFORM(TextureAtlas);
-    OPENGL_LOAD_UNIFORM(ChunkAt);
-    OPENGL_LOAD_UNIFORM(PerFaceData);
-    
-    // NOTE(Dima): Loading uniforms for text rendering
-    OPENGL_LOAD_UNIFORM(IsImage);
-    OPENGL_LOAD_UNIFORM(Image);
-    OPENGL_LOAD_UNIFORM(RectsColors);
-    OPENGL_LOAD_UNIFORM(RectsTypes);
-    OPENGL_LOAD_UNIFORM(IsBatch);
-#endif
-    
     // NOTE(Dima): Adding this shader to LoadedShaders
-    Result->NextInList = OpenGL->ShaderList;
-    OpenGL->ShaderList = Result;
+    opengl_loaded_shader* LoadedShader = PushStruct(OpenGL->Arena, opengl_loaded_shader);
+    LoadedShader->Shader = Result;
+    LoadedShader->NextInLoadedShaderList = OpenGL->LoadedShadersList;
+    OpenGL->LoadedShadersList = LoadedShader;
     
     return(Result);
 }
@@ -1352,12 +1311,12 @@ INTERNAL_FUNCTION void OpenGLFree(render_commands* Commands)
     OpenGL_SSAO_Free(Commands);
     
     // NOTE(Dima): Delete shaders
-    opengl_shader* ShaderAt = OpenGL->ShaderList;
+    opengl_loaded_shader* ShaderAt = OpenGL->LoadedShadersList;
     while(ShaderAt != 0)
     {
-        OpenGLDeleteShader(ShaderAt);
+        OpenGLDeleteShader(ShaderAt->Shader);
         
-        ShaderAt = ShaderAt->NextInList;
+        ShaderAt = ShaderAt->NextInLoadedShaderList;
     }
 }
 
@@ -2221,7 +2180,7 @@ INTERNAL_FUNCTION void OpenGLRenderImagesList(render_commands* Commands)
 }
 
 INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands, 
-                                              rect_buffer* RectBuffer)
+                                              batch_rect_buffer* RectBuffer)
 {
     opengl_state* OpenGL = GetOpenGL(Commands);
     opengl_shader* Shader = OpenGL->UIRectShader;
@@ -2247,17 +2206,37 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
     
     InitAttribFloat(Shader->GetAttribLoc("InPosUV"), 4, 4 * sizeof(float), 0);
     
+    m44 ViewProjectionMatrix = IdentityMatrix4();
+    if (RectBuffer->Type == BatchRectBuffer_Window)
+    {
+        ViewProjectionMatrix = OrthographicProjectionWindow(Commands->WindowDimensions.Width,
+                                                            Commands->WindowDimensions.Height);
+    }
+    else if (RectBuffer->Type == BatchRectBuffer_Unit)
+    {
+#if 0
+        const m44& ViewMatrix = ???;
+#else
+        const m44& ViewMatrix = IdentityMatrix4();
+#endif
+        m44 ProjectionMatrix = OrthographicProjectionUnit(Commands->WindowDimensions.Width,
+                                                          Commands->WindowDimensions.Height);
+        
+        ViewProjectionMatrix = ViewMatrix * ProjectionMatrix;
+    }
+    
     Shader->Use();
-    Shader->SetMat4("Projection", Commands->ScreenOrthoProjection.e);
+    Shader->SetMat4("ViewProjection", ViewProjectionMatrix);
     Shader->SetVec4("MultColor", 1.0f, 1.0f, 1.0f, 1.0f);
     Shader->SetBool("IsBatch", true);
     
-    b32 IsImage = Commands->FontAtlas != 0;
+    
+    b32 IsImage = RectBuffer->TextureAtlas != 0;
     if(IsImage)
     {
-        OpenGLInitImage(Commands->FontAtlas);
+        OpenGLInitImage(RectBuffer->TextureAtlas);
         
-        Shader->SetTexture2D("Image", Commands->FontAtlas->Handle.Image.TextureObject, 0);
+        Shader->SetTexture2D("Image", RectBuffer->TextureAtlas->Handle.Image.TextureObject, 0);
     }
     Shader->SetBool("IsImage", IsImage);
     
@@ -2473,7 +2452,8 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
     OpenGLRenderImagesList(Commands);
-    OpenGLRenderRectBuffer(Commands, &Commands->Rects2D);
+    OpenGLRenderRectBuffer(Commands, &Commands->Rects2D_Unit);
+    OpenGLRenderRectBuffer(Commands, &Commands->Rects2D_Window);
     glDisable(GL_BLEND);
 }
 

@@ -1337,7 +1337,7 @@ inline m44 PerspectiveProjection(int Width, int Height,
 }
 
 
-inline m44 OrthographicProjection(int Width, int Height)
+inline m44 OrthographicProjectionWindow(int Width, int Height)
 {
     f32 a = 2.0f / (f32)Width;
     f32 b = -1.0f;
@@ -1356,9 +1356,9 @@ inline m44 OrthographicProjection(int Width, int Height)
     return(Result);
 }
 
-inline m44 OrthographicProjection(f32 RadiusW,
-                                  f32 RadiusH,
-                                  f32 Far, f32 Near)
+inline m44 OrthographicProjectionUnitRadius(f32 RadiusW,
+                                            f32 RadiusH,
+                                            f32 Far, f32 Near)
 {
     m44 Result = {};
     
@@ -1370,6 +1370,39 @@ inline m44 OrthographicProjection(f32 RadiusW,
     
     return(Result);
 }
+
+inline m44 OrthographicProjectionUnit(f32 Width, f32 Height)
+{
+    f32 a = Height / Width * 0.5f;
+    f32 b = 0.5f;
+    
+    m44 Result = {};
+    
+    Result.e[0] = a;
+    Result.e[5] = b;
+    Result.e[10] = 1.0f;
+    Result.e[15] = 1.0f;
+    
+    return(Result);
+}
+
+inline m44 OrthographicProjectionUnit(f32 Width, f32 Height,
+                                      f32 Far, f32 Near)
+{
+    f32 a = Height / Width;
+    f32 b = 1.0f;
+    
+    m44 Result = {};
+    
+    Result.e[0] = a;
+    Result.e[5] = b;
+    Result.e[10] = 2.0f / (Far - Near);
+    Result.e[14] = -(Far + Near) / (Far - Near);
+    Result.e[15] = 1.0f;
+    
+    return(Result);
+}
+
 
 /*Conversions*/
 inline m44 Matrix3ToMatrix4(const m33& Matrix)

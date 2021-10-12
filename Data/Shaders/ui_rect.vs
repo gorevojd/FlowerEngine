@@ -10,14 +10,15 @@ uniform bool IsBatch;
 uniform vec4 MultColor;
 uniform usamplerBuffer RectsColors;
 uniform usamplerBuffer RectsTypes;
-uniform mat4 Projection;
+
+uniform mat4 ViewProjection;
 
 void main()
 {
 	int PerRectIndex = gl_VertexID / 4;
 
 	//NOTE(Dima): Calculating Clip-Space position
-	gl_Position = vec4(InPosUV.xy, 0.0f, 1.0f) * Projection;
+	gl_Position = vec4(InPosUV.xy, 0.0f, 1.0f) * ViewProjection;
 
 	//NOTE(Dima): Extracting color
 	vec4 ExtractedColor = MultColor;

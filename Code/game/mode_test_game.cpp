@@ -185,6 +185,25 @@ SCENE_UPDATE(TestGame)
                  ScalingMatrix(0.05f) * TranslationMatrix(Pos));
     }
 #endif
+    
+    render_pass* OrthoPass = AddRenderPass();
+    SetOrthographicPassData(OrthoPass,
+                            V3(0.0f),
+                            IdentityMatrix4(),
+                            500, 0.1f,
+                            Global_RenderCommands->WindowDimensions.Width,
+                            Global_RenderCommands->WindowDimensions.Height);
+    
+    f32 RectAtX = -1.0f;
+    for (int i = 0; i < 10; i++)
+    {
+        PushRect(&Global_RenderCommands->Rects2D_Unit, 
+                 RectMinDim(V2(RectAtX, 1.5f), V2(0.1f)),
+                 ColorRed());
+        
+        RectAtX += 0.2f;
+    }
+    
 }
 
 

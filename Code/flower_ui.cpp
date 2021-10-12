@@ -61,7 +61,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     
     v2 AtP = V2(P.x, P.y);
     
-    rect_buffer* Buffer = &Global_RenderCommands->Rects2D;
+    batch_rect_buffer* Buffer = &Global_RenderCommands->Rects2D_Window;
     
     //int IndexToTransformMatrix = Buffer->IdentityMatrixIndex;
     
@@ -1271,7 +1271,8 @@ INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree,
                 BackgroundColor = UIGetColor(UIColor_ButtonBackground);
             }
             
-            PushRect(Bounds, BackgroundColor);
+            PushRect(&Global_RenderCommands->Rects2D_Window,
+                     Bounds, BackgroundColor);
         }
         
         // NOTE(Dima): Printing text

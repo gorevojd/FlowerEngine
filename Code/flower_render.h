@@ -61,6 +61,7 @@ enum render_command_type
 {
     RenderCommand_Clear,
     RenderCommand_Mesh,
+    RenderCommand_RectBatch,
     RenderCommand_InstancedMesh,
     RenderCommand_VoxelChunkMesh,
 };
@@ -168,15 +169,27 @@ enum rect_type
     Rect_Solid = 1,
 };
 
-struct rect_buffer
+enum batch_rect_buffer_type
 {
-#define MAX_RECTS_COUNT 30000
-    rect_vertex Vertices[MAX_RECTS_COUNT * 4];
-    u32 Indices[MAX_RECTS_COUNT * 6];
-    u32 Colors[MAX_RECTS_COUNT];
-    u8 Types[MAX_RECTS_COUNT];
+    BatchRectBuffer_Window,
+    BatchRectBuffer_Unit,
+    
+    BatchRectBuffer_3D,
+};
+
+struct batch_rect_buffer
+{
+    rect_vertex* Vertices;
+    u32* Indices;
+    u32* Colors;
+    u8* Types;
     
     int RectCount;
+    int MaxRectCount;
+    
+    image* TextureAtlas;
+    
+    u32 Type;
 };
 
 struct window_dimensions
@@ -320,7 +333,8 @@ struct render_commands
     memory_arena* Arena;
     
     m44 ScreenOrthoProjection;
-    rect_buffer Rects2D;
+    batch_rect_buffer Rects2D_Window;
+    batch_rect_buffer Rects2D_Unit;
     
     void* StateOfGraphicsAPI;
     
