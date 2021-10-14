@@ -2258,11 +2258,8 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
                                      GL_R8UI, 2, 
                                      Shader->GetLoc("RectsTypes"));
     
+    
     glDrawElements(GL_TRIANGLES, RectBuffer->RectCount * 6, GL_UNSIGNED_INT, 0);
-    
-    glBindVertexArray(OpenGL->ScreenQuad.VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    
     
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);

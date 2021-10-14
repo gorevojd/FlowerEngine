@@ -227,6 +227,11 @@ inline batch_rect_buffer CreateRectBuffer(int NumRects, u32 BatchRectBufferType)
     return (Result);
 }
 
+inline void ResetRectBuffer(batch_rect_buffer* RectBuffer)
+{
+    RectBuffer->RectCount = 0;
+}
+
 inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     if(Global_RenderCommands->ImageFree.Next == &Global_RenderCommands->ImageFree)
@@ -651,11 +656,6 @@ inline void PushGlyph(batch_rect_buffer* RectBuffer,
     Verts[3] = { V2(P.x, P.y + Dim.y), V2(MinUV.x, MaxUV.y)};
     
     PushRectInternal(RectBuffer, Verts, Rect_Textured, C);
-}
-
-INTERNAL_FUNCTION void ResetRectBuffer(batch_rect_buffer* RectBuffer)
-{
-    RectBuffer->RectCount = 0;
 }
 
 INTERNAL_FUNCTION render_api_dealloc_entry* AllocateDeallocEntry()
