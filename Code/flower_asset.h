@@ -54,7 +54,7 @@ struct asset_system
     v2 FontAtlasAtP;
     int FontAtlasMaxRowY;
     
-    image VoxelAtlas;
+    image* VoxelAtlas;
     
     // NOTE(Dima): Assets
     mesh Cube;
@@ -62,9 +62,9 @@ struct asset_system
     
     cubemap Sky;
     
-    image BoxTexture;
-    image PlaneTexture;
-    image Palette; 
+    image* BoxTexture;
+    image* PlaneTexture;
+    image* Palette; 
     
 #if 0    
     font TimesNewRoman;
@@ -75,15 +75,15 @@ struct asset_system
     font BerlinSans;
     font LiberationMono;
     
-    image BearDiffuse;
-    image BearNormal;
-    image BearEyesDiffuse;
-    image BearEyesShine;
+    image* BearDiffuse;
+    image* BearNormal;
+    image* BearEyesDiffuse;
+    image* BearEyesShine;
     
-    image FoxDiffuse;
-    image FoxNormal;
-    image FoxEyesDiffuse;
-    image FoxEyesShine;
+    image* FoxDiffuse;
+    image* FoxNormal;
+    image* FoxEyesDiffuse;
+    image* FoxEyesShine;
     
     model Bear;
     model Fox;

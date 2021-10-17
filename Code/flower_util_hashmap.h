@@ -6,35 +6,35 @@
 
 
 template <typename t>
-struct flower_hashmap_entry
+struct hashmap_entry
 {
-    flower_hashmap_entry* NextInHash;
+    hashmap_entry* NextInHash;
     u32 CachedHash;
     
     t Data;
     
-    flower_hashmap_entry* NextInList;
-    flower_hashmap_entry* PrevInList;
+    hashmap_entry<t>* NextInList;
+    hashmap_entry<t>* PrevInList;
 };
 
 
 template <typename t, int MapSize=1024>
-struct FlowerHashMap
+struct hashmap
 {
-    flower_hashmap_entry<t>* m_MapArray[MapSize];
+    hashmap_entry<t>* m_MapArray[MapSize];
     memory_arena* m_Arena;
     
-    flower_hashmap_entry<t>* m_SentinelUse;
-    flower_hashmap_entry<t>* m_SentinelFree;
+    hashmap_entry<t>* m_SentinelUse;
+    hashmap_entry<t>* m_SentinelFree;
     
-    FlowerHashMap() = delete;
+    hashmap() = delete;
     
-    explicit FlowerHashMap(memory_arena* Arena)
+    explicit hashmap(memory_arena* Arena)
     {
         m_Arena = Arena;
         
-        m_SentinelUse = PushStruct(Arena, flower_hashmap_entry<t>);
-        m_SentinelFree = PushStruct(Arena, flower_hashmap_entry<t>);
+        m_SentinelUse = PushStruct(Arena, hashmap_entry<t>);
+        m_SentinelFree = PushStruct(Arena, hashmap_entry<t>);
         
         // NOTE(Dima): Reflecting Use Sentinel pointers
         m_SentinelUse->NextInList = m_SentinelUse;
@@ -59,13 +59,13 @@ struct FlowerHashMap
     {
         int ToAllocate = 256;
         
-        flower_hashmap_entry<t>* NewEntries = PushArray(m_Arena, 
-                                                        flower_hashmap_entry<t>, 
-                                                        ToAllocate);
+        hashmap_entry<t>* NewEntries = PushArray(m_Arena, 
+                                                 hashmap_entry<t>, 
+                                                 ToAllocate);
         
         for(int i = 0; i < ToAllocate; i++)
         {
-            flower_hashmap_entry<t>* Entry = NewEntries + i;
+            hashmap_entry<t>* Entry = NewEntries + i;
             
             // NOTE(Dima): Inserting entry to free list
             Entry->PrevInList = m_SentinelFree;
@@ -77,14 +77,14 @@ struct FlowerHashMap
     }  
     
     
-    flower_hashmap_entry<t>* allocateHashMapEntry()
+    hashmap_entry<t>* allocateHashMapEntry()
     {
         if (m_SentinelFree->NextInList == m_SentinelFree)
         {
             growAllocatedCount();
         }
         
-        flower_hashmap_entry<t>* Entry = m_SentinelFree->NextInList;
+        hashmap_entry<t>* Entry = m_SentinelFree->NextInList;
         
         // NOTE(Dima): Removing entry from Free list
         Entry->NextInList->PrevInList = Entry->PrevInList;
@@ -103,7 +103,7 @@ struct FlowerHashMap
     }
     
     
-    void deallocateHashMapEntry(flower_hashmap_entry<t>* Entry)
+    void deallocateHashMapEntry(hashmap_entry<t>* Entry)
     {
         // NOTE(Dima): Removing entry from Use list
         Entry->NextInList->PrevInList = Entry->PrevInList;
@@ -123,7 +123,7 @@ struct FlowerHashMap
     {
         u32 Key = KeyHash % MapSize;
         
-        flower_hashmap_entry<t>* New = allocateHashMapEntry();
+        hashmap_entry<t>* New = allocateHashMapEntry();
         
         New->NextInHash = m_MapArray[Key];
         New->CachedHash = KeyHash;
@@ -134,13 +134,13 @@ struct FlowerHashMap
     
     
     // NOTE(Dima): Find internal entry by key hash
-    flower_hashmap_entry<t>* findInternal(u32 KeyHash)
+    hashmap_entry<t>* findInternal(u32 KeyHash)
     {
         u32 Key = KeyHash % MapSize;
         
-        flower_hashmap_entry<t>* ResultEntry = 0;
+        hashmap_entry<t>* ResultEntry = 0;
         
-        flower_hashmap_entry<t>* At = m_MapArray[Key];
+        hashmap_entry<t>* At = m_MapArray[Key];
         while (At != nullptr)
         {
             if (At->CachedHash == KeyHash)
@@ -160,7 +160,7 @@ struct FlowerHashMap
     // NOTE(Dima): Find by key hash
     t* find(u32 KeyHash)
     {
-        flower_hashmap_entry<t>* ResEntry = findInternal(KeyHash);
+        hashmap_entry<t>* ResEntry = findInternal(KeyHash);
         
         t* Result = nullptr;
         
@@ -189,9 +189,9 @@ struct FlowerHashMap
     {
         u32 Key = KeyHash % MapSize;
         
-        flower_hashmap_entry<t>* Prev = nullptr;
-        flower_hashmap_entry<t>* Found = nullptr;
-        flower_hashmap_entry<t>* At = m_MapArray[Key];
+        hashmap_entry<t>* Prev = nullptr;
+        hashmap_entry<t>* Found = nullptr;
+        hashmap_entry<t>* At = m_MapArray[Key];
         
         while (At != nullptr)
         {
@@ -229,11 +229,11 @@ struct FlowerHashMap
         // NOTE(Dima): NULL-ify table 
         for(int i = 0; i < MapSize; i++)
         {
-            flower_hashmap_entry<t>* At = m_MapArray[i];
+            hashmap_entry<t>* At = m_MapArray[i];
             
             while (At != nullptr)
             {
-                flower_hashmap_entry<t>* ToDealloc = At;
+                hashmap_entry<t>* ToDealloc = At;
                 At = At->NextInHash;
                 
                 deallocateHashMapEntry(ToDealloc);

@@ -249,8 +249,8 @@ INTERNAL_FUNCTION opengl_shader* OpenGLLoadShader(opengl_state* OpenGL,
     Result->PathG = GeometryFilePath;
     
     // NOTE(Dima): Init uniform table
-    Result->Name2Loc = FlowerHashMap<uniform_name_entry, 256>(Arena);
-    Result->Name2Attrib = FlowerHashMap<uniform_name_entry, 256>(Arena);
+    Result->Name2Loc = hashmap<uniform_name_entry, 256>(Arena);
+    Result->Name2Attrib = hashmap<uniform_name_entry, 256>(Arena);
     
     
     Result->ID = OpenGLLoadProgram(VertexFilePath, 
@@ -417,12 +417,12 @@ INTERNAL_FUNCTION void OpenGLInitCubemap(cubemap* Cubemap)
         glGenTextures(1, &NewHandle);
         glBindTexture(GL_TEXTURE_CUBE_MAP, NewHandle);
         
-        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_POSITIVE_X, &Cubemap->Left);
-        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, &Cubemap->Right);
-        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, &Cubemap->Top);
-        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, &Cubemap->Down);
-        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, &Cubemap->Front);
-        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, &Cubemap->Back);
+        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_POSITIVE_X, Cubemap->Left);
+        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, Cubemap->Right);
+        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, Cubemap->Top);
+        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, Cubemap->Down);
+        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, Cubemap->Front);
+        BindImageToCubemapSide(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, Cubemap->Back);
         
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -1736,7 +1736,8 @@ INTERNAL_FUNCTION void OpenGLRenderImage(render_commands* Commands,
     
     // NOTE(Dima): Using program and setting uniforms
     Shader->Use();
-    Shader->SetMat4("Projection", Commands->ScreenOrthoProjection.e);
+    Shader->SetMat4("Projection", OrthographicProjectionWindow(Commands->WindowDimensions.Width,
+                                                               Commands->WindowDimensions.Height));
     Shader->SetVec4("MultColor", C.r, C.g, C.b, C.a);
     Shader->SetBool("IsBatch", false);
     
@@ -2182,6 +2183,12 @@ INTERNAL_FUNCTION void OpenGLRenderImagesList(render_commands* Commands)
 INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands, 
                                               batch_rect_buffer* RectBuffer)
 {
+    // NOTE(Dima): Skip if we have no rectangles to render
+    if (RectBuffer->RectCount == 0)
+    {
+        return;
+    }
+    
     opengl_state* OpenGL = GetOpenGL(Commands);
     opengl_shader* Shader = OpenGL->UIRectShader;
     
@@ -2206,30 +2213,10 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
     
     InitAttribFloat(Shader->GetAttribLoc("InPosUV"), 4, 4 * sizeof(float), 0);
     
-    m44 ViewProjectionMatrix = IdentityMatrix4();
-    if (RectBuffer->Type == BatchRectBuffer_Window)
-    {
-        ViewProjectionMatrix = OrthographicProjectionWindow(Commands->WindowDimensions.Width,
-                                                            Commands->WindowDimensions.Height);
-    }
-    else if (RectBuffer->Type == BatchRectBuffer_Unit)
-    {
-#if 0
-        const m44& ViewMatrix = ???;
-#else
-        const m44& ViewMatrix = IdentityMatrix4();
-#endif
-        m44 ProjectionMatrix = OrthographicProjectionUnit(Commands->WindowDimensions.Width,
-                                                          Commands->WindowDimensions.Height);
-        
-        ViewProjectionMatrix = ViewMatrix * ProjectionMatrix;
-    }
-    
     Shader->Use();
-    Shader->SetMat4("ViewProjection", ViewProjectionMatrix);
+    Shader->SetMat4("ViewProjection", RectBuffer->ViewProjection);
     Shader->SetVec4("MultColor", 1.0f, 1.0f, 1.0f, 1.0f);
     Shader->SetBool("IsBatch", true);
-    
     
     b32 IsImage = RectBuffer->TextureAtlas != 0;
     if(IsImage)
@@ -2449,8 +2436,9 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
     OpenGLRenderImagesList(Commands);
-    OpenGLRenderRectBuffer(Commands, &Commands->Rects2D_Unit);
-    OpenGLRenderRectBuffer(Commands, &Commands->Rects2D_Window);
+    OpenGLRenderRectBuffer(Commands, Commands->Rects2D_Unit);
+    OpenGLRenderRectBuffer(Commands, Commands->Rects2D_Window);
+    OpenGLRenderRectBuffer(Commands, Commands->Rects3D);
     glDisable(GL_BLEND);
 }
 

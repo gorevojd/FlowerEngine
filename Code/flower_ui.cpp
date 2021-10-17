@@ -61,7 +61,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     
     v2 AtP = V2(P.x, P.y);
     
-    batch_rect_buffer* Buffer = &Global_RenderCommands->Rects2D_Window;
+    batch_rect_buffer* Buffer = Global_RenderCommands->Rects2D_Window;
     
     //int IndexToTransformMatrix = Buffer->IdentityMatrixIndex;
     
@@ -95,7 +95,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     Bounds.Min.y = AtP.y - Font->Ascent * Scale;
     Bounds.Max.y = AtP.y - Font->Descent * Scale;
     
-    image* GlyphImages = Font->GlyphImages;
+    image** GlyphImages = Font->GlyphImages;
     
     while(*At)
     {
@@ -108,16 +108,20 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
         if(!IsGetSizePass)
         {
             glyph_style* GlyphStyle = &Glyph->Styles[FontStyle];
-            image* Image = &GlyphImages[GlyphStyle->ImageIndex];
             
-            f32 TargetHeight = (f32)Image->Height * Scale;
-            
-            v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;
-            if(!Is3D)
+            if (GlyphStyle->ImageIndex != -1)
             {
-                PushGlyph(Buffer, Glyph, ImageP, 
-                          TargetHeight, 
-                          FontStyle, C);
+                image* Image = GlyphImages[GlyphStyle->ImageIndex];
+                
+                f32 TargetHeight = (f32)Image->Height * Scale;
+                
+                v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;
+                if(!Is3D)
+                {
+                    PushGlyph(Buffer, Glyph, ImageP, 
+                              TargetHeight, 
+                              FontStyle, C);
+                }
             }
         }
         
@@ -1271,7 +1275,7 @@ INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree,
                 BackgroundColor = UIGetColor(UIColor_ButtonBackground);
             }
             
-            PushRect(&Global_RenderCommands->Rects2D_Window,
+            PushRect(Global_RenderCommands->Rects2D_Window,
                      Bounds, BackgroundColor);
         }
         

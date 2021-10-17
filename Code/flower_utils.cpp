@@ -1,107 +1,3 @@
-#include <vector>
-#include <string>
-#include <map>
-#include <algorithm>
-
-#include "flower_util_hashmap.h"
-#include "flower_util_list.h"
-
-struct helper_byte_buffer
-{
-    void* Data;
-    mi DataSize;
-    b32 UsedCustomAllocator;
-    
-    std::unordered_map<std::string, mi> NameToOffset;
-    std::unordered_map<std::string, int> NameToCount;
-    
-    helper_byte_buffer()
-    {
-        Data = 0;
-        DataSize = 0;
-        UsedCustomAllocator = false;
-    }
-    
-    u32 AddPlace(std::string Name, 
-                 int NumElements, 
-                 mi SizeOfElement)
-    {
-        u32 Offset = 0;
-        
-        NameToCount.insert(std::pair<std::string, int>(Name, NumElements));
-        
-        if(NumElements > 0)
-        {
-            Offset = DataSize;
-            
-            NameToOffset.insert(std::pair<std::string, mi>(Name, Offset));
-            
-            DataSize += NumElements * SizeOfElement;
-        }
-        
-        return(Offset);
-    }
-    
-    void Generate(void* CustomPlace = 0)
-    {
-        if(CustomPlace != 0)
-        {
-            UsedCustomAllocator = true;
-            
-            Data = CustomPlace;
-        }
-        else
-        {
-            Data = malloc(DataSize);
-        }
-    }
-    
-    void Free()
-    {
-        if(!UsedCustomAllocator)
-        {
-            if(Data != 0)
-            {
-                free(Data);
-            }
-            Data = 0;
-        }
-    }
-    
-    void* GetPlace(std::string GetName)
-    {
-        void* Result = 0;
-        
-        if(NameToCount.find(GetName) != NameToCount.end())
-        {
-            if(NameToCount[GetName] > 0)
-            {
-                Assert(NameToOffset.find(GetName) != NameToOffset.end());
-                
-                Result = (void*)((u8*)Data + NameToOffset[GetName]);
-            }
-        }
-        
-        return(Result);
-    }
-};
-
-
-struct helper_mesh
-{
-    std::string Name;
-    
-    std::vector<v3> Vertices;
-    std::vector<v2> TexCoords;
-    std::vector<v3> Normals;
-    std::vector<v3> Colors;
-    std::vector<u32> Indices;
-    std::vector<v4> BoneWeights;
-    std::vector<u32> BoneIndices;
-    
-    b32 IsSkinned;
-};
-
 INTERNAL_FUNCTION helper_mesh CombineHelperMeshes(const helper_mesh* A, const helper_mesh* B)
 {
     helper_mesh Result = {};
@@ -145,31 +41,34 @@ INTERNAL_FUNCTION helper_mesh CombineHelperMeshes(const helper_mesh* A, const he
     return(Result);
 }
 
-INTERNAL_FUNCTION image AllocateImageInternal(u32 Width, u32 Height, 
-                                              void* PixData, u32 Format)
+INTERNAL_FUNCTION inline void AllocateImageInternal(image* Image,
+                                                    u32 Width, u32 Height, 
+                                                    void* PixData)
 {
-    image Result = {};
+	Image->Width = Width;
+	Image->Height = Height;
     
-	Result.Width = Width;
-	Result.Height = Height;
+	Image->WidthOverHeight = (float)Width / (float)Height;
     
-	Result.WidthOverHeight = (float)Width / (float)Height;
-    Result.Format = Format;
-    
-	Result.Pixels = PixData;
-    
-	return(Result);
+	Image->Pixels = PixData;
 }
 
-INTERNAL_FUNCTION image AllocateImageInternal(u32 Width, u32 Height, 
-                                              u32 Format,
-                                              b32 PremultiplyAlpha = false)
+INTERNAL_FUNCTION image* AllocateImage(u32 Width, u32 Height, 
+                                       b32 FilteringIsClosest = false)
 {
-    mi DataSize = Width * Height * ImageFormatPixelSizes[Format];
-    void* Data = malloc(DataSize);
-    memset(Data, 0, DataSize);
+    mi DataSize = Width * Height * 4;
+    mi OffsetToPixelsData = Align(sizeof(image), 64);
     
-    image Result = AllocateImageInternal(Width, Height, Data, Format);
+    void* ResultData = malloc(OffsetToPixelsData + DataSize);
+    
+    image* Result = (image*)ResultData;
+    void* ResultPixels = (u8*)ResultData + OffsetToPixelsData;
+    
+    memset(ResultPixels, 0, DataSize);
+    
+    AllocateImageInternal(Result, Width, Height, ResultPixels);
+    Result->FilteringIsClosest = FilteringIsClosest;
+    Result->Handle = {};
     
     return(Result);
 }
@@ -189,18 +88,48 @@ INTERNAL_FUNCTION inline v4 GetPixelColor(image* Image, int x, int y)
 INTERNAL_FUNCTION void CopyImage(image* Dst,
                                  image* Src)
 {
-    Assert(Dst->Format == Src->Format);
     Assert(Dst->Width == Src->Width);
     Assert(Dst->Height == Src->Height);
     
-    void* DstData = Dst->Pixels;
-    mi DstDataSize = Dst->Width * Dst->Height * ImageFormatPixelSizes[Dst->Format];
+    memcpy(Dst->Pixels, Src->Pixels, 
+           Dst->Width * Dst->Height * 4);
     
-    memcpy(DstData, Src->Pixels, DstDataSize);
-    
-    *Dst = *Src;
-    
-    Dst->Pixels = DstData;
+    Dst->Handle = {};
+}
+
+INTERNAL_FUNCTION void ConvertGrayscaleToRGBA(u32* RGBA, u8* Grayscale,
+                                              int Width, 
+                                              int Height)
+{
+    for (int y = 0; y < Height; y++)
+    {
+        for (int x = 0; x < Width; x++)
+        {
+            u8* Src = Grayscale + y * Width + x;
+            u32* Dst = RGBA + y * Width + x;
+            
+            f32 SrcValue = (f32)(*Src) * F_ONE_OVER_255;
+            v4 DstColor = V4(SrcValue);
+            
+            
+#if 1
+            *Dst = PackRGBA(DstColor);
+#else
+            *Dst = PackRGBA(V4(0.0f, 1.0f, 0.0f, 1.0f));
+#endif
+            
+            
+        }
+    }
+}
+
+INTERNAL_FUNCTION void ConvertGrayscaleToRGBA(image* Image,
+                                              u8* Grayscale)
+{
+    ConvertGrayscaleToRGBA((u32*)Image->Pixels,
+                           Grayscale,
+                           Image->Width,
+                           Image->Height);
 }
 
 INTERNAL_FUNCTION inline void InvalidateImage(image* Image)

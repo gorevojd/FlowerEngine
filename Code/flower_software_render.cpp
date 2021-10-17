@@ -7,8 +7,6 @@ void RenderOneBitmapIntoAnother(image* Dst,
 {
 	float OneOver255 = 1.0f / 255.0f;
     
-    Assert(Dst->Format == ImageFormat_RGBA);
-    
 	int MaxToX = StartX + Src->Width;
 	int MaxToY = StartY + Src->Height;
     
@@ -18,8 +16,6 @@ void RenderOneBitmapIntoAnother(image* Dst,
     int SrcX = 0;
     int SrcY = 0;
     
-    u32 SrcPitch = ImageFormatPixelSizes[Src->Format];
-    
     for (int Y = StartY; Y < MaxToY; Y++) 
     {
         SrcY = Y - StartY;
@@ -28,7 +24,7 @@ void RenderOneBitmapIntoAnother(image* Dst,
         {
             SrcX = X - StartX;
             
-            void* From = (u8*)Src->Pixels + (SrcY * Src->Width + SrcX) * SrcPitch;
+            void* From = (u8*)Src->Pixels + (SrcY * Src->Width + SrcX) * 4;
             u32* To = (u32*)Dst->Pixels + Y * Dst->Width + X;
             
             // NOTE(Dima): Extracting dst color
@@ -36,16 +32,8 @@ void RenderOneBitmapIntoAnother(image* Dst,
             v4 DstInitColor = UnpackRGBA(DstValue);
             
             // NOTE(Dima): Extracting src color
-            v4 FromColor;
             u32 FromValue = *((u32*)From);
-            if(Src->Format == ImageFormat_RGBA)
-            {
-                FromColor = UnpackRGBA(FromValue);
-            }
-            else if(Src->Format == ImageFormat_Grayscale)
-            {
-                FromColor = UnpackGrayscalePremultiplied(FromValue & 0xFF);
-            }
+            v4 FromColor = UnpackRGBA(FromValue);
             
             // NOTE(Dima): Calculate result color
             v4 ResultColor = FromColor * ModColor;
@@ -144,9 +132,6 @@ static void BoxBlurApproximate(image* To,
 {
 	int BlurDiam = 1 + BlurRadius + BlurRadius;
     
-    Assert(To->Format == ImageFormat_RGBA);
-    Assert(From->Format == ImageFormat_RGBA);
-    
 	for (int Y = 0; Y < From->Height; Y++) {
 		for (int X = 0; X < From->Width; X++) {
             
@@ -201,10 +186,6 @@ void BlurBitmapApproximateGaussian(image* Dst,
 	Assert(Tmp->Width == Src->Width);
 	Assert(Tmp->Height == Src->Height);
     
-    Assert(Dst->Format == ImageFormat_RGBA);
-    Assert(Src->Format == ImageFormat_RGBA);
-    Assert(Tmp->Format == ImageFormat_RGBA);
-    
 	/*
  var wIdeal = Math.sqrt((12 * sigma*sigma / n) + 1);  // Ideal averaging filter Width
  var wl = Math.floor(wIdeal);  if (wl % 2 == 0) wl--;
@@ -253,9 +234,6 @@ void BlurBitmapExactGaussian(image* Dst,
 	Assert(Dst->Width == Src->Width);
 	Assert(Dst->Height == Src->Height);
     
-    Assert(Dst->Format == ImageFormat_RGBA);
-    Assert(Src->Format == ImageFormat_RGBA);
-    
 	int BlurDiam = 1 + BlurRadius + BlurRadius;
     
 	for (int Y = 0; Y < Src->Height; Y++)
@@ -290,8 +268,6 @@ void BlurBitmapExactGaussian(image* Dst,
 
 void InvertImageColors(image* Image)
 {
-    Assert(Image->Format == ImageFormat_RGBA);
-    
     for(int x = 0; x < Image->Width; x++)
     {
         for(int y = 0; y < Image->Height; y++)

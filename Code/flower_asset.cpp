@@ -19,7 +19,7 @@ INTERNAL_FUNCTION void AddGlyphToAtlas(font* Font, int GlyphIndex)
         int ImageIndex = Style->ImageIndex;
         if(ImageIndex != -1)
         {
-            image* Src = &Font->GlyphImages[ImageIndex];
+            image* Src = Font->GlyphImages[ImageIndex];
             int SrcW = Src->Width;
             int SrcH = Src->Height;
             
@@ -70,7 +70,11 @@ INTERNAL_FUNCTION void AddFontToAtlas(font* Font)
     }
 }
 
-INTERNAL_FUNCTION asset_id AddAsset(const char* GUID, u32 Type, void* Ptr)
+#if 0
+INTERNAL_FUNCTION asset_id AddAssetInternal(asset_pack* Pack, 
+                                            const char* GUID, 
+                                            u32 Type, 
+                                            void* Ptr)
 {
     asset_id NewAssetID = Global_Assets->NumAssets++;
     
@@ -90,6 +94,7 @@ INTERNAL_FUNCTION asset_id AddAsset(const char* GUID, u32 Type, void* Ptr)
     
     return(NewAssetID);
 }
+#endif
 
 #if 0
 inline asset_id GetByName(char* AssetName)
@@ -236,10 +241,10 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     // NOTE(Dima): Font atlas initializing
     int FontAtlasSize = 2048;
     void* FontsAtlasMem = calloc(FontAtlasSize * FontAtlasSize * sizeof(u32), 1);
-    Global_Assets->FontsAtlas = AllocateImageInternal(FontAtlasSize,
-                                                      FontAtlasSize,
-                                                      FontsAtlasMem,
-                                                      ImageFormat_RGBA);
+    AllocateImageInternal(&Global_Assets->FontsAtlas,
+                          FontAtlasSize,
+                          FontAtlasSize,
+                          FontsAtlasMem);
     
 #if 0    
     Assert(ArrayCount(Global_AssetTypeSize) == Asset_Count);
@@ -417,13 +422,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     // NOTE(Dima): Bear materials
     A->BearMaterial = {};
-    A->BearMaterial.Diffuse = &A->BearDiffuse;
+    A->BearMaterial.Diffuse = A->BearDiffuse;
     
     A->BearEyesMaterial = {};
-    A->BearEyesMaterial.Diffuse = &A->BearEyesDiffuse;
+    A->BearEyesMaterial.Diffuse = A->BearEyesDiffuse;
     
     A->BearEyesShineMaterial = {};
-    A->BearEyesShineMaterial.Diffuse = &A->BearEyesShine;
+    A->BearEyesShineMaterial.Diffuse = A->BearEyesShine;
     
     A->Bear.Materials[0] = &A->BearMaterial;
     A->Bear.Materials[1] = &A->BearEyesMaterial;
@@ -435,13 +440,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     // NOTE(Dima): Fox materials
     A->FoxMaterial = {};
-    A->FoxMaterial.Diffuse = &A->FoxDiffuse;
+    A->FoxMaterial.Diffuse = A->FoxDiffuse;
     
     A->FoxEyesMaterial = {};
-    A->FoxEyesMaterial.Diffuse = &A->FoxEyesDiffuse;
+    A->FoxEyesMaterial.Diffuse = A->FoxEyesDiffuse;
     
     A->FoxEyesShineMaterial = {};
-    A->FoxEyesShineMaterial.Diffuse = &A->FoxEyesShine;
+    A->FoxEyesShineMaterial.Diffuse = A->FoxEyesShine;
     
     A->Fox.Materials[0] = &A->FoxMaterial;
     A->Fox.Materials[1] = &A->FoxEyesMaterial;
@@ -453,28 +458,63 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     // NOTE(Dima): Other materials
     A->PaletteMaterial = {};
-    A->PaletteMaterial.Diffuse = &A->Palette;
+    A->PaletteMaterial.Diffuse = A->Palette;
     
     A->GroundMaterial = {};
-    A->GroundMaterial.Diffuse = &A->PlaneTexture;
+    A->GroundMaterial.Diffuse = A->PlaneTexture;
     
     // NOTE(Dima): Supra material
     A->Supra.Materials[0] = &A->PaletteMaterial;
 #endif
     
-    AddAsset("Image_VoxelAtlas", Asset_Image, &A->VoxelAtlas);
+#if 0
+    {
+        asset_pack* Pack = CreateAssetPack();
+        
+        loading_params VoxelAtlasParams = DefaultLoadingParams();
+        VoxelAtlasParams.Image_FilteringIsClosest = true;
+        AddAssetImage(Pack, "Image_VoxelAtlas1", 
+                      "../Data/Textures/minc_atlas1.png",
+                      VoxelAtlasParams);
+        
+        AddAssetImage(Pack, "Image_VoxelAtlas2", 
+                      "../Data/Textures/minc_atlas2.png",
+                      VoxelAtlasParams);
+        
+        AddAssetImage(Pack, "Image_BoxDiffuse", 
+                      "../Data/Textures/container_diffuse.png");
+        
+        AddAssetImage(Pack, "Image_PlaneTexture", 
+                      "../Data/Textures/PixarTextures/png/fabric/Flower_pattern_pxr128.png");
+        
+        loading_params PaletteParams = DefaultLoadingParams();
+        PaletteParams.Image_FilteringIsClosest = true;
+        AddAssetImage(Pack, "Image_Palette", 
+                      "../Data/Textures/MyPallette.png");
+        
+        loading_params BerlinSansParams = DefaultLoadingParams();
+        BerlinSansParams.Font_PixelHeight = 60;
+        AddAssetFont("Font_BerlinSans", 
+                     "../Data/Fonts/BerlinSans.ttf",
+                     BerlinSansParams);
+        
+        loading_params LibMonoParams = DefaultLoadingParams();
+        LibMonoParams.Font_PixelHeight = 24;
+        AddAssetFont("Font_LiberationMono", 
+                     "../Data/Fonts/liberation-mono.ttf",
+                     LibMonoParams);
+        
+        AddAssetInternal("Mesh_Cube", Asset_Mesh, &A->Cube);
+        AddAssetInternal("Mesh_Plane", Asset_Mesh, &A->Plane);
+        
+        WriteAssetPackToFile(Pack, "../Data/Packs/common.pack");
+    }
+#endif
     
-    AddAsset("Font_BerlinSans", Asset_Font, &A->BerlinSans);
-    AddAsset("Font_LiberationMono", Asset_Font, &A->LiberationMono);
     
-    AddAsset("Mesh_Cube", Asset_Mesh, &A->Cube);
-    AddAsset("Mesh_Plane", Asset_Mesh, &A->Plane);
-    
+#if 0    
     AddAsset("Cubemap_Sky", Asset_Cubemap, &A->Sky);
     
-    AddAsset("Image_BoxDiffuse", Asset_Image, &A->BoxTexture);
-    AddAsset("Image_PlaneTexture", Asset_Image, &A->PlaneTexture);
-    AddAsset("Image_Palette", Asset_Image, &A->Palette);
     
     AddAsset("Image_BearDiffuse", Asset_Image, &A->BearDiffuse);
     AddAsset("Image_BearNormal", Asset_Image, &A->BearNormal);
@@ -489,4 +529,5 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     AddAsset("Model_Bear", Asset_Model, &A->Bear);
     AddAsset("Model_Fox", Asset_Model, &A->Fox);
     AddAsset("Model_Supra", Asset_Model, &A->Supra);
+#endif
 }

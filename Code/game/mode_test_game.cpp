@@ -86,7 +86,7 @@ SCENE_UPDATE(TestGame)
 #else
             PushMesh(&Global_Assets->Plane,
                      0, ScalingMatrix(10.0f), 
-                     V3(0.0f, 0.3f, 1.0f));
+                     V3(0.6f));
 #endif
             
         }break;
@@ -186,6 +186,8 @@ SCENE_UPDATE(TestGame)
     }
 #endif
     
+    
+#if 1    
     render_pass* OrthoPass = AddRenderPass();
     SetOrthographicPassData(OrthoPass,
                             V3(0.0f),
@@ -194,15 +196,21 @@ SCENE_UPDATE(TestGame)
                             Global_RenderCommands->WindowDimensions.Width,
                             Global_RenderCommands->WindowDimensions.Height);
     
+    RectBufferSetMatrices(Global_RenderCommands->Rects2D_Unit,
+                          IdentityMatrix4(),
+                          OrthographicProjectionUnit(Global_RenderCommands->WindowDimensions.Width,
+                                                     Global_RenderCommands->WindowDimensions.Height));
+    
     f32 RectAtX = -1.0f;
     for (int i = 0; i < 10; i++)
     {
-        PushRect(&Global_RenderCommands->Rects2D_Unit, 
+        PushRect(Global_RenderCommands->Rects2D_Unit, 
                  RectMinDim(V2(RectAtX, 1.5f), V2(0.1f)),
                  ColorRed());
         
         RectAtX += 0.2f;
     }
+#endif
     
 }
 

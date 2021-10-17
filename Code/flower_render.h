@@ -169,14 +169,6 @@ enum rect_type
     Rect_Solid = 1,
 };
 
-enum batch_rect_buffer_type
-{
-    BatchRectBuffer_Window,
-    BatchRectBuffer_Unit,
-    
-    BatchRectBuffer_3D,
-};
-
 struct batch_rect_buffer
 {
     rect_vertex* Vertices;
@@ -184,12 +176,12 @@ struct batch_rect_buffer
     u32* Colors;
     u8* Types;
     
-    int RectCount;
-    int MaxRectCount;
+    m44 ViewProjection;
     
     image* TextureAtlas;
     
-    u32 Type;
+    int RectCount;
+    int MaxRectCount;
 };
 
 struct window_dimensions
@@ -332,9 +324,12 @@ struct render_commands
     memory_arena CommandsBuffer;
     memory_arena* Arena;
     
-    m44 ScreenOrthoProjection;
-    batch_rect_buffer Rects2D_Window;
-    batch_rect_buffer Rects2D_Unit;
+    //m44 ScreenOrthoProjection;
+    dlist<batch_rect_buffer> RectBuffersPool;
+    
+    batch_rect_buffer* Rects2D_Window;
+    batch_rect_buffer* Rects2D_Unit;
+    batch_rect_buffer* Rects3D;
     
     void* StateOfGraphicsAPI;
     

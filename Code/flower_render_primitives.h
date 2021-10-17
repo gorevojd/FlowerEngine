@@ -129,22 +129,6 @@ struct voxel_mesh
     renderer_handle PerFaceBufHandle;
 };
 
-enum image_format
-{
-    ImageFormat_RGBA,
-    ImageFormat_RGB,
-    ImageFormat_Grayscale,
-    
-    ImageFormat_Count,
-};
-
-GLOBAL_VARIABLE int ImageFormatPixelSizes[] = 
-{
-    4, 
-    3,
-    1,
-};
-
 struct image
 {
     void* Pixels;
@@ -153,7 +137,6 @@ struct image
     int Height;
     
     float WidthOverHeight;
-    u32 Format;
     
     b32 FilteringIsClosest;
     
@@ -162,12 +145,12 @@ struct image
 
 struct cubemap
 {
-    image Left;
-    image Right;
-    image Down;
-    image Top;
-    image Front;
-    image Back;
+    image* Left;
+    image* Right;
+    image* Down;
+    image* Top;
+    image* Front;
+    image* Back;
     
     renderer_handle Handle;
 };
@@ -256,7 +239,7 @@ struct glyph
 
 struct font
 {
-    image* GlyphImages;
+    image** GlyphImages;
     glyph* Glyphs;
     int GlyphCount;
     

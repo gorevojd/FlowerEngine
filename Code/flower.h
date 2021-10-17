@@ -17,6 +17,7 @@ using namespace std;
 #include "flower_strings.h"
 #include "flower_platform.h"
 #include "flower_mem.h"
+#include "flower_utils.h"
 
 #include "flower_jobs.h"
 #include "flower_input.h"

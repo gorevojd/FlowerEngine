@@ -37,8 +37,8 @@ struct opengl_shader
     u32 NameHash;
     
     // NOTE(Dima): This map will cache all locations that were queried
-    FlowerHashMap<uniform_name_entry, 256> Name2Loc;
-    FlowerHashMap<uniform_name_entry, 256> Name2Attrib;
+    hashmap<uniform_name_entry, 256> Name2Loc;
+    hashmap<uniform_name_entry, 256> Name2Attrib;
     
     void Use()
     {

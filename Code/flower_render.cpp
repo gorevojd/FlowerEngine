@@ -208,28 +208,32 @@ inline void PushSky(v3 Color)
     Global_RenderCommands->SkyType = RenderSky_SolidColor;
 }
 
-inline batch_rect_buffer CreateRectBuffer(int NumRects, u32 BatchRectBufferType)
+inline void InitRectBuffer(batch_rect_buffer* Result, int NumRects)
 {
-    batch_rect_buffer Result = {};
-    
-    Result.MaxRectCount = NumRects;
-    Result.RectCount = 0;
+    Result->MaxRectCount = NumRects;
+    Result->RectCount = 0;
+    Result->ViewProjection = IdentityMatrix4();
     
     memory_arena* Arena = Global_RenderCommands->Arena;
     
-    Result.Vertices = PushArray(Arena, rect_vertex, NumRects * 4);
-    Result.Indices = PushArray(Arena, u32, NumRects * 6);
-    Result.Colors = PushArray(Arena, u32, NumRects);
-    Result.Types = PushArray(Arena, u8, NumRects);
-    
-    Result.Type = BatchRectBufferType;
-    
-    return (Result);
+    Result->Vertices = PushArray(Arena, rect_vertex, NumRects * 4);
+    Result->Indices = PushArray(Arena, u32, NumRects * 6);
+    Result->Colors = PushArray(Arena, u32, NumRects);
+    Result->Types = PushArray(Arena, u8, NumRects);
 }
 
 inline void ResetRectBuffer(batch_rect_buffer* RectBuffer)
 {
     RectBuffer->RectCount = 0;
+    
+    RectBuffer->ViewProjection = IdentityMatrix4();
+}
+
+inline void RectBufferSetMatrices(batch_rect_buffer* Buf, 
+                                  const m44& View,
+                                  const m44& Projection)
+{
+    Buf->ViewProjection = View * Projection;
 }
 
 inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
@@ -433,7 +437,7 @@ INTERNAL_FUNCTION inline void PushFullscreenRect(v4 C = ColorWhite())
                           V2(Global_RenderCommands->WindowDimensions.Width,
                              Global_RenderCommands->WindowDimensions.Height));
     
-    PushRect(&Global_RenderCommands->Rects2D_Window, Rect, C);
+    PushRect(Global_RenderCommands->Rects2D_Window, Rect, C);
 }
 
 INTERNAL_FUNCTION inline void PushRectOutline(batch_rect_buffer* RectBuffer,
@@ -954,6 +958,26 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
     
     // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();
+    
+    
+    // NOTE(Dima): Setting default rect buffers matrices
+    RectBufferSetMatrices(Commands->Rects2D_Window,
+                          IdentityMatrix4(),
+                          OrthographicProjectionWindow(Commands->WindowDimensions.Width,
+                                                       Commands->WindowDimensions.Height));
+    
+    RectBufferSetMatrices(Commands->Rects2D_Unit,
+                          IdentityMatrix4(),
+                          OrthographicProjectionUnit(Commands->WindowDimensions.Width,
+                                                     Commands->WindowDimensions.Height));
+    
+    RectBufferSetMatrices(Commands->Rects3D,
+                          IdentityMatrix4(),
+                          PerspectiveProjection(Commands->WindowDimensions.Width,
+                                                Commands->WindowDimensions.Height,
+                                                500.0f,
+                                                0.5f));
+    
 }
 
 INTERNAL_FUNCTION void EndRender()
@@ -963,8 +987,9 @@ INTERNAL_FUNCTION void EndRender()
     FreeArena(&Commands->CommandsBuffer, true);
     Commands->CommandCount = 0;
     
-    ResetRectBuffer(&Commands->Rects2D_Window);
-    ResetRectBuffer(&Commands->Rects2D_Unit);
+    ResetRectBuffer(Commands->Rects2D_Window);
+    ResetRectBuffer(Commands->Rects2D_Unit);
+    ResetRectBuffer(Commands->Rects3D);
     
     Commands->Sky = 0;
     Commands->ClearCommand.Set = false;
@@ -976,9 +1001,6 @@ INTERNAL_FUNCTION void RenderAll()
 {
     render_commands* Commands = Global_RenderCommands;
     
-    Commands->ScreenOrthoProjection = OrthographicProjectionUnit(Commands->WindowDimensions.Width, 
-                                                                 Commands->WindowDimensions.Height);
-    
     // NOTE(Dima): Render
     Platform.Render(Commands);
     
@@ -988,32 +1010,43 @@ INTERNAL_FUNCTION void RenderAll()
 INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensions)
 {
     Global_RenderCommands = PushStruct(Arena, render_commands);
+    render_commands* Comms = Global_RenderCommands;
     
-    Global_RenderCommands->Arena = Arena;
-    Global_RenderCommands->WindowDimensions = Dimensions;
+    Comms->Arena = Arena;
+    Comms->WindowDimensions = Dimensions;
     
-    // NOTE(Dima): Init dealloc list
-    InitTicketMutex(&Global_RenderCommands->DeallocEntriesMutex);
-    DLIST_REFLECT_PTRS(Global_RenderCommands->UseDealloc, Next, Prev);
-    DLIST_REFLECT_PTRS(Global_RenderCommands->FreeDealloc, Next, Prev);
+    // NOTE(Dima): Allocating main rect buffers
+    Comms->RectBuffersPool = dlist<batch_rect_buffer>(Arena);
+    dlist_entry<batch_rect_buffer>* Buf1 = Comms->RectBuffersPool.allocate();
+    dlist_entry<batch_rect_buffer>* Buf2 = Comms->RectBuffersPool.allocate();
+    dlist_entry<batch_rect_buffer>* Buf3 = Comms->RectBuffersPool.allocate();
     
-    // NOTE(Dima): Init images list
-    DLIST_REFLECT_PTRS(Global_RenderCommands->ImageUse, Next, Prev);
-    DLIST_REFLECT_PTRS(Global_RenderCommands->ImageFree, Next, Prev);
-    
-    // NOTE(Dima): Init other stuff
-    InitLighting(&Global_RenderCommands->Lighting, Arena);
-    InitPostprocessing(&Global_RenderCommands->PostProcessing);
-    
-    Global_RenderCommands->DefaultSkyColor = V3(0.1f, 0.7f, 0.8f);
-    Global_RenderCommands->DefaultSkyType = RenderSky_SolidColor;
-    
-    Global_RenderCommands->VoxelTempData = 0;
-    Global_RenderCommands->PrevVoxelDataSize = 0;
-    
-    Global_RenderCommands->CullingEnabled = true;
+    Comms->Rects2D_Window = &Buf1->Data;
+    Comms->Rects2D_Unit = &Buf2->Data;
+    Comms->Rects3D = &Buf3->Data;
     
     // NOTE(Dima): Initialize batched rect buffers
-    Global_RenderCommands->Rects2D_Window = CreateRectBuffer(30000, BatchRectBuffer_Window);
-    Global_RenderCommands->Rects2D_Unit = CreateRectBuffer(10000, BatchRectBuffer_Unit);
+    InitRectBuffer(Comms->Rects2D_Window, 30000);
+    InitRectBuffer(Comms->Rects2D_Unit, 10000);
+    
+    // NOTE(Dima): Init dealloc list
+    InitTicketMutex(&Comms->DeallocEntriesMutex);
+    DLIST_REFLECT_PTRS(Comms->UseDealloc, Next, Prev);
+    DLIST_REFLECT_PTRS(Comms->FreeDealloc, Next, Prev);
+    
+    // NOTE(Dima): Init images list
+    DLIST_REFLECT_PTRS(Comms->ImageUse, Next, Prev);
+    DLIST_REFLECT_PTRS(Comms->ImageFree, Next, Prev);
+    
+    // NOTE(Dima): Init other stuff
+    InitLighting(&Comms->Lighting, Arena);
+    InitPostprocessing(&Comms->PostProcessing);
+    
+    Comms->DefaultSkyColor = V3(0.1f, 0.7f, 0.8f);
+    Comms->DefaultSkyType = RenderSky_SolidColor;
+    
+    Comms->VoxelTempData = 0;
+    Comms->PrevVoxelDataSize = 0;
+    
+    Comms->CullingEnabled = true;
 }

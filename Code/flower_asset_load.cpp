@@ -38,8 +38,8 @@ inline loading_params DefaultLoadingParams()
     return(Result);
 }
 
-INTERNAL_FUNCTION image LoadImageFile(char* FilePath, 
-                                      const loading_params& Params = DefaultLoadingParams())
+INTERNAL_FUNCTION image* LoadImageFile(char* FilePath, 
+                                       const loading_params& Params = DefaultLoadingParams())
 {
     int Width;
     int Height;
@@ -53,37 +53,44 @@ INTERNAL_FUNCTION image LoadImageFile(char* FilePath,
     
     stbi_set_flip_vertically_on_load(FlipVert);
     
-    unsigned char* Image = stbi_load(FilePath,
-                                     &Width,
-                                     &Height,
-                                     &Channels,
-                                     STBI_rgb_alpha);
+    unsigned char* LoadedImageBytes = stbi_load(FilePath,
+                                                &Width,
+                                                &Height,
+                                                &Channels,
+                                                STBI_rgb_alpha);
     
-    Assert(Image);
+    Assert(LoadedImageBytes);
     
-    int PixCount = Width * Height;
-    int ImageSize = PixCount * 4;
-    
-    void* OurImageMem = malloc(ImageSize);
-    
-    image Result = AllocateImageInternal(Width, Height, OurImageMem, ImageFormat_RGBA);
-    Result.FilteringIsClosest = Params.Image_FilteringIsClosest;
-    Result.Format = ImageFormat_RGBA;
-    
-    for(int PixelIndex = 0;
-        PixelIndex < PixCount;
-        PixelIndex++)
+    image* Result = 0;
+    if (LoadedImageBytes)
     {
-        u32 Pix = *((u32*)Image + PixelIndex);
+        int PixCount = Width * Height;
+        int PixelsSize = PixCount * 4;
+        mi OffsetToPixelsData = Align(sizeof(image), 64);
         
-        v4 Color = PremultiplyAlpha(UnpackRGBA(Pix));
+        void* ResultMem = malloc(OffsetToPixelsData + PixelsSize);
         
-        u32 PackedColor = PackRGBA(Color);
+        Result = (image*)ResultMem;
+        void* ResultPixels = (u8*)ResultMem + OffsetToPixelsData;
         
-        *((u32*)Result.Pixels + PixelIndex) = PackedColor;
+        AllocateImageInternal(Result, Width, Height, ResultPixels);
+        Result->FilteringIsClosest = Params.Image_FilteringIsClosest;
+        
+        for(int PixelIndex = 0;
+            PixelIndex < PixCount;
+            PixelIndex++)
+        {
+            u32 Pix = *((u32*)LoadedImageBytes + PixelIndex);
+            
+            v4 Color = PremultiplyAlpha(UnpackRGBA(Pix));
+            
+            u32 PackedColor = PackRGBA(Color);
+            
+            *((u32*)Result->Pixels + PixelIndex) = PackedColor;
+        }
+        
+        stbi_image_free(LoadedImageBytes);
     }
-    
-    stbi_image_free(Image);
     
     return(Result);
 }
@@ -131,7 +138,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
     Result.LineAdvance = Result.Ascent - Result.Descent + Result.LineGap;
     
     std::vector<glyph> Glyphs;
-    std::vector<image> GlyphImages;
+    std::vector<image*> GlyphImages;
     
     int GlyphCount = ('~' - ' ' + 1);
     
@@ -180,9 +187,10 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
         glyph_style* Styles = Glyph.Styles;
         if(ImageExist)
         {
-            image StbImage = AllocateImageInternal(StbW, StbH, 
-                                                   StbBitmap, 
-                                                   ImageFormat_Grayscale);
+            image* StbImage = AllocateImage(StbW, StbH);
+            
+            // NOTE(Dima): Initializing stb image
+            ConvertGrayscaleToRGBA(StbImage, StbBitmap);
             
             b32 ShouldPremultiplyAlpha = true;
             
@@ -192,7 +200,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
             // NOTE(Dima): Creating image for regular font
             int RegularWidth = StbW + 2 * Border;
             int RegularHeight = StbH + 2 * Border;
-            image RegularImage = AllocateImageInternal(RegularWidth, RegularHeight, ImageFormat_RGBA);
+            image* RegularImage = AllocateImage(RegularWidth, RegularHeight);
             
             int RegularImageIndex = GlyphImages.size();
             GlyphImages.push_back(RegularImage);
@@ -200,15 +208,15 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
                                                          RegularWidth, 
                                                          RegularHeight);
             
-            RenderOneBitmapIntoAnother(&RegularImage,
-                                       &StbImage,
+            RenderOneBitmapIntoAnother(RegularImage,
+                                       StbImage,
                                        Border, Border,
                                        ColorWhite());
             
             // NOTE(Dima): Creating image for shadowed font
             int ImageShadowWidth = RegularWidth + ShadowOffset;
             int ImageShadowHeight = RegularHeight + ShadowOffset;
-            image ShadowImage = AllocateImageInternal(ImageShadowWidth, ImageShadowHeight, ImageFormat_RGBA);
+            image* ShadowImage = AllocateImage(ImageShadowWidth, ImageShadowHeight);
             
             int ShadowImageIndex = GlyphImages.size();
             GlyphImages.push_back(ShadowImage);
@@ -216,22 +224,22 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
                                                         ImageShadowWidth,
                                                         ImageShadowHeight);
             
-            RenderOneBitmapIntoAnother(&ShadowImage,
-                                       &StbImage,
+            RenderOneBitmapIntoAnother(ShadowImage,
+                                       StbImage,
                                        Border + ShadowOffset,
                                        Border + ShadowOffset,
                                        Params.Font_ShadowColor);
             
-            RenderOneBitmapIntoAnother(&ShadowImage,
-                                       &StbImage,
+            RenderOneBitmapIntoAnother(ShadowImage,
+                                       StbImage,
                                        Border, Border,
                                        ColorWhite());
             
             // NOTE(Dima): Creating image for outlined font
             int ImageOutlineW = RegularWidth;
             int ImageOutlineH = RegularHeight;
-            image OutlineSrc = AllocateImageInternal(ImageOutlineW, ImageOutlineH, ImageFormat_RGBA);
-            image OutlineImage = AllocateImageInternal(ImageOutlineW, ImageOutlineH, ImageFormat_RGBA);
+            image* OutlineSrc = AllocateImage(ImageOutlineW, ImageOutlineH);
+            image* OutlineImage = AllocateImage(ImageOutlineW, ImageOutlineH);
             
             int OutlineImageIndex = GlyphImages.size();
             GlyphImages.push_back(OutlineImage);
@@ -246,10 +254,10 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
                                        Border,
                                        Params.Font_OutlineColor);
             
-            image OutlineTemp = AllocateImageInternal(ImageOutlineW, ImageOutlineH, ImageFormat_RGBA);
-            BlurBitmapApproximateGaussian(&OutlineImage,
-                                          &OutlineSrc,
-                                          &OutlineTemp,
+            image* OutlineTemp = AllocateImage(ImageOutlineW, ImageOutlineH);
+            BlurBitmapApproximateGaussian(OutlineImage,
+                                          OutlineSrc,
+                                          OutlineTemp,
                                           3);
             
             for(int y = 0; y < OutlineImage.Height; y++)
@@ -271,24 +279,24 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
 #else
             // NOTE(Dima): Simple cellural automata for outline generation
             int CellDist = 1;
-            RenderOneBitmapIntoAnother(&OutlineImage,
-                                       &StbImage,
+            RenderOneBitmapIntoAnother(OutlineImage,
+                                       StbImage,
                                        Border,
                                        Border,
                                        Params.Font_OutlineColor);
             
-            for(int y = CellDist; y < OutlineImage.Height - CellDist; y++)
+            for(int y = CellDist; y < OutlineImage->Height - CellDist; y++)
             {
-                for(int x = CellDist; x < OutlineImage.Width - CellDist; x++)
+                for(int x = CellDist; x < OutlineImage->Width - CellDist; x++)
                 {
-                    u32* At = (u32*)OutlineSrc.Pixels + OutlineImage.Width * y + x;
+                    u32* At = (u32*)OutlineSrc->Pixels + OutlineImage->Width * y + x;
                     
                     f32 NearAlphaSum = 0.0f;
                     for(int CheckY = y - CellDist; CheckY <= y + CellDist; CheckY++)
                     {
                         for(int CheckX = x - CellDist; CheckX <= x + CellDist; CheckX++)
                         {
-                            u32* CheckAt = (u32*)OutlineImage.Pixels + OutlineImage.Width * CheckY + CheckX;
+                            u32* CheckAt = (u32*)OutlineImage->Pixels + OutlineImage->Width * CheckY + CheckX;
                             
                             v4 CheckColor = UnpackRGBA(*CheckAt);
                             
@@ -306,15 +314,15 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
                 }
             }
             
-            image OutlineTemp = AllocateImageInternal(ImageOutlineW, ImageOutlineH, ImageFormat_RGBA);
-            BlurBitmapApproximateGaussian(&OutlineImage,
-                                          &OutlineSrc,
-                                          &OutlineTemp,
+            image* OutlineTemp = AllocateImage(ImageOutlineW, ImageOutlineH);
+            BlurBitmapApproximateGaussian(OutlineImage,
+                                          OutlineSrc,
+                                          OutlineTemp,
                                           2);
 #endif
             
-            RenderOneBitmapIntoAnother(&OutlineImage,
-                                       &StbImage,
+            RenderOneBitmapIntoAnother(OutlineImage,
+                                       StbImage,
                                        Border,
                                        Border,
                                        ColorWhite());
@@ -354,8 +362,8 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
     memcpy(Result.Glyphs, &Glyphs[0], Glyphs.size() * sizeof(glyph));
     
     // NOTE(Dima): Copy images
-    Result.GlyphImages = (image*)calloc(GlyphImages.size(), sizeof(image));
-    memcpy(Result.GlyphImages, &GlyphImages[0], GlyphImages.size() * sizeof(image));
+    Result.GlyphImages = (image**)calloc(GlyphImages.size(), sizeof(image*));
+    memcpy(Result.GlyphImages, &GlyphImages[0], GlyphImages.size() * sizeof(image*));
     
     // NOTE(Dima): Loading kerning
     Result.KerningPairs = (f32*)malloc(Result.GlyphCount * Result.GlyphCount * sizeof(f32));
