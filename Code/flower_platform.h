@@ -49,16 +49,6 @@ typedef PLATFORM_PROCESS_INPUT(platform_process_input);
 #define PLATFORM_SET_CAPTURING_MOUSE(name) void name(b32 IsCapture)
 typedef PLATFORM_SET_CAPTURING_MOUSE(platform_set_capturing_mouse);
 
-// NOTE(Dima): Renderer functions
-#define PLATFORM_RENDERER_BEGIN_FRAME(name) void name(struct render_commands* Commands)
-typedef PLATFORM_RENDERER_BEGIN_FRAME(platform_renderer_begin_frame);
-
-#define PLATFORM_RENDERER_RENDER(name) void name(struct render_commands* Commands)
-typedef PLATFORM_RENDERER_RENDER(platform_renderer_render);
-
-#define PLATFORM_RENDERER_SWAPBUFFERS(name) void name(struct render_commands* Commands)
-typedef PLATFORM_RENDERER_SWAPBUFFERS(platform_renderer_swapbuffers);
-
 // NOTE(Dima): Read file functions
 #define PLATFORM_READ_FILE_AND_NULL_TERMINATE(name) char* name(char* FileName)
 typedef PLATFORM_READ_FILE_AND_NULL_TERMINATE(platform_read_file_and_null_terminate);
@@ -94,10 +84,6 @@ struct platform_api
     platform_process_input* ProcessInput;
     platform_set_capturing_mouse* SetCapturingMouse;
     
-    platform_renderer_begin_frame* BeginFrame;
-    platform_renderer_render* Render;
-    platform_renderer_swapbuffers* SwapBuffers;
-    
     platform_read_file_and_null_terminate* ReadFileAndNullTerminate;
     platform_read_file* ReadFile;
     platform_allocate_memory* AllocateMemory;
@@ -112,7 +98,7 @@ struct platform_api
     platform_output_log* Log;
 };
 
-extern platform_api Platform;
+extern platform_api PlatformAPI;
 
 #include "flower_debug_api.h"
 

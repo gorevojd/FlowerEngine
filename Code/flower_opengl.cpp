@@ -147,9 +147,9 @@ INTERNAL_FUNCTION GLuint OpenGLLoadProgram(char* VertexFilePath,
                                            char* FragmentFilePath, 
                                            char* GeometryFilePath = 0) 
 {
-    char* VertexSource = Platform.ReadFileAndNullTerminate(VertexFilePath);
-    char* FragmentSource = Platform.ReadFileAndNullTerminate(FragmentFilePath);
-    char* GeometrySource = Platform.ReadFileAndNullTerminate(GeometryFilePath);
+    char* VertexSource = PlatformAPI.ReadFileAndNullTerminate(VertexFilePath);
+    char* FragmentSource = PlatformAPI.ReadFileAndNullTerminate(FragmentFilePath);
+    char* GeometrySource = PlatformAPI.ReadFileAndNullTerminate(GeometryFilePath);
     
     char InfoLog[1024];
 	int Success;
@@ -2442,7 +2442,7 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     glDisable(GL_BLEND);
 }
 
-INTERNAL_FUNCTION PLATFORM_RENDERER_SWAPBUFFERS(OpenGLSwapBuffers)
+INTERNAL_FUNCTION PLATFORM_RENDERER_PRESENT(OpenGLPresent)
 {
     SDL_GL_SwapWindow(App->Window);
 }

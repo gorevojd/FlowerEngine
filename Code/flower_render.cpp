@@ -1002,7 +1002,7 @@ INTERNAL_FUNCTION void RenderAll()
     render_commands* Commands = Global_RenderCommands;
     
     // NOTE(Dima): Render
-    Platform.Render(Commands);
+    RenderAPI.Render(Commands);
     
     EndRender();
 }

@@ -57,7 +57,7 @@ inline void DEBUGAddRecord(char* UniqueName, u8 Type)
         TargetRecord->UniqueName = UniqueName;
         TargetRecord->Type = Type;
         TargetRecord->TimeStampCounter = __rdtsc();
-        TargetRecord->ThreadID = Platform.GetThreadID();
+        TargetRecord->ThreadID = PlatformAPI.GetThreadID();
     }
 }
 

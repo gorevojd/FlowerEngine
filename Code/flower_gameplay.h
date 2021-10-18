@@ -106,6 +106,7 @@ struct game
     render_commands* RenderCommands;
     job_system* JobSystem;
     platform_api* PlatformAPI;
+    renderer_api* RenderAPI;
     
 #if defined(INTERNAL_BUILD)
     debug_state* Debug;

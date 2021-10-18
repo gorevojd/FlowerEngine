@@ -101,7 +101,7 @@ inline void* AllocateFromArena(memory_arena* Arena, u32 Size, u32 Align = 16)
                 NewBlockSize = Size;
             }
             
-            NewBlock = Platform.AllocateBlock(NewBlockSize);
+            NewBlock = PlatformAPI.AllocateBlock(NewBlockSize);
             NewBlock->Next = 0;
             NewBlock->Prev = Block;
             if(NewBlock->Prev)
@@ -146,7 +146,7 @@ inline void FreeArena(memory_arena* Arena, b32 JustResetData = false)
             {
                 At->Next = At->Prev = 0;
                 
-                Platform.DeallocateBlock(At);
+                PlatformAPI.DeallocateBlock(At);
             }
             else
             {

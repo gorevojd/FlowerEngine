@@ -24,7 +24,8 @@
 #include "flower_standard.cpp"
 #include "flower_jobs_platform.cpp"
 
-platform_api Platform;
+platform_api PlatformAPI;
+renderer_api RenderAPI;
 GLOBAL_VARIABLE job_system* Global_Jobs;
 
 #if !defined(PLATFORM_IS_WINDOWS)
@@ -132,7 +133,7 @@ INTERNAL_FUNCTION inline PLATFORM_GET_PERFORMANCE_COUNTER(SDLGetPerfCounter)
 
 INTERNAL_FUNCTION inline PLATFORM_GET_ELAPSED_TIME(SDLGetElapsedTime)
 {
-    f64 Result = ((f64)ClocksEnd - (f64)ClocksBegin) * Platform.OneOverPerfFrequency;
+    f64 Result = ((f64)ClocksEnd - (f64)ClocksBegin) * PlatformAPI.OneOverPerfFrequency;
     
     return(Result);
 }
@@ -1094,23 +1095,26 @@ int main(int ArgsCount, char** Args)
 {
     int SDLInitCode = SDL_Init(SDL_INIT_EVERYTHING);
     
-    Platform = {};
-    Platform.AllocateBlock = AppAllocBlock;
-    Platform.DeallocateBlock = AppDeallocBlock;
-    Platform.ProcessInput = ProcessInput;
-    Platform.SetCapturingMouse = SetCapturingMouse;
-    Platform.Render = OpenGLRender;
-    Platform.SwapBuffers = OpenGLSwapBuffers;
-    Platform.ReadFileAndNullTerminate = StandardReadFileAndNullTerminate;
-    Platform.ReadFile = StandardReadFile;
-    Platform.AllocateMemory = StandardAllocateMemory;
-    Platform.FreeMemory = StandardFreeMemory;
-    Platform.GetThreadID = SDLGetThreadID;
-    Platform.GetPerfCounter = SDLGetPerfCounter;
-    Platform.GetElapsedTime = SDLGetElapsedTime;
-    Platform.PerfFrequency = SDL_GetPerformanceFrequency();
-    Platform.OneOverPerfFrequency = 1.0 / (f64)SDL_GetPerformanceFrequency();
-    Platform.Log = SDLOutputLog;
+    // NOTE(Dima): Platform API
+    PlatformAPI = {};
+    PlatformAPI.AllocateBlock = AppAllocBlock;
+    PlatformAPI.DeallocateBlock = AppDeallocBlock;
+    PlatformAPI.ProcessInput = ProcessInput;
+    PlatformAPI.SetCapturingMouse = SetCapturingMouse;
+    PlatformAPI.ReadFileAndNullTerminate = StandardReadFileAndNullTerminate;
+    PlatformAPI.ReadFile = StandardReadFile;
+    PlatformAPI.AllocateMemory = StandardAllocateMemory;
+    PlatformAPI.FreeMemory = StandardFreeMemory;
+    PlatformAPI.GetThreadID = SDLGetThreadID;
+    PlatformAPI.GetPerfCounter = SDLGetPerfCounter;
+    PlatformAPI.GetElapsedTime = SDLGetElapsedTime;
+    PlatformAPI.PerfFrequency = SDL_GetPerformanceFrequency();
+    PlatformAPI.OneOverPerfFrequency = 1.0 / (f64)SDL_GetPerformanceFrequency();
+    PlatformAPI.Log = SDLOutputLog;
+    
+    // NOTE(Dima): Render API
+    RenderAPI.Render = OpenGLRender;
+    RenderAPI.Present = OpenGLPresent;
     
     memory_arena GameArena = {};
     App = PushStruct(&GameArena, app_state);
@@ -1151,7 +1155,7 @@ int main(int ArgsCount, char** Args)
                                    SDL_WINDOW_OPENGL);
     
     // NOTE(Dima): Init game
-    App->GameInit(Game, &GameArena, &Platform, App->WndDims);
+    App->GameInit(Game, &GameArena, &PlatformAPI, &RenderAPI, App->WndDims);
     
     // NOTE(Dima): Setting up global variables after game init
     SetGlobalVariables(Game);
@@ -1194,7 +1198,7 @@ int main(int ArgsCount, char** Args)
         u64 ClocksElapsed = NewClocks - LastClocks;
         LastClocks = NewClocks;
         
-        Global_Time->DeltaTime = (f32)((f64)ClocksElapsed * Platform.OneOverPerfFrequency); 
+        Global_Time->DeltaTime = (f32)((f64)ClocksElapsed * PlatformAPI.OneOverPerfFrequency); 
         if(Global_Time->DeltaTime < 0.000001f)
         {
             Global_Time->DeltaTime = 0.000001f;

@@ -36,7 +36,7 @@ inline void ChangeScene(game* Game, int NewSceneIndex)
     Game->NextSceneIndex = NewSceneIndex;
 }
 
-#define GAME_INIT(name) void name(game* Game, memory_arena* Arena, platform_api* PlatformAPI, window_dimensions WindowDimensions)
+#define GAME_INIT(name) void name(game* Game, memory_arena* Arena, platform_api* Platform, renderer_api* Render, window_dimensions WindowDimensions)
 typedef GAME_INIT(game_init);
 
 #define GAME_UPDATE_AND_RENDER(name) void name(game* Game)

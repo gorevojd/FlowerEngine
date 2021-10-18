@@ -1,6 +1,7 @@
 #include "flower.h"
 
-platform_api Platform;
+platform_api PlatformAPI;
+renderer_api RenderAPI;
 GLOBAL_VARIABLE input_system* Global_Input;
 GLOBAL_VARIABLE time_system* Global_Time;
 GLOBAL_VARIABLE asset_system* Global_Assets;
@@ -34,7 +35,7 @@ inline void OutputLog(const char* Format, ...)
     stbsp_vsnprintf(Buf, ARC(Buf), Format, va);
     va_end(va);
     
-    Platform.Log(Buf);
+    PlatformAPI.Log(Buf);
 }
 
 #include "flower_standard.cpp"
@@ -131,7 +132,8 @@ INTERNAL_FUNCTION void SaveGlobalVariables(game* Game)
 
 INTERNAL_FUNCTION void RestoreGlobalVariables(game* Game)
 {
-    Platform = *Game->PlatformAPI;
+    PlatformAPI = *Game->PlatformAPI;
+    RenderAPI = *Game->RenderAPI;
     
     Global_Time = Game->Time;
     Global_Input = Game->Input;
@@ -166,8 +168,11 @@ extern "C" __declspec(dllexport) GAME_INIT(GameInit)
     Game->Arena = Arena;
     
     // NOTE(Dima): Init subsystems
-    Game->PlatformAPI = PlatformAPI;
-    Platform = *PlatformAPI;
+    Game->PlatformAPI = Platform;
+    PlatformAPI = *Platform;
+    
+    Game->RenderAPI = Render;
+    RenderAPI = *Render;
     
     Global_Time = PushStruct(Arena, time_system);
     Global_Jobs = Game->JobSystem;
@@ -214,7 +219,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     FUNCTION_TIMING();
     
     // NOTE(Dima): Processing Input
-    Platform.ProcessInput();
+    PlatformAPI.ProcessInput();
     
     UIBeginFrame(Game->WindowDimensions);
     
@@ -271,7 +276,7 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
             if(GetKeyDown(Key_C))
             {
                 Global_Input->CapturingMouse = !Global_Input->CapturingMouse;
-                Platform.SetCapturingMouse(!Global_Input->CapturingMouse);
+                PlatformAPI.SetCapturingMouse(!Global_Input->CapturingMouse);
             }
             if(GetKeyDown(Key_D))
             {
@@ -303,10 +308,10 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     RenderAll();
     
     {
-        BLOCK_TIMING("Swapping buffers");
+        BLOCK_TIMING("Presenting (Swapping Buffers)");
         
         // NOTE(Dima): Swapping buffers
-        Platform.SwapBuffers(Global_RenderCommands);
+        RenderAPI.Present(Global_RenderCommands);
     }
     
     Game->GameCodeWasJustReloaded = false;

@@ -9,6 +9,26 @@
 #define RENDER_DEFAULT_2D_LINE_DASH_SPACING 8.0f
 #define RENDER_MAX_BONES 256
 
+// NOTE(Dima): Renderer functions
+#define PLATFORM_RENDERER_BEGIN_FRAME(name) void name(struct render_commands* Commands)
+typedef PLATFORM_RENDERER_BEGIN_FRAME(platform_renderer_begin_frame);
+
+#define PLATFORM_RENDERER_RENDER(name) void name(struct render_commands* Commands)
+typedef PLATFORM_RENDERER_RENDER(platform_renderer_render);
+
+#define PLATFORM_RENDERER_PRESENT(name) void name(struct render_commands* Commands)
+typedef PLATFORM_RENDERER_PRESENT(platform_renderer_present);
+
+struct renderer_api
+{
+    platform_renderer_begin_frame* BeginFrame;
+    platform_renderer_render* Render;
+    platform_renderer_present* Present;
+};
+
+extern renderer_api RenderAPI;
+
+
 enum class culling_mode : u32
 {
     AABB,

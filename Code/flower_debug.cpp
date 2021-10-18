@@ -654,7 +654,7 @@ INTERNAL_FUNCTION void DEBUGInit(memory_arena* Arena)
     State->ProfiledThreadsCount = 0;
     DLIST_REFLECT_PTRS(State->ThreadSentinel, NextAlloc, PrevAlloc);
     ClearThreadsTable(State->ThreadHashTable, DEBUG_THREADS_TABLE_SIZE);
-    State->MainThread = CreateOrFindThreadForID(State, Platform.GetThreadID());
+    State->MainThread = CreateOrFindThreadForID(State, PlatformAPI.GetThreadID());
     State->WatchThread = State->MainThread;
 #endif
 }
