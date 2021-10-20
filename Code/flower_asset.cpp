@@ -70,6 +70,25 @@ INTERNAL_FUNCTION void AddFontToAtlas(font* Font)
     }
 }
 
+INTERNAL_FUNCTION char* GenerateSpecialGUID(char* Buf, 
+                                            int BufSize,
+                                            const char* BaseGUID,
+                                            const char* SpecialStr)
+{
+    char* StringsToConcat[] = 
+    {
+        (char*)BaseGUID,
+        "_",
+        (char*)SpecialStr
+    };
+    
+    ConcatBunchOfStrings(Buf, BufSize, 
+                         StringsToConcat,
+                         ARC(StringsToConcat));
+    
+    return (Buf);
+}
+
 #if 0
 INTERNAL_FUNCTION asset_id AddAssetInternal(asset_pack* Pack, 
                                             const char* GUID, 
@@ -93,6 +112,64 @@ INTERNAL_FUNCTION asset_id AddAssetInternal(asset_pack* Pack,
     Global_Assets->NameToAssetID->insert(NewPair);
     
     return(NewAssetID);
+}
+
+INTERNAL_FUNCTION asset_id AddAssetBitmap(const char* GUID, 
+                                          const char* Path,
+                                          const loading_params& Params)
+{
+    
+}
+
+INTERNAL_FUNCTION asset_id AddAssetSkybox(const char* GUID,
+                                          asset_id LeftID,
+                                          asset_id RightID,
+                                          asset_id FrontID,
+                                          asset_id BackID,
+                                          asset_id RightID,
+                                          asset_id UpID,
+                                          asset_id DownID,
+                                          const loading_params& Params)
+{
+    
+}
+
+INTERNAL_FUNCTION asset_id AddAssetSkybox(const char* GUID,
+                                          const char* LeftPath,
+                                          const char* RightPath,
+                                          const char* FrontPath,
+                                          const char* BackPath,
+                                          const char* UpPath,
+                                          const char* DownPath,
+                                          const loading_params& Params)
+{
+    char GuidBuf[128];
+    
+    GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Left");
+    asset_id LeftID = AddAssetBitmap(GuidBuf, LeftPath);
+    
+    GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Right");
+    asset_id RightID = AddAssetBitmap(GuidBuf, RightPath);
+    
+    GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Front");
+    asset_id FrontID = AddAssetBitmap(GuidBuf, FrontPath);
+    
+    GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Back");
+    asset_id BackID = AddAssetBitmap(GuidBuf, BackPath);
+    
+    GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Up");
+    asset_id UpID = AddAssetBitmap(GuidBuf, UpPath);
+    
+    GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Down");
+    asset_id DownID = AddAssetBitmap(GuidBuf, DownPath);
+    
+    asset_id Result = AddAssetSkybox(GUID,
+                                     LeftID, RightID,
+                                     FrontID, BackID,
+                                     UpID, DownID,
+                                     Params);
+    
+    return Result;
 }
 #endif
 
@@ -506,6 +583,14 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
         
         AddAssetInternal("Mesh_Cube", Asset_Mesh, &A->Cube);
         AddAssetInternal("Mesh_Plane", Asset_Mesh, &A->Plane);
+        
+        AddAssetSkybox("Skybox_Default", 
+                       "../Data/Textures/Cubemaps/Pink/left.png",
+                       "../Data/Textures/Cubemaps/Pink/right.png",
+                       "../Data/Textures/Cubemaps/Pink/front.png",
+                       "../Data/Textures/Cubemaps/Pink/back.png",
+                       "../Data/Textures/Cubemaps/Pink/up.png",
+                       "../Data/Textures/Cubemaps/Pink/down.png");
         
         WriteAssetPackToFile(Pack, "../Data/Packs/common.pack");
     }

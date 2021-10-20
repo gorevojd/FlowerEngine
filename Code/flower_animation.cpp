@@ -73,6 +73,7 @@ INTERNAL_FUNCTION nearest_frames FindNearestFrames(f32* Times, int TimesCount,
         
         else
         {
+            // TODO(Dima): This is slow. SHould use binary search here to find needed frame
             for(int TimeIndex = 0; TimeIndex < TimesCount; TimeIndex++)
             {
                 if(Times[TimeIndex] > CurrentTick)
@@ -101,6 +102,9 @@ INTERNAL_FUNCTION inline v3 InterpolateVectorKeys(nearest_frames* Nearest,
 {
     v3 Result = Values[Nearest->Prev];
     
+    // TODO(Dima): Not sure if this check is needed. 
+    // TODO(Dima): Even if they are equal the result will be calculated correctly
+    // TODO(Dima): With this if it will be harder to optimize
     if(Nearest->Prev != Nearest->Next)
     {
         v3 A = Values[Nearest->Prev];
@@ -118,6 +122,9 @@ INTERNAL_FUNCTION inline quat InterpolateQuaternionKeys(nearest_frames* Nearest,
 {
     quat Result = Values[Nearest->Prev];
     
+    // TODO(Dima): Not sure if this check is needed. 
+    // TODO(Dima): Even if they are equal the result will be calculated correctly
+    // TODO(Dima): With this if it will be harder to optimize
     if(Nearest->Prev != Nearest->Next)
     {
         quat A = Values[Nearest->Prev];

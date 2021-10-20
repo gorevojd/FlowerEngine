@@ -384,20 +384,74 @@ inline void StringToUpper(char* To, char* From){
     }
 }
 
-inline void AppendStringSafe(char* To, int ToSize, char* Src)
+// NOTE(Dima): This function returns one past last symbol of Src in Dst
+inline int CopyStringIntoDst(char* Dst, int DstSize,
+                             char* Src,
+                             int StartInsertFrom = 0)
 {
-    int ToCurLen = StringLength(To);
     int SrcLen = StringLength(Src);
     
-    Assert(ToCurLen + SrcLen + 1 <= ToSize);
+    Assert(StartInsertFrom + SrcLen <= DstSize);
     
-    int At = ToCurLen;
+    int At = StartInsertFrom;
     for(int CharIndex = 0; CharIndex < SrcLen; CharIndex++)
     {
-        To[At++] = Src[CharIndex];
+        Dst[At++] = Src[CharIndex];
     }
     
-    To[At++] = 0;
+    Dst[At] = 0;
+    
+    return (At);
+}
+
+// NOTE(Dima): This function returns one past last symbol of Src in Dst
+inline int CopyStringIntoDstAndNullTerminate(char* Dst, int DstSize,
+                                             char* Src,
+                                             int StartInsertFrom = 0)
+{
+    int EndIndex = CopyStringIntoDst(Dst, DstSize, Src, StartInsertFrom);
+    
+    Assert(EndIndex < DstSize);
+    
+    Dst[EndIndex] = 0;
+    
+    return (EndIndex);
+}
+
+// NOTE(Dima): This function returns one past last symbol of Src in Dst
+inline int AppendToString(char* Dst, int DstSize, 
+                          char* Src)
+{
+    int DstCurLen = StringLength(Dst);
+    int SrcLen = StringLength(Src);
+    
+    int EndIndex = CopyStringIntoDstAndNullTerminate(Dst, DstSize, 
+                                                     Src,
+                                                     DstCurLen);
+    
+    return EndIndex;
+}
+
+inline int ConcatBunchOfStrings(char* Dst, int DstSize,
+                                char** StringsToConcat,
+                                int NumStringsToConcat)
+{
+    int InsertAt = 0;
+    
+    for (int StringIndex = 0;
+         StringIndex < NumStringsToConcat;
+         StringIndex++)
+    {
+        InsertAt = CopyStringIntoDst(Dst, DstSize,
+                                     StringsToConcat[StringIndex],
+                                     InsertAt);
+    }
+    
+    Assert(InsertAt < DstSize);
+    
+    Dst[InsertAt] = 0;
+    
+    return InsertAt;
 }
 
 #endif

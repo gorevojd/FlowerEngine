@@ -566,7 +566,7 @@ INTERNAL_FUNCTION std::string OuterCombinationUniqueName(rubiks_is_outer_bool* B
     {
         if(Bool->Result[DirectionIndex])
         {
-            AppendStringSafe(Buf, ArrayCount(Buf), (char*)RubiksDirectionName[DirectionIndex]);
+            AppendToString(Buf, ArrayCount(Buf), (char*)RubiksDirectionName[DirectionIndex]);
         }
     }
     
