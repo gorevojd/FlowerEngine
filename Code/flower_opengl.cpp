@@ -1530,26 +1530,42 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(render_commands* Commands,
     
     // NOTE(Dima): Setting material
     b32 MaterialMissing = true;
-    b32 DiffuseWasSet = false;
     
     if(Material != 0)
     {
         MaterialMissing = false;
         
-        if(Material->Diffuse != 0)
+        switch(Material->Type)
         {
-            DiffuseWasSet = true;
+            case Material_SpecularDiffuse:
+            {
+                image* DiffuseTex = Material->Textures[MatTex_SpecularDiffuse_Diffuse];
+                Shader->SetBool("HasDiffuse", DiffuseTex != 0);
+                
+                if(DiffuseTex != 0)
+                {
+                    OpenGLInitImage(DiffuseTex);
+                    
+                    Shader->SetTexture2D("TexDiffuse", 
+                                         DiffuseTex->Handle.Image.TextureObject,
+                                         0);
+                }
+                
+            }break;
             
-            OpenGLInitImage(Material->Diffuse);
+            case Material_PBR:
+            {
+                
+            }break;
             
-            Shader->SetTexture2D("TexDiffuse", 
-                                 Material->Diffuse->Handle.Image.TextureObject,
-                                 0);
+            case Material_Solid:
+            {
+                
+            }break;
         }
     }
     
     Shader->SetBool("MaterialMissing", MaterialMissing);
-    Shader->SetBool("HasDiffuse", DiffuseWasSet);
     
     Shader->SetBool("HasClippingPlane", RenderPass->ClippingPlaneIsSet);
     if(RenderPass->ClippingPlaneIsSet)

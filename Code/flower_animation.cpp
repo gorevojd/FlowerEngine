@@ -26,13 +26,13 @@ INTERNAL_FUNCTION nearest_frames FindNearestFrames(f32* Times, int TimesCount,
             // NOTE(Dima): Pre-behaviour case
             switch(Behaviour)
             {
-                case AnimBehaviour_Closest:
+                case AnimOutsideBehaviour_Closest:
                 {
                     Result.Prev = FirstFrameIndex;
                     Result.Next = FirstFrameIndex;
                 }break;
                 
-                case AnimBehaviour_Repeat:
+                case AnimOutsideBehaviour_Repeat:
                 {
                     Result.Prev = LastFrameIndex;
                     Result.Next = FirstFrameIndex;
@@ -51,13 +51,13 @@ INTERNAL_FUNCTION nearest_frames FindNearestFrames(f32* Times, int TimesCount,
             // NOTE(Dima): Post-behaviour case
             switch(Behaviour)
             {
-                case AnimBehaviour_Closest:
+                case AnimOutsideBehaviour_Closest:
                 {
                     Result.Prev = LastFrameIndex;
                     Result.Next = LastFrameIndex;
                 }break;
                 
-                case AnimBehaviour_Repeat:
+                case AnimOutsideBehaviour_Repeat:
                 {
                     Result.Prev = LastFrameIndex;
                     Result.Next = FirstFrameIndex;
@@ -154,35 +154,33 @@ struct playing_animation
 
 void UpdateAnimation(animation* Animation, f32 Time, m44* NodeMatrices)
 {
-    asset_animation_shared* Shared = &Animation->Shared;
-    
-    f32 CurrentTick = fmod(Time * Shared->TicksPerSecond, 
-                           Shared->DurationTicks);
-    u32 AnimBehaviour = AnimBehaviour_Repeat;
+    f32 CurrentTick = fmod(Time * Animation->TicksPerSecond, 
+                           Animation->DurationTicks);
+    u32 AnimBehaviour = AnimOutsideBehaviour_Repeat;
     
     for(int NodeAnimIndex = 0;
-        NodeAnimIndex < Shared->NumNodeAnims;
+        NodeAnimIndex < Animation->NumNodeAnims;
         NodeAnimIndex++)
     {
-        node_animation* NodeAnim = &Animation->NodeAnims[NodeAnimIndex];
+        node_animation* NodeAnim = Animation->NodeAnims[NodeAnimIndex];
         
         // NOTE(Dima): Finding frames that we will interpolate between
         nearest_frames NearestP = FindNearestFrames(NodeAnim->PositionTimes,
                                                     NodeAnim->NumPos,
                                                     CurrentTick,
-                                                    Shared->DurationTicks,
+                                                    Animation->DurationTicks,
                                                     AnimBehaviour);
         
         nearest_frames NearestR = FindNearestFrames(NodeAnim->RotationTimes,
                                                     NodeAnim->NumRot,
                                                     CurrentTick,
-                                                    Shared->DurationTicks,
+                                                    Animation->DurationTicks,
                                                     AnimBehaviour);
         
         nearest_frames NearestS = FindNearestFrames(NodeAnim->ScalingTimes,
                                                     NodeAnim->NumScl,
                                                     CurrentTick,
-                                                    Shared->DurationTicks,
+                                                    Animation->DurationTicks,
                                                     AnimBehaviour);
         
         // NOTE(Dima): Checking and interpolating
@@ -222,7 +220,7 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model* Model, m44* ToModel)
     m44* ArrayToParent = Model->Node_ToParent;
     
     for(int TranIndex = 0;
-        TranIndex < Model->Shared.NumNodes;
+        TranIndex < Model->NumNodes;
         TranIndex++)
     {
         int ParentIndex = Model->Node_ParentIndex[TranIndex];
@@ -243,7 +241,7 @@ INTERNAL_FUNCTION void CalculateSkinningMatrices(model* Model,
                                                  m44* SkinningMatrices)
 {
     for(int BoneIndex = 0;
-        BoneIndex < Model->Shared.NumBones;
+        BoneIndex < Model->NumBones;
         BoneIndex++)
     {
         int NodeIndex = Model->Bone_NodeIndex[BoneIndex];

@@ -1,7 +1,7 @@
 #ifndef FLOWER_RENDER_PRIMITIVES_H
 #define FLOWER_RENDER_PRIMITIVES_H
 
-#include "flower_asset_types_shared.h"
+#include "flower_asset_shared.h"
 
 enum renderer_handle_type
 {
@@ -158,9 +158,10 @@ struct cubemap
 struct material
 {
     char Name[64];
-    u32 ID;
     
-    image* Diffuse;
+    u32 Type;
+    
+    image* Textures[MAX_MATERIAL_TEXTURES];
 };
 
 struct node_animation
@@ -180,18 +181,17 @@ struct node_animation
     int NodeIndex;
 };
 
-enum animation_behaviour
-{
-    AnimBehaviour_Closest,
-    AnimBehaviour_Repeat,
-};
-
 struct animation
 {
     char Name[64];
-    asset_animation_shared Shared;
     
-    node_animation* NodeAnims;
+    node_animation** NodeAnims;
+    int NumNodeAnims;
+    
+    u32 Behaviour;
+    
+    f32 DurationTicks;
+    f32 TicksPerSecond;
     
     void* Free;
 };
@@ -270,6 +270,11 @@ struct model
     mesh** Meshes;
     material** Materials;
     
+    int NumMeshes;
+    int NumMaterials;
+    int NumNodes;
+    int NumBones;
+    
     // NOTE(Dima): Nodes
     model_node* Nodes;
     m44* Node_ToParent;
@@ -278,8 +283,6 @@ struct model
     // NOTE(Dima): Bones
     m44* Bone_InvBindPose;
     int* Bone_NodeIndex;
-    
-    asset_model_shared Shared;
     
     void* Free;
 };

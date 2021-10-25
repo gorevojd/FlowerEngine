@@ -432,6 +432,13 @@ inline int AppendToString(char* Dst, int DstSize,
     return EndIndex;
 }
 
+inline void ClearString(char* Dst, int DstSize)
+{
+    Assert(DstSize > 0);
+    
+    Dst[0] = 0;
+}
+
 inline int ConcatBunchOfStrings(char* Dst, int DstSize,
                                 char** StringsToConcat,
                                 int NumStringsToConcat)

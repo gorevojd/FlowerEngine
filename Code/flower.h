@@ -21,6 +21,7 @@ using namespace std;
 
 #include "flower_jobs.h"
 #include "flower_input.h"
+#include "flower_asset_shared.h"
 #include "flower_render_primitives.h"
 #include "flower_asset.h"
 #include "flower_opengl.h"

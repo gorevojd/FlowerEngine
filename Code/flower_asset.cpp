@@ -90,26 +90,42 @@ INTERNAL_FUNCTION char* GenerateSpecialGUID(char* Buf,
 }
 
 #if 0
+struct asset_pack
+{
+    char PackFileName[256];
+    char PackBlobName[256];
+    
+    vector<asset> Assets;
+};
+
+INTERNAL_FUNCTION asset_pack* CreateAssetPack(char* Name)
+{
+    asset_pack* Pack = new asset_pack;
+    
+    ClearString(Pack->PackFileName, ArrayCount(Pack->PackFileName));
+    AppendToString(Pack->PackFileName, ArrayCount(Pack->PackFileName), Name);
+    AppendToString(Pack->PackFileName, ArrayCount(Pack->PackFileName), ".json");
+    
+    ClearString(Pack->PackFileName, ArrayCount(Pack->PackFileName));
+    AppendToString(Pack->PackBlobName, ArrayCount(Pack->PackBlobName), Name);
+    AppendToString(Pack->PackBlobName, ArrayCount(Pack->PackBlobName), ".blob");
+    
+    return Pack;
+}
+
 INTERNAL_FUNCTION asset_id AddAssetInternal(asset_pack* Pack, 
                                             const char* GUID, 
                                             u32 Type, 
                                             void* Ptr)
 {
-    asset_id NewAssetID = Global_Assets->NumAssets++;
+    asset NewAsset;
     
-    asset* NewAsset = &Global_Assets->Assets[NewAssetID];
-    
-    CopyStringsSafe(NewAsset->GUID, ArrayCount(NewAsset->GUID), (char*)GUID);
-    NewAsset->Type = Type;
-    NewAsset->Ptr = Ptr;
+    CopyStringsSafe(NewAsset.GUID, ASSET_GUID_SIZE, (char*)GUID);
+    NewAsset.Type = Type;
+    NewAsset.Ptr = Ptr;
     
     // NOTE(Dima): Inserting to assets array
-    
-    // NOTE(Dima): Insering to table
-    auto NewPair = std::pair<std::string, asset_id>(std::string(GUID), 
-                                                    NewAssetID);
-    
-    Global_Assets->NameToAssetID->insert(NewPair);
+    Pack->Assets.push_back(NewAsset);
     
     return(NewAssetID);
 }
@@ -173,139 +189,6 @@ INTERNAL_FUNCTION asset_id AddAssetSkybox(const char* GUID,
 }
 #endif
 
-#if 0
-inline asset_id GetByName(char* AssetName)
-{
-    asset_id Result = 0;
-    auto FindIt = Global_Assets->NameToAssetID->find(std::string(AssetName));
-    if(FindIt != Global_Assets->NameToAssetID->end())
-    {
-        Result = FindIt->second;
-    }
-    
-    return(Result);
-}
-
-inline void* GetAssetDataByIDInternal(asset_id ID, u32 AssetType)
-{
-    asset* Asset = &Global_Assets->Assets[ID];
-    
-    Assert(Asset->Type == AssetType);
-    
-    void* Result = Asset->Ptr;
-    return(Result);
-}
-
-#define GetAssetDataByID(id, data_type, asset_type) (data_type*)GetAssetByIDInternal(id, asset_type);
-#define GetAsset(guid, data_type, asset_type) GetAssetDataByID(GetByName(guid), asset_type) 
-#endif
-
-#if 0
-struct asset_source
-{
-    std::string GUID;
-    std::string FilePath;
-    
-    u32 Type;
-    u32 TypeSize;
-    
-    b32 FromFile;
-    
-    loading_params LoadingParams;
-    
-    void* Data;
-};
-
-struct loaded_assets
-{
-    std::vector<asset_source> Sources;
-    
-    memory_arena Arena;
-    
-    loaded_assets()
-    {
-        Arena = {};
-    }
-    
-    ~loaded_assets()
-    {
-        FreeArena(&Arena);
-    }
-    
-    int AddSource(const char* GUID,
-                  const char* FilePath,
-                  u32 AssetType)
-    {
-        int Result = Sources.size();
-        
-        asset_source New = {};
-        
-        New.GUID = std::string(GUID);
-        New.FilePath = std::string(FilePath);
-        New.FromFile = true;
-        New.Type = AssetType;
-        New.LoadingParams = DefaultLoadingParams();
-        New.TypeSize = Global_AssetTypeSize[AssetType];
-        
-        Sources.push_back(New);
-        
-        return(Result);
-    }
-    
-    int AddSource(const char* GUID,
-                  void* Source,
-                  u32 AssetType)
-    {
-        int Result = Sources.size();
-        
-        asset_source New = {};
-        
-        New.GUID = std::string(GUID);
-        New.FromFile = false;
-        New.Type = AssetType;
-        New.LoadingParams = DefaultLoadingParams();
-        New.TypeSize = Global_AssetTypeSize[AssetType];
-        
-        Sources.push_back(New);
-        
-        return(Result);
-    }
-    
-    void Load()
-    {
-        for(auto& Source : Sources)
-        {
-            Source.Data = malloc(Source.TypeSize);
-            
-            switch(Source.Type)
-            {
-                case Asset_Model:
-                {
-                    model* Model = (model*)Source.Data;
-                    
-                    *Model = LoadModel();
-                }break;
-                
-                case Asset_Animation:
-                {
-                    
-                }break;
-                
-                case Asset_Image:
-                {
-                    
-                }break;
-                
-                case Asset_Mesh:
-                {
-                    
-                }break;
-            }
-        }
-    }
-};
-#endif
-
 INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
 {
     Global_Assets = PushStruct(Arena, asset_system);
@@ -322,94 +205,6 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
                           FontAtlasSize,
                           FontAtlasSize,
                           FontsAtlasMem);
-    
-#if 0    
-    Assert(ArrayCount(Global_AssetTypeSize) == Asset_Count);
-    loaded_assets Loaded;
-    
-    // NOTE(Dima): Loading assets
-    mesh Cube = MakeUnitCube();
-    mesh Plane = MakePlane();
-    
-    Loaded.AddSource("Mesh_Cube", &Cube, Asset_Mesh);
-    Loaded.AddSource("Mesh_Plane", &Plane, Asset_Mesh);
-    
-    // NOTE(Dima): Adding fonts
-    Loaded.AddSource("Times_New_Roman",
-                     "C:/Windows/Fonts/times.ttf",
-                     Asset_Font);
-    Loaded.AddSource("Life_Is_Goofy",
-                     "../Data/Fonts/Life is goofy.ttf",
-                     Asset_Font);
-    Loaded.AddSource("Arial",
-                     "c:/windows/fonts/arial.ttf",
-                     Asset_Font);
-    
-    // NOTE(Dima): Adding images
-    Loaded.AddSource("Image_Cheese", "E:/Media/Photos/Internet/Images/Cheese.png", Asset_Image);
-    Loaded.AddSource("Image_Mouse", "E:/Media/Photos/Internet/Images/Mouse.png", Asset_Image);
-    
-    Loaded.AddSource("Texture_Box", "../Data/Textures/container_diffuse.png", Asset_Image);
-    Loaded.AddSource("Texture_Plane", "E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png", Asset_Image);
-    int PalleteSI = Loaded.AddSource("Texture_Palette", 
-                                     "E:/Development/Modeling/Pallette/MyPallette.png", 
-                                     Asset_Image);
-    
-    // NOTE(Dima): Adding Bear Textures
-    Loaded.AddSource("Bear_Diffuse", "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear.tga",
-                     Asset_Image);
-    Loaded.AddSource("Bear_Normal", "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear Normals.tga",
-                     Asset_Image);
-    Loaded.AddSource("Bear_Eyes_Diffuse", "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Eye Bear.tga",
-                     Asset_Image);
-    Loaded.AddSource("Bear_Eyes_Shine", 
-                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Eye Shine Bear.tga", 
-                     Asset_Image);
-    
-    // NOTE(Dima): Adding Fox Textures
-    Loaded.AddSource("Fox_Diffuse", 
-                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Fox.tga",
-                     Asset_Image);
-    Loaded.AddSource("Fox_Normal", 
-                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Fox Normals.tga",
-                     Asset_Image);
-    Loaded.AddSource("Fox_Eyes_Diffuse", 
-                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Eye Green.tga",
-                     Asset_Image);
-    Loaded.AddSource("Fox_Eyes_Shine", 
-                     "E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Eye Shine.tga", 
-                     Asset_Image);
-    
-    // NOTE(Dima): Adding models
-    Loaded.AddSource("Bear", 
-                     "E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/bear.FBX",
-                     Asset_Model);
-    
-    Loaded.AddSource("Fox",
-                     "E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/Fox.FBX",
-                     Asset_Model);
-    
-    Loaded.AddSource("Supra",
-                     "E:/Development/Modeling/Modeling challenge/ToyotaSupra/Supra.FBX",
-                     Asset_Model);
-    
-    // NOTE(Dima): Adding animations
-    loaded_animations BearSuccess = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
-    Loaded.AddSource("Bear_Success",
-                     &BearSuccess.Animations[0],
-                     Asset_Animation);
-    
-    loaded_animations BearIdle = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
-    Loaded.AddSource("Bear_Idle",
-                     &BearIdle.Animations[0],
-                     Asset_Animation);
-    
-    loaded_animations FoxTalk = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
-    Loaded.AddSource("Fox_Talk",
-                     &FoxTalk.Animations[0],
-                     Asset_Animation);
-#endif
-    
     
 #if 1
     loading_params VoxelAtlasParams = DefaultLoadingParams();
@@ -499,13 +294,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     // NOTE(Dima): Bear materials
     A->BearMaterial = {};
-    A->BearMaterial.Diffuse = A->BearDiffuse;
+    A->BearMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearDiffuse;
     
     A->BearEyesMaterial = {};
-    A->BearEyesMaterial.Diffuse = A->BearEyesDiffuse;
+    A->BearEyesMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearEyesDiffuse;
     
     A->BearEyesShineMaterial = {};
-    A->BearEyesShineMaterial.Diffuse = A->BearEyesShine;
+    A->BearEyesShineMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearEyesShine;
     
     A->Bear.Materials[0] = &A->BearMaterial;
     A->Bear.Materials[1] = &A->BearEyesMaterial;
@@ -517,13 +312,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     // NOTE(Dima): Fox materials
     A->FoxMaterial = {};
-    A->FoxMaterial.Diffuse = A->FoxDiffuse;
+    A->FoxMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxDiffuse;
     
     A->FoxEyesMaterial = {};
-    A->FoxEyesMaterial.Diffuse = A->FoxEyesDiffuse;
+    A->FoxEyesMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxEyesDiffuse;
     
     A->FoxEyesShineMaterial = {};
-    A->FoxEyesShineMaterial.Diffuse = A->FoxEyesShine;
+    A->FoxEyesShineMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxEyesShine;
     
     A->Fox.Materials[0] = &A->FoxMaterial;
     A->Fox.Materials[1] = &A->FoxEyesMaterial;
@@ -535,10 +330,10 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     // NOTE(Dima): Other materials
     A->PaletteMaterial = {};
-    A->PaletteMaterial.Diffuse = A->Palette;
+    A->PaletteMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->Palette;
     
     A->GroundMaterial = {};
-    A->GroundMaterial.Diffuse = A->PlaneTexture;
+    A->GroundMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->PlaneTexture;
     
     // NOTE(Dima): Supra material
     A->Supra.Materials[0] = &A->PaletteMaterial;
@@ -546,7 +341,7 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
 #if 0
     {
-        asset_pack* Pack = CreateAssetPack();
+        asset_pack* Pack = CreateAssetPack("common");
         
         loading_params VoxelAtlasParams = DefaultLoadingParams();
         VoxelAtlasParams.Image_FilteringIsClosest = true;
@@ -592,7 +387,7 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
                        "../Data/Textures/Cubemaps/Pink/up.png",
                        "../Data/Textures/Cubemaps/Pink/down.png");
         
-        WriteAssetPackToFile(Pack, "../Data/Packs/common.pack");
+        WriteAssetPackToFile(Pack);
     }
 #endif
     

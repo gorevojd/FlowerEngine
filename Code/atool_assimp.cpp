@@ -415,16 +415,17 @@ INTERNAL_FUNCTION animation ConvertToActualAnimation(loaded_animation* Load)
     
     animation Result = {};
     
-    Result.Shared.DurationTicks = Load->DurationTicks;
-    Result.Shared.TicksPerSecond = Load->TicksPerSecond;
-    Result.Shared.Behaviour = Load->Behaviour;
-    Result.Shared.NumNodeAnims = NumNodeAnims;
+    Result.DurationTicks = Load->DurationTicks;
+    Result.TicksPerSecond = Load->TicksPerSecond;
+    Result.Behaviour = Load->Behaviour;
+    Result.NumNodeAnims = NumNodeAnims;
     
     CopyStringsSafe(Result.Name, ArrayCount(Result.Name), (char*)Load->Name.c_str());
     
     helper_byte_buffer Help = {};
     
-    Help.AddPlace("NodeAnims", NumNodeAnims, sizeof(node_animation));
+    Help.AddPlace("NodeAnims", NumNodeAnims, sizeof(node_animation*));
+    Help.AddPlace("NodeAnimsArr", NumNodeAnims, sizeof(node_animation));
     
     std::string PKeysStr = std::string("PKeys");
     std::string RKeysStr = std::string("RKeys");
@@ -451,7 +452,8 @@ INTERNAL_FUNCTION animation ConvertToActualAnimation(loaded_animation* Load)
     
     Help.Generate();;
     
-    Result.NodeAnims = (node_animation*)Help.GetPlace("NodeAnims");
+    Result.NodeAnims = (node_animation**)Help.GetPlace("NodeAnims");
+    node_animation* NodeAnimsArr = (node_animation*)Help.GetPlace("NodeAnimsArr");
     
     for(int NodeAnimIndex = 0;
         NodeAnimIndex < NumNodeAnims;
@@ -459,7 +461,9 @@ INTERNAL_FUNCTION animation ConvertToActualAnimation(loaded_animation* Load)
     {
         loaded_node_animation* Src = &Load->NodeAnims[NodeAnimIndex];
         
-        node_animation* NodeAnim = &Result.NodeAnims[NodeAnimIndex];
+        Result.NodeAnims[NodeAnimIndex] = &NodeAnimsArr[NodeAnimIndex];
+        
+        node_animation* NodeAnim = Result.NodeAnims[NodeAnimIndex];
         
         NodeAnim->NumPos = Src->PositionKeys.size();
         NodeAnim->NumRot = Src->RotationKeys.size();
@@ -595,21 +599,21 @@ INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
     model Model_ = {};
     model* Model = &Model_;
     
-    Model->Shared.NumNodes = Load->Nodes.size();
-    Model->Shared.NumBones = Load->NumBones;
-    Model->Shared.NumMeshes = Load->NumMeshes;
-    Model->Shared.NumMaterials = Load->Materials.size();
+    Model->NumNodes = Load->Nodes.size();
+    Model->NumBones = Load->NumBones;
+    Model->NumMeshes = Load->NumMeshes;
+    Model->NumMaterials = Load->Materials.size();
     
     int AllocMaterialsCount = std::max(50, (int)Load->Materials.size());
     
     helper_byte_buffer Help = {};
-    Help.AddPlace("Meshes", Model->Shared.NumMeshes, sizeof(mesh*));
+    Help.AddPlace("Meshes", Model->NumMeshes, sizeof(mesh*));
     Help.AddPlace("Materials", AllocMaterialsCount, sizeof(material*));
-    Help.AddPlace("Nodes", Model->Shared.NumNodes, sizeof(model_node));
-    Help.AddPlace("Node_ToParent", Model->Shared.NumNodes, sizeof(m44));
-    Help.AddPlace("Node_ParentIndex", Model->Shared.NumNodes, sizeof(int));
-    Help.AddPlace("Bone_InvBindPose", Model->Shared.NumNodes, sizeof(m44));
-    Help.AddPlace("Bone_NodeIndex", Model->Shared.NumBones, sizeof(int));
+    Help.AddPlace("Nodes", Model->NumNodes, sizeof(model_node));
+    Help.AddPlace("Node_ToParent", Model->NumNodes, sizeof(m44));
+    Help.AddPlace("Node_ParentIndex", Model->NumNodes, sizeof(int));
+    Help.AddPlace("Bone_InvBindPose", Model->NumNodes, sizeof(m44));
+    Help.AddPlace("Bone_NodeIndex", Model->NumBones, sizeof(int));
     
     Help.Generate();
     
@@ -625,7 +629,7 @@ INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
     
     // NOTE(Dima): Setting meshes
     for(int MeshIndex = 0;
-        MeshIndex < Model->Shared.NumMeshes;
+        MeshIndex < Model->NumMeshes;
         MeshIndex++)
     {
         Model->Meshes[MeshIndex] = &Load->Meshes[MeshIndex];
@@ -633,7 +637,7 @@ INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
     
     // NOTE(Dima): Setting materials
     for(int MaterialIndex = 0;
-        MaterialIndex < Model->Shared.NumMaterials;
+        MaterialIndex < Model->NumMaterials;
         MaterialIndex++)
     {
         Model->Materials[MaterialIndex] = Load->Materials[MaterialIndex];
@@ -641,7 +645,7 @@ INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
     
     // NOTE(Dima): Setting bones
     for(int BoneIndex = 0;
-        BoneIndex < Model->Shared.NumBones;
+        BoneIndex < Model->NumBones;
         BoneIndex++)
     {
         Model->Bone_InvBindPose[BoneIndex] = Load->Bone_InvBindPose[BoneIndex];
@@ -650,7 +654,7 @@ INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
     
     // NOTE(Dima): Setting nodes
     for(int NodeIndex = 0;
-        NodeIndex < Model->Shared.NumNodes;
+        NodeIndex < Model->NumNodes;
         NodeIndex++)
     {
         model_node* Node = &Model->Nodes[NodeIndex];

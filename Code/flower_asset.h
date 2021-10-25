@@ -13,31 +13,12 @@ enum asset_type
     Asset_Image,
     Asset_Mesh,
     Asset_Animation,
+    Asset_NodeAnimation,
     Asset_Material,
     Asset_Model,
-    Asset_Cubemap,
+    Asset_Skybox,
     
     Asset_Count,
-};
-
-GLOBAL_VARIABLE mi Global_AssetTypeSize[Asset_Count] = 
-{
-    0,
-    sizeof(font),
-    sizeof(image),
-    sizeof(mesh),
-    sizeof(animation),
-    sizeof(material),
-    sizeof(model),
-};
-
-struct asset
-{
-    char GUID[64];
-    
-    u32 Type;
-    
-    void* Ptr;
 };
 
 typedef u32 asset_id;
@@ -47,7 +28,7 @@ struct asset_system
     memory_arena* Arena;
     
     std::unordered_map<std::string, asset_id>* NameToAssetID;
-    asset Assets[2048];
+    //asset Assets[2048];
     int NumAssets;
     
     image FontsAtlas;

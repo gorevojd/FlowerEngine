@@ -324,14 +324,14 @@ game_object* CreateModelGameObject(game* Game,
     
     game_object* Result = CreateGameObject(Game, GameObject_Object, Name);
     
-    if(Model->Shared.NumNodes)
+    if(Model->NumNodes)
     {
-        Help.AddPlace("NodeToModel", Model->Shared.NumNodes, sizeof(m44));
+        Help.AddPlace("NodeToModel", Model->NumNodes, sizeof(m44));
     }
     
-    if(Model->Shared.NumBones)
+    if(Model->NumBones)
     {
-        Help.AddPlace("SkinningMatrices", Model->Shared.NumBones, sizeof(m44));
+        Help.AddPlace("SkinningMatrices", Model->NumBones, sizeof(m44));
     }
     
     Help.Generate();
@@ -367,7 +367,7 @@ void UpdateModelGameObject(game_object* Object)
         UpdateAnimation(Animation, Global_Time->Time, Model->Node_ToParent);
         
         SkinningMatrices = CompModel->SkinningMatrices;
-        SkinningMatricesCount = Model->Shared.NumBones;
+        SkinningMatricesCount = Model->NumBones;
         
         CalculateToModelTransforms(Model, CompModel->NodeToModel);
         // NOTE(Dima): Setting this to false so next time they should be recomputed again
@@ -390,7 +390,7 @@ void UpdateModelGameObject(game_object* Object)
     m44 ModelToWorld = TranslationMatrix(Object->P);
     
     for(int NodeIndex = 0;
-        NodeIndex < Model->Shared.NumNodes;
+        NodeIndex < Model->NumNodes;
         NodeIndex++)
     {
         model_node* Node = &Model->Nodes[NodeIndex];
