@@ -389,6 +389,7 @@ void UpdateModelGameObject(game_object* Object)
     
     m44 ModelToWorld = TranslationMatrix(Object->P);
     
+    
     for(int NodeIndex = 0;
         NodeIndex < Model->NumNodes;
         NodeIndex++)
@@ -401,7 +402,7 @@ void UpdateModelGameObject(game_object* Object)
             MeshIndex < Node->NumMeshIndices;
             MeshIndex++)
         {
-            int ActualMeshIndex = Node->MeshIndices[MeshIndex];
+            int ActualMeshIndex = Model->NodesMeshIndices[Node->StartInMeshIndices + MeshIndex];
             
             mesh* Mesh = Model->Meshes[ActualMeshIndex];
             
@@ -429,6 +430,7 @@ void UpdateModelGameObject(game_object* Object)
             }
         }
     }
+    
 }
 
 #define PROCESS_GAME_OBJECT_FUNC(name) void name(game* Game, game_object* Obj)

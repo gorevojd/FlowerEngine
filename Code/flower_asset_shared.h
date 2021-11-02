@@ -40,4 +40,8 @@ enum animation_ouside_behaviour
 };
 
 
+// Fonts
+#define FONT_MAPPING_SIZE 512
+
+
 #endif //FLOWER_ASSET_TYPES_SHARED_H

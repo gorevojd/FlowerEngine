@@ -574,6 +574,8 @@ INTERNAL_FUNCTION void ProcessKeyboardEvents(SDL_KeyboardEvent* KeyEvent)
 INTERNAL_FUNCTION PLATFORM_SET_CAPTURING_MOUSE(SetCapturingMouse)
 {
     SDL_SetRelativeMouseMode(IsCapture ? SDL_TRUE : SDL_FALSE);
+    
+    SDL_ShowCursor(!IsCapture ? SDL_ENABLE : SDL_DISABLE);
 }
 
 INTERNAL_FUNCTION void ProcessEvents()

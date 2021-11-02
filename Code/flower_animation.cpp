@@ -223,7 +223,7 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model* Model, m44* ToModel)
         TranIndex < Model->NumNodes;
         TranIndex++)
     {
-        int ParentIndex = Model->Node_ParentIndex[TranIndex];
+        int ParentIndex = Model->Nodes[TranIndex].ParentIndex;
         
         if(ParentIndex == -1)
         {

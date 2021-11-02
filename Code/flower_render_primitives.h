@@ -207,18 +207,18 @@ enum font_style
 
 struct glyph_style
 {
-    int ImageIndex;
+    image* Image;
     f32 WidthOverHeight;
     
     v2 MinUV;
     v2 MaxUV;
 };
 
-inline glyph_style CreateGlyphStyle(int ImageIndex, int Width, int Height)
+inline glyph_style CreateGlyphStyle(image* Image, int Width, int Height)
 {
     glyph_style Result = {};
     
-    Result.ImageIndex = ImageIndex;
+    Result.Image = Image;
     Result.WidthOverHeight = (f32)Width / (f32)Height;
     
     return(Result);
@@ -237,13 +237,28 @@ struct glyph
     f32 YOffset;
 };
 
+struct font_codepoint_slot_range
+{
+    int Count;
+    int StartIndexInSlotsGlyphsIds;
+};
+
+struct font_slot_glyph_id
+{
+    u32 Codepoint;
+    int IndexInGlyphs;
+};
+
+// TODO: Texture atlas per font
 struct font
 {
-    image** GlyphImages;
-    glyph* Glyphs;
+    glyph** Glyphs;
     int GlyphCount;
     
     float* KerningPairs;
+    
+    font_codepoint_slot_range* CodepointToSlot;
+    font_slot_glyph_id* SlotsGlyphsIds;
     
     f32 Ascent;
     f32 Descent;
@@ -254,15 +269,38 @@ struct font
     f32 PixelsPerMeter;
 };
 
+inline int GetGlyphByCodepoint(font* Font, int Codepoint)
+{
+    font_codepoint_slot_range* SlotRange = &Font->CodepointToSlot[Codepoint % FONT_MAPPING_SIZE];
+    
+    int Result = -1;
+    
+    for (int i = 0; i < SlotRange->Count; i++)
+    {
+        int IndexInSlotsGlyphsIds = SlotRange->StartIndexInSlotsGlyphsIds + i;
+        
+        font_slot_glyph_id* GlyphId = &Font->SlotsGlyphsIds[IndexInSlotsGlyphsIds];
+        if (GlyphId->Codepoint == Codepoint)
+        {
+            Result = GlyphId->IndexInGlyphs;
+            break;
+        }
+    }
+    
+    return Result;
+}
+
 struct model_node
 {
     char Name[64];
     
-    int ChildIndices[32];
-    int MeshIndices[8];
+    int StartInChildIndices;
+    int StartInMeshIndices;
     
     int NumChildIndices;
     int NumMeshIndices;
+    
+    int ParentIndex;
 };
 
 struct model
@@ -274,17 +312,19 @@ struct model
     int NumMaterials;
     int NumNodes;
     int NumBones;
+    int NumNodesMeshIndices;
+    int NumNodesChildIndices;
     
     // NOTE(Dima): Nodes
     model_node* Nodes;
     m44* Node_ToParent;
-    int* Node_ParentIndex;
     
     // NOTE(Dima): Bones
     m44* Bone_InvBindPose;
     int* Bone_NodeIndex;
     
-    void* Free;
+    int* NodesMeshIndices;
+    int* NodesChildIndices;
 };
 
 #endif //FLOWER_RENDER_PRIMITIVES_H

@@ -1,49 +1,6 @@
 #ifndef FLOWER_ASSET_TYPES_H
 #define FLOWER_ASSET_TYPES_H
 
-#if 0
-struct asset_model_offsets
-{
-    u32 OffsetMeshIDs;
-    u32 OffsetMaterialIDs;
-    u32 OffsetNodes;
-    u32 OffsetNode_ToModel;
-    u32 OffsetNode_ToParent;
-    u32 OffsetNode_ParentIndex;
-    u32 OffsetBone_InvBindPose;
-    u32 OffsetBone_NodeIndex;
-    u32 OffsetBone_SkinningMatrices;
-};
-
-struct asset_node_animation_offsets
-{
-    u32 OffsetPositionKeys;
-    u32 OffsetRotationKeys;
-    u32 OffsetScalingKeys;
-    u32 OffsetPositionTimes;
-    u32 OffsetRotationTimes;
-    u32 OffsetScalingTimes;
-};
-
-struct asset_model
-{
-    // NOTE(Dima): Meshes
-    u32* MeshIDs;
-    u32* MaterialIDs;
-    
-    asset_model_shared Shared;
-    model_offsets Offsets;
-};
-
-struct asset_animation
-{
-    char Name[64];
-    
-    asset_animation_shared Shared;
-};
-#endif
-
-
 struct asset_image
 {
     int Width;
@@ -118,6 +75,22 @@ struct asset_animation
     u32 OutsideBehaviour;
 };
 
+struct asset_font
+{
+    u32 FirstGlyphID;
+    int GlyphCount;
+    
+    u32 BlobOffset_Mapping;
+    u32 BlobOffset_SlotsGlyphsIds;
+    u32 BlobOffset_KerningPairs;
+    
+    f32 Ascent;
+    f32 Descent;
+    f32 LineGap;
+    f32 LineAdvance;
+    f32 PixelsPerMeter;
+};
+
 #define ASSET_GUID_SIZE 64
 
 struct asset
@@ -134,9 +107,8 @@ struct asset
         asset_material Material;
         asset_animation Animation;
         asset_node_animation NodeAnimation;
+        asset_font Font;
     } Data;
-    
-    void* Ptr;
 };
 
 #endif //FLOWER_ASSET_TYPES_H

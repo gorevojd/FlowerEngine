@@ -95,13 +95,15 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     Bounds.Min.y = AtP.y - Font->Ascent * Scale;
     Bounds.Max.y = AtP.y - Font->Descent * Scale;
     
-    image** GlyphImages = Font->GlyphImages;
-    
     while(*At)
     {
-        int GlyphIndex = *At - ' ';
+        int GlyphIndex = GetGlyphByCodepoint(Font, *At);
+        if (GlyphIndex == -1)
+        {
+            GlyphIndex = GetGlyphByCodepoint(Font, '?');
+        }
         
-        glyph* Glyph = &Font->Glyphs[GlyphIndex];
+        glyph* Glyph = Font->Glyphs[GlyphIndex];
         
         b32 IsGetSizePass = BoolFlag(Flags, PrintText_IsGetSizePass);
         
@@ -109,10 +111,9 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
         {
             glyph_style* GlyphStyle = &Glyph->Styles[FontStyle];
             
-            if (GlyphStyle->ImageIndex != -1)
+            image* Image = GlyphStyle->Image;
+            if (Image)
             {
-                image* Image = GlyphImages[GlyphStyle->ImageIndex];
-                
                 f32 TargetHeight = (f32)Image->Height * Scale;
                 
                 v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;

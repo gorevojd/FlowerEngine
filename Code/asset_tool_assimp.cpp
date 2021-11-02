@@ -39,6 +39,9 @@ struct loaded_model_node
     std::vector<int> ChildNodesIndices;
     std::vector<int> MeshIndices;
     
+    int StartInChildIndices;
+    int StartInMeshIndices;
+    
     m44 ToParent;
     m44 ToModel;
     
@@ -87,6 +90,9 @@ struct loaded_model
     std::map<std::string, int> NodeNameToBoneIndex;
     
     std::vector<loaded_animation> Animations;
+    
+    std::vector<int> NodesChildIndices;
+    std::vector<int> NodesMeshIndices;
     
     void* ModelFree;
     void* MeshesFree;
@@ -281,7 +287,7 @@ mesh ConvertAssimpMesh(const aiScene* AssimpScene,
     std::string MeshName = std::string(AssimpMesh->mName.C_Str());
     
     CopyStringsSafe(Result.Name, ArrayCount(Result.Name), (char*)MeshName.c_str());
-    Result.MaterialIndexInModel = 0;
+    Result.MaterialIndexInModel = AssimpMesh->mMaterialIndex;
     
     return(Result);
 }
@@ -594,38 +600,71 @@ INTERNAL_FUNCTION void LoadModelAnimations(const aiScene* AssimpScene,
     }
 }
 
-INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
+INTERNAL_FUNCTION void LoadModelMaterials(const aiScene* AssimpScene,
+                                          loaded_model* Model)
 {
-    model Model_ = {};
-    model* Model = &Model_;
     
-    Model->NumNodes = Load->Nodes.size();
-    Model->NumBones = Load->NumBones;
-    Model->NumMeshes = Load->NumMeshes;
-    Model->NumMaterials = Load->Materials.size();
-    
+}
+
+INTERNAL_FUNCTION void LoadModel_ProcessInternals(const aiScene* AssimpScene,
+                                                  loaded_model* Model)
+{
+    for (int NodeIndex = 0;
+         NodeIndex < Model->Nodes.size();
+         NodeIndex++)
+    {
+        loaded_model_node* Node = &Model->Nodes[NodeIndex];
+        
+        Node->StartInMeshIndices = Model->NodesMeshIndices.size();
+        Node->StartInChildIndices = Model->NodesChildIndices.size();
+        
+        for (int MeshIndex : Node->MeshIndices)
+        {
+            Model->NodesMeshIndices.push_back(MeshIndex);
+        }
+        
+        for (int ChildIndex : Node->ChildNodesIndices)
+        {
+            Model->NodesChildIndices.push_back(ChildIndex);
+        }
+    }
+}
+
+INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
+{
     int AllocMaterialsCount = std::max(50, (int)Load->Materials.size());
     
     helper_byte_buffer Help = {};
-    Help.AddPlace("Meshes", Model->NumMeshes, sizeof(mesh*));
+    Help.AddPlace("ResultPtr", 1, sizeof(model));
+    Help.AddPlace("Meshes", Load->NumMeshes, sizeof(mesh*));
     Help.AddPlace("Materials", AllocMaterialsCount, sizeof(material*));
-    Help.AddPlace("Nodes", Model->NumNodes, sizeof(model_node));
-    Help.AddPlace("Node_ToParent", Model->NumNodes, sizeof(m44));
-    Help.AddPlace("Node_ParentIndex", Model->NumNodes, sizeof(int));
-    Help.AddPlace("Bone_InvBindPose", Model->NumNodes, sizeof(m44));
-    Help.AddPlace("Bone_NodeIndex", Model->NumBones, sizeof(int));
+    Help.AddPlace("Nodes", Load->Nodes.size(), sizeof(model_node));
+    Help.AddPlace("Node_ToParent", Load->Nodes.size(), sizeof(m44));
+    Help.AddPlace("Node_ParentIndex", Load->Nodes.size(), sizeof(int));
+    Help.AddPlace("Bone_InvBindPose", Load->Nodes.size(), sizeof(m44));
+    Help.AddPlace("Bone_NodeIndex", Load->NumBones, sizeof(int));
+    Help.AddPlace("NodesMeshIndices", Load->NodesMeshIndices.size(), sizeof(int));
+    Help.AddPlace("NodesChildIndices", Load->NodesChildIndices.size(), sizeof(int));
     
     Help.Generate();
+    
+    model* Model = (model*)Help.GetPlace("ResultPtr");
     
     Model->Meshes = (mesh**)Help.GetPlace("Meshes");
     Model->Materials = (material**)Help.GetPlace("Materials");
     Model->Nodes = (model_node*)Help.GetPlace("Nodes");
     Model->Node_ToParent = (m44*)Help.GetPlace("Node_ToParent");
-    Model->Node_ParentIndex = (int*)Help.GetPlace("Node_ParentIndex");
     Model->Bone_InvBindPose = (m44*)Help.GetPlace("Bone_InvBindPose");
     Model->Bone_NodeIndex = (int*)Help.GetPlace("Bone_NodeIndex");
+    Model->NodesMeshIndices = (int*)Help.GetPlace("NodesMeshIndices");
+    Model->NodesChildIndices = (int*)Help.GetPlace("NodesChildIndices");
     
-    Model->Free = Help.Data;
+    Model->NumNodes = Load->Nodes.size();
+    Model->NumBones = Load->NumBones;
+    Model->NumMeshes = Load->NumMeshes;
+    Model->NumMaterials = Load->Materials.size();
+    Model->NumNodesMeshIndices = Load->NodesMeshIndices.size();
+    Model->NumNodesChildIndices = Load->NodesChildIndices.size();
     
     // NOTE(Dima): Setting meshes
     for(int MeshIndex = 0;
@@ -660,38 +699,27 @@ INTERNAL_FUNCTION model ConvertToActualModel(loaded_model* Load)
         model_node* Node = &Model->Nodes[NodeIndex];
         loaded_model_node* Src = &Load->Nodes[NodeIndex];
         
+        Node->ParentIndex = Src->ParentNodeIndex;
+        
         CopyStringsSafe(Node->Name, ArrayCount(Node->Name), (char*)Src->Name.c_str());
         Node->NumChildIndices = Src->ChildNodesIndices.size();
         Node->NumMeshIndices = Src->MeshIndices.size();
-        
-        Assert(Node->NumChildIndices <= ArrayCount(Node->ChildIndices));
-        Assert(Node->NumMeshIndices <= ArrayCount(Node->MeshIndices));
-        
-        Node->NumChildIndices = FlowerMin(Node->NumChildIndices, ArrayCount(Node->ChildIndices));
-        Node->NumMeshIndices = FlowerMin(Node->NumMeshIndices, ArrayCount(Node->MeshIndices));
-        
-        // NOTE(Dima): Copy child indices
-        for(int ChildIndex = 0;
-            ChildIndex < Node->NumChildIndices;
-            ChildIndex++)
-        {
-            Node->ChildIndices[ChildIndex] = Src->ChildNodesIndices[ChildIndex];
-        }
-        
-        // NOTE(Dima): Copy mesh indices
-        for(int MeshIndex = 0;
-            MeshIndex < Node->NumMeshIndices;
-            MeshIndex++)
-        {
-            Node->MeshIndices[MeshIndex] = Src->MeshIndices[MeshIndex];
-        }
+        Node->StartInMeshIndices = Src->StartInMeshIndices;
+        Node->StartInChildIndices = Src->StartInChildIndices;
         
         // NOTE(Dima): Copy other arrays
         Model->Node_ToParent[NodeIndex] = Src->ToParent;
-        Model->Node_ParentIndex[NodeIndex] = Src->ParentNodeIndex;
     }
     
-    return(Model_);
+    memcpy(Model->NodesMeshIndices, 
+           &Load->NodesMeshIndices[0], 
+           Model->NumNodesMeshIndices * sizeof(int));
+    
+    memcpy(Model->NodesChildIndices,
+           &Load->NodesChildIndices[0],
+           Model->NumNodesChildIndices * sizeof(int));
+    
+    return(Model);
 }
 
 INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
@@ -746,6 +774,8 @@ INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
     // NOTE(Dima): Loading meshes
     loaded_model Loaded;
     
+    LoadModelMaterials(Scene, &Loaded);
+    
     AssimpProcessNode((aiScene*)Scene, 
                       Scene->mRootNode, 
                       0, GlobalTransform, 
@@ -763,19 +793,21 @@ INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
         LoadModelMeshes(Scene, &Loaded);
     }
     
+    LoadModel_ProcessInternals(Scene, &Loaded);
+    
     return(Loaded);
 }
 
 // NOTE(Dima): Pass LoadAnimations = true to get all animations that were in this file
-model LoadModel(char* FilePath,
-                loading_params Params = DefaultLoadingParams())
+model* LoadModel(char* FilePath,
+                 loading_params Params = DefaultLoadingParams())
 {
     b32 LoadOnlyAnimations = false;
     b32 LoadAnimations = false;
     
     loaded_model Loaded = LoadModelFileInternal(FilePath, Params, LoadAnimations, LoadOnlyAnimations);
     
-    model Result = ConvertToActualModel(&Loaded);
+    model* Result = ConvertToActualModel(&Loaded);
     
     return(Result);
 }

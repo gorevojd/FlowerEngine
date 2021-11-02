@@ -275,8 +275,9 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         {
             if(GetKeyDown(Key_C))
             {
-                Global_Input->CapturingMouse = !Global_Input->CapturingMouse;
                 PlatformAPI.SetCapturingMouse(!Global_Input->CapturingMouse);
+                
+                Global_Input->CapturingMouse = !Global_Input->CapturingMouse;
             }
             if(GetKeyDown(Key_D))
             {

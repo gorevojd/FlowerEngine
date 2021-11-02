@@ -4,7 +4,7 @@ INTERNAL_FUNCTION void AddGlyphToAtlas(font* Font, int GlyphIndex)
 {
     image* Dst = &Global_Assets->FontsAtlas;
     
-    glyph* Glyph = &Font->Glyphs[GlyphIndex];
+    glyph* Glyph = Font->Glyphs[GlyphIndex];
     
     int DstSize = Global_Assets->FontsAtlas.Width;
     f32 OneOverSize = 1.0f / DstSize;
@@ -16,10 +16,9 @@ INTERNAL_FUNCTION void AddGlyphToAtlas(font* Font, int GlyphIndex)
         glyph_style* Style = &Glyph->Styles[StyleIndex];
         
         // NOTE(Dima): Getting image 
-        int ImageIndex = Style->ImageIndex;
-        if(ImageIndex != -1)
+        image* Src = Style->Image;
+        if(Src)
         {
-            image* Src = Font->GlyphImages[ImageIndex];
             int SrcW = Src->Width;
             int SrcH = Src->Height;
             
@@ -64,7 +63,7 @@ INTERNAL_FUNCTION void AddFontToAtlas(font* Font)
         GlyphIndex < Font->GlyphCount;
         GlyphIndex++)
     {
-        glyph* Glyph = &Font->Glyphs[GlyphIndex];
+        glyph* Glyph = Font->Glyphs[GlyphIndex];
         
         AddGlyphToAtlas(Font, GlyphIndex);
     }
@@ -302,13 +301,15 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->BearEyesShineMaterial = {};
     A->BearEyesShineMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearEyesShine;
     
-    A->Bear.Materials[0] = &A->BearMaterial;
-    A->Bear.Materials[1] = &A->BearEyesMaterial;
-    A->Bear.Materials[2] = &A->BearEyesShineMaterial;
+    A->Bear->Materials[0] = &A->BearMaterial;
+    A->Bear->Materials[1] = &A->BearEyesMaterial;
+    A->Bear->Materials[2] = &A->BearEyesShineMaterial;
+#if 0
     A->Bear.Meshes[1]->MaterialIndexInModel = 1;
     A->Bear.Meshes[2]->MaterialIndexInModel = 2;
     A->Bear.Meshes[3]->MaterialIndexInModel = 1;
     A->Bear.Meshes[4]->MaterialIndexInModel = 2;
+#endif
     
     // NOTE(Dima): Fox materials
     A->FoxMaterial = {};
@@ -320,13 +321,16 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->FoxEyesShineMaterial = {};
     A->FoxEyesShineMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxEyesShine;
     
-    A->Fox.Materials[0] = &A->FoxMaterial;
-    A->Fox.Materials[1] = &A->FoxEyesMaterial;
-    A->Fox.Materials[2] = &A->FoxEyesShineMaterial;
+    A->Fox->Materials[0] = &A->FoxMaterial;
+    A->Fox->Materials[1] = &A->FoxEyesMaterial;
+    A->Fox->Materials[2] = &A->FoxEyesShineMaterial;
+    
+#if 0    
     A->Fox.Meshes[1]->MaterialIndexInModel = 1;
     A->Fox.Meshes[2]->MaterialIndexInModel = 2;
     A->Fox.Meshes[3]->MaterialIndexInModel = 1;
     A->Fox.Meshes[4]->MaterialIndexInModel = 2;
+#endif
     
     // NOTE(Dima): Other materials
     A->PaletteMaterial = {};
@@ -336,7 +340,7 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->GroundMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->PlaneTexture;
     
     // NOTE(Dima): Supra material
-    A->Supra.Materials[0] = &A->PaletteMaterial;
+    A->Supra->Materials[0] = &A->PaletteMaterial;
 #endif
     
 #if 0

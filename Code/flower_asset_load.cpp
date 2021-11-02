@@ -1,6 +1,8 @@
 #include "flower_utils.cpp"
 #include "flower_software_render.cpp"
 
+#include <array>
+
 struct loading_params
 {
     u32 AssetType;
@@ -138,17 +140,22 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
     Result.LineAdvance = Result.Ascent - Result.Descent + Result.LineGap;
     
     std::vector<glyph> Glyphs;
-    std::vector<image*> GlyphImages;
+    std::array<std::vector<font_slot_glyph_id>, FONT_MAPPING_SIZE> Mapping;
     
     int GlyphCount = ('~' - ' ' + 1);
     
-    for(int Index = 0;
-        Index < GlyphCount;
-        Index++)
+    for(int Codepoint = ' ';
+        Codepoint <= '~';
+        Codepoint++)
     {
         glyph Glyph = {};
         
-        int Codepoint = ' ' + Index;
+        int SlotIndex = Codepoint % FONT_MAPPING_SIZE;
+        
+        font_slot_glyph_id SlotGlyphId = {};
+        SlotGlyphId.Codepoint = Codepoint;
+        SlotGlyphId.IndexInGlyphs = Glyphs.size();
+        Mapping[SlotIndex].push_back(SlotGlyphId);
         
         int StbAdvance;
         int StbLeftBearing;
@@ -202,9 +209,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
             int RegularHeight = StbH + 2 * Border;
             image* RegularImage = AllocateImage(RegularWidth, RegularHeight);
             
-            int RegularImageIndex = GlyphImages.size();
-            GlyphImages.push_back(RegularImage);
-            Styles[FontStyle_Regular] = CreateGlyphStyle(RegularImageIndex, 
+            Styles[FontStyle_Regular] = CreateGlyphStyle(RegularImage, 
                                                          RegularWidth, 
                                                          RegularHeight);
             
@@ -218,9 +223,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
             int ImageShadowHeight = RegularHeight + ShadowOffset;
             image* ShadowImage = AllocateImage(ImageShadowWidth, ImageShadowHeight);
             
-            int ShadowImageIndex = GlyphImages.size();
-            GlyphImages.push_back(ShadowImage);
-            Styles[FontStyle_Shadow] = CreateGlyphStyle(ShadowImageIndex,
+            Styles[FontStyle_Shadow] = CreateGlyphStyle(ShadowImage,
                                                         ImageShadowWidth,
                                                         ImageShadowHeight);
             
@@ -241,9 +244,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
             image* OutlineSrc = AllocateImage(ImageOutlineW, ImageOutlineH);
             image* OutlineImage = AllocateImage(ImageOutlineW, ImageOutlineH);
             
-            int OutlineImageIndex = GlyphImages.size();
-            GlyphImages.push_back(OutlineImage);
-            Styles[FontStyle_Outline] = CreateGlyphStyle(OutlineImageIndex,
+            Styles[FontStyle_Outline] = CreateGlyphStyle(OutlineImage,
                                                          ImageOutlineW,
                                                          ImageOutlineH);
             
@@ -344,7 +345,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
             {
                 glyph_style* Style = Styles + StyleIndex;
                 
-                *Style = CreateGlyphStyle(-1, 1, 1);
+                *Style = CreateGlyphStyle(nullptr, 1, 1);
             }
         }
         
@@ -357,13 +358,54 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
     }
     
     // NOTE(Dima): Copying glyphs
-    Result.Glyphs = (glyph*)calloc(Glyphs.size(), sizeof(glyph));
-    Result.GlyphCount = Glyphs.size();
-    memcpy(Result.Glyphs, &Glyphs[0], Glyphs.size() * sizeof(glyph));
+    helper_byte_buffer HelpBytes;
+    HelpBytes.AddPlace("Ptrs", Glyphs.size(), sizeof(glyph*));
+    HelpBytes.AddPlace("Glyphs", Glyphs.size(), sizeof(glyph));
+    HelpBytes.Generate();
     
-    // NOTE(Dima): Copy images
-    Result.GlyphImages = (image**)calloc(GlyphImages.size(), sizeof(image*));
-    memcpy(Result.GlyphImages, &GlyphImages[0], GlyphImages.size() * sizeof(image*));
+    glyph* GlyphsArr = (glyph*)HelpBytes.GetPlace("Glyphs");
+    glyph** Ptrs = (glyph**)HelpBytes.GetPlace("Ptrs");
+    
+    memcpy(GlyphsArr, &Glyphs[0], Glyphs.size() * sizeof(glyph));
+    
+    for (int GlyphIndex = 0;
+         GlyphIndex < Glyphs.size();
+         GlyphIndex++)
+    {
+        Ptrs[GlyphIndex] = &GlyphsArr[GlyphIndex];
+    }
+    
+    Result.Glyphs = Ptrs;
+    Result.GlyphCount = Glyphs.size();
+    
+    
+    // NOTE(Dima): Integrating glyph mapping
+    std::vector<font_slot_glyph_id> SlotsGlyphsIds;
+    std::vector<font_codepoint_slot_range> CodepointToSlot; 
+    for (int i = 0; i < FONT_MAPPING_SIZE; i++)
+    {
+        const vector<font_slot_glyph_id>& CurVector = Mapping[i];
+        
+        font_codepoint_slot_range NewRange = {};
+        NewRange.Count = CurVector.size();
+        NewRange.StartIndexInSlotsGlyphsIds = SlotsGlyphsIds.size();
+        
+        for (font_slot_glyph_id GlyphIndex : CurVector)
+        {
+            SlotsGlyphsIds.push_back(GlyphIndex);
+        }
+        
+        CodepointToSlot.push_back(NewRange);
+    }
+    
+    size_t SlotMappingSize = sizeof(font_codepoint_slot_range) * FONT_MAPPING_SIZE;
+    size_t SlotsGlyphsIdsSize = sizeof(font_slot_glyph_id) * Glyphs.size();
+    Result.CodepointToSlot = (font_codepoint_slot_range*)malloc(SlotMappingSize);
+    Result.SlotsGlyphsIds = (font_slot_glyph_id*)malloc(SlotsGlyphsIdsSize);
+    
+    memcpy(Result.CodepointToSlot, &CodepointToSlot[0], SlotMappingSize);
+    memcpy(Result.SlotsGlyphsIds, &SlotsGlyphsIds[0], SlotsGlyphsIdsSize);
+    
     
     // NOTE(Dima): Loading kerning
     Result.KerningPairs = (f32*)malloc(Result.GlyphCount * Result.GlyphCount * sizeof(f32));
@@ -650,4 +692,4 @@ mesh MakePlane()
     return(Result);
 }
 
-#include "atool_assimp.cpp"
+#include "asset_tool_assimp.cpp"

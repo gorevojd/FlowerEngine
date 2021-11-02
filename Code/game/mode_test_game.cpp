@@ -28,10 +28,10 @@ SCENE_INIT(TestGame)
     
     InitCamera(&State->Camera, Camera_FlyAround, 0.5f, 500.0f);
     
-    State->Bear1 = CreateModelGameObject(Scene->Game, &Global_Assets->Bear);
-    State->Bear2 = CreateModelGameObject(Scene->Game, &Global_Assets->Bear);
-    State->Fox = CreateModelGameObject(Scene->Game, &Global_Assets->Fox);
-    State->Supra = CreateModelGameObject(Scene->Game, &Global_Assets->Supra);
+    State->Bear1 = CreateModelGameObject(Scene->Game, Global_Assets->Bear);
+    State->Bear2 = CreateModelGameObject(Scene->Game, Global_Assets->Bear);
+    State->Fox = CreateModelGameObject(Scene->Game, Global_Assets->Fox);
+    State->Supra = CreateModelGameObject(Scene->Game, Global_Assets->Supra);
     
     State->Bear1->P = V3(0.0f, 0.0f, 0.0f);
     State->Bear1->CompAnimator.PlayingAnimation = &Global_Assets->BearSuccess;

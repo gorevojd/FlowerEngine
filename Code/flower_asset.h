@@ -66,9 +66,9 @@ struct asset_system
     image* FoxEyesDiffuse;
     image* FoxEyesShine;
     
-    model Bear;
-    model Fox;
-    model Supra;
+    model* Bear;
+    model* Fox;
+    model* Supra;
     
     animation BearSuccess;
     animation BearIdle;
