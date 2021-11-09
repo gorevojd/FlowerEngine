@@ -13,10 +13,11 @@ struct loading_params
     f32 Model_DefaultScale;
     b32 Model_FixInvalidRotation;
     
-    int Font_PixelHeight;
     v4 Font_ShadowColor;
     v4 Font_OutlineColor;
     int Font_ShadowOffset;
+    int Font_AtlasWidth;
+    u32 Font_SizesFlags;
 };
 
 inline loading_params DefaultLoadingParams()
@@ -32,10 +33,11 @@ inline loading_params DefaultLoadingParams()
     Result.Model_DefaultScale = 1.0f;
     
     // NOTE(Dima): Font
-    Result.Font_PixelHeight = 30;
     Result.Font_ShadowOffset = 1;
     Result.Font_ShadowColor = ColorBlack();
     Result.Font_OutlineColor = ColorBlack();
+    Result.Font_AtlasWidth = 2048;
+    Result.Font_SizesFlags = 0;
     
     return(Result);
 }
@@ -116,58 +118,365 @@ INTERNAL_FUNCTION cubemap LoadCubemap(const char* Left,
     return(Result);
 }
 
-INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer, 
-                                          const loading_params& Params)
+struct load_font_size_context
 {
-    font Result = {};
+    u32 SizeTypeEnum;
     
-    Result.PixelsPerMeter = Params.Font_PixelHeight;
+    f32 Scale;
     
+    f32 PixelsPerMeter;
+    
+    std::vector<glyph> Glyphs;
+};
+
+struct load_font_context
+{
+    u8* FileBufferToFree;
+    
+    f32 Ascent;
+    f32 Descent;
+    f32 LineGap;
+    f32 LineAdvance;
+    
+    int NumGlyphs;
+    font* Result;
     stbtt_fontinfo StbFont;
-    stbtt_InitFont(&StbFont, Buffer, 0);
     
-    f32 Scale = stbtt_ScaleForPixelHeight(&StbFont, Params.Font_PixelHeight);
+    std::array<std::vector<font_slot_glyph_id>, FONT_MAPPING_SIZE> Mapping;
     
+    v2 FontAtlasAtP;
+    int FontAtlasMaxRowY;
+    
+    char UniqueName[256];
+    u32 UniqueNameHash;
+    
+    std::vector<load_font_size_context> FontSizes;
+    
+    loading_params Params;
+};
+
+INTERNAL_FUNCTION std::vector<u32> ExtractFontSizesToLoad(u32 SizesFlags)
+{
+    std::vector<u32> Result;
+    
+    for (int i = 0; i < FontSize_Count; i++)
+    {
+        Result.push_back(i);
+    }
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION bool
+BeginFontLoading(load_font_context* Ctx, char* FilePath, 
+                 loading_params Params)
+{
+    bool Result = false;
+    
+    u8* Buffer = (u8*)StandardReadFile(FilePath, 0);
+    
+    Ctx->Params = Params;
+    
+    if(Buffer)
+    {
+        Result = true;
+        
+        Ctx->FileBufferToFree = Buffer;
+        
+        stbtt_InitFont(&Ctx->StbFont, Ctx->FileBufferToFree, 0);
+        
+        int FontNameLength;
+        const char * FontName = stbtt_GetFontNameString(&Ctx->StbFont, 
+                                                        &FontNameLength, 
+                                                        STBTT_PLATFORM_ID_MICROSOFT, 
+                                                        STBTT_MS_EID_UNICODE_BMP,
+                                                        STBTT_MS_LANG_ENGLISH, 
+                                                        4);
+        
+        char Buf[256];
+        for (int i = 0; i < FontNameLength; i++)
+        {
+            Buf[i] = FontName[i*2 + 1];
+        }
+        Buf[FontNameLength] = 0;
+        
+        CopyStringsSafe(Ctx->UniqueName, ARC(Ctx->UniqueName), Buf);
+        Ctx->UniqueNameHash = StringHashFNV(Ctx->UniqueName);
+        
+        std::vector<u32> SizesToLoad = ExtractFontSizesToLoad(Params.Font_SizesFlags);
+        
+        for (u32 FontSizeIndex : SizesToLoad)
+        {
+            load_font_size_context FontSize = {};
+            
+            FontSize.SizeTypeEnum = FontSizeIndex;
+            
+            int PixelHeight = Global_FontSizes[FontSizeIndex];
+            FontSize.Scale = stbtt_ScaleForPixelHeight(&Ctx->StbFont, 
+                                                       PixelHeight);
+            
+            FontSize.PixelsPerMeter = PixelHeight;
+            
+            Ctx->FontSizes.push_back(FontSize);
+        }
+    }
+    
+    return Result;
+}
+
+
+INTERNAL_FUNCTION void AddGlyphToAtlas(load_font_context* Ctx, glyph* Glyph)
+{
+    font* Font = Ctx->Result;
+    image* Dst = Font->Atlas;
+    
+    int DstSize = Dst->Width;
+    f32 OneOverSize = 1.0f / (f32)DstSize;
+    
+    for(int StyleIndex = 0; 
+        StyleIndex < FontStyle_Count;
+        StyleIndex++)
+    {
+        glyph_style* Style = &Glyph->Styles[StyleIndex];
+        
+        // NOTE(Dima): Getting image 
+        image* Src = Style->Image;
+        if(Src)
+        {
+            int SrcW = Src->Width;
+            int SrcH = Src->Height;
+            
+            int DstPx = std::ceil(Ctx->FontAtlasAtP.x);
+            int DstPy = std::ceil(Ctx->FontAtlasAtP.y);
+            
+            Style->MinUV = V2(DstPx, DstPy) * OneOverSize;
+            Style->MaxUV = V2(DstPx + SrcW, DstPy + SrcH) * OneOverSize;
+            
+            if(DstPx + SrcW >= DstSize)
+            {
+                DstPx = 0;
+                DstPy = Ctx->FontAtlasMaxRowY;
+            }
+            
+            Assert(DstPy + SrcH < DstSize);
+            
+            // NOTE(Dima): Copy pixels
+            for(int y = 0; y < SrcH; y++)
+            {
+                for(int x = 0; x < SrcW; x++)
+                {
+                    int DstPixelY = DstPy + y;
+                    int DstPixelX = DstPx + x;
+                    
+                    u32* DstPixel = (u32*)Dst->Pixels + DstPixelY * DstSize + DstPixelX;
+                    u32* SrcPixel = (u32*)Src->Pixels + y * SrcW + x;
+                    
+                    *DstPixel = *SrcPixel;
+                }
+            }
+            
+            Ctx->FontAtlasAtP = V2(DstPx + SrcW, DstPy);
+            Ctx->FontAtlasMaxRowY = FlowerMax(Ctx->FontAtlasMaxRowY, DstPy + SrcH);
+        }
+    }
+}
+
+INTERNAL_FUNCTION void 
+EndFontLoading(load_font_context* Ctx)
+{
+    int NumGlyphs = Ctx->NumGlyphs;
+    int NumSizes = Ctx->FontSizes.size();
+    int AtlasWidth = Ctx->Params.Font_AtlasWidth;
+    
+    // NOTE(Dima): Copying glyphs
+    helper_byte_buffer HelpBytes;
+    HelpBytes.AddPlace("FontResultPtr", 1, sizeof(font));
+    
+    for (int SizeIndex = 0;
+         SizeIndex < NumSizes;
+         SizeIndex++)
+    {
+        char TempBuf[256];
+        
+        stbsp_sprintf(TempBuf, "Ptrs[%d]", SizeIndex);
+        HelpBytes.AddPlace(TempBuf, NumGlyphs, sizeof(glyph*));
+        
+        stbsp_sprintf(TempBuf, "Glyphs[%d]", SizeIndex);
+        HelpBytes.AddPlace(TempBuf, NumGlyphs, sizeof(glyph));
+    }
+    
+    HelpBytes.AddPlace("Kerning", NumGlyphs * NumGlyphs, sizeof(f32));
+    HelpBytes.AddPlace("CodepointToSlot", FONT_MAPPING_SIZE, sizeof(font_codepoint_slot_range));
+    HelpBytes.AddPlace("SlotsGlyphsIds", NumGlyphs, sizeof(font_slot_glyph_id));
+    HelpBytes.AddPlace("AtlasImage", 1, sizeof(image));
+    HelpBytes.AddPlace("AtlasData", AtlasWidth * AtlasWidth, 4);
+    HelpBytes.AddPlace("FontSizes", NumSizes, sizeof(font_size));
+    
+    HelpBytes.Generate();
+    
+    Ctx->Result = (font*)HelpBytes.GetPlace("FontResultPtr");
+    font* Result = Ctx->Result;
+    
+    // NOTE(Dima): SEtting some result fields
+    Result->UniqueNameHash = Ctx->UniqueNameHash;
+    Result->NumGlyphs = NumGlyphs;
+    Result->NumSizes = NumSizes;
+    Result->Sizes = (font_size*)HelpBytes.GetPlace("FontSizes");
+    
+    // NOTE(Dima): Getting font metrics
     int StbAscent;
     int StbDescent;
     int StbLineGap;
-    stbtt_GetFontVMetrics(&StbFont, &StbAscent, &StbDescent, &StbLineGap);
     
-    Result.Ascent = (f32)StbAscent * Scale;
-    Result.Descent = (f32)StbDescent * Scale;
-    Result.LineGap = (f32)StbLineGap * Scale;
+    stbtt_GetFontVMetrics(&Ctx->StbFont, 
+                          &StbAscent, 
+                          &StbDescent, 
+                          &StbLineGap);
     
-    Result.LineAdvance = Result.Ascent - Result.Descent + Result.LineGap;
+    Result->Ascent = (f32)StbAscent;
+    Result->Descent = (f32)StbDescent;
+    Result->LineGap = (f32)StbLineGap;
+    Result->LineAdvance = Result->Ascent - Result->Descent + Result->LineGap;
     
-    std::vector<glyph> Glyphs;
-    std::array<std::vector<font_slot_glyph_id>, FONT_MAPPING_SIZE> Mapping;
-    
-    int GlyphCount = ('~' - ' ' + 1);
-    
-    for(int Codepoint = ' ';
-        Codepoint <= '~';
-        Codepoint++)
+    for (int SizeIndex = 0;
+         SizeIndex < NumSizes;
+         SizeIndex++)
     {
-        glyph Glyph = {};
+        load_font_size_context* SizeCtx = &Ctx->FontSizes[SizeIndex];
+        font_size* FontSize = &Result->Sizes[SizeIndex];
         
-        int SlotIndex = Codepoint % FONT_MAPPING_SIZE;
+        FontSize->Scale = SizeCtx->Scale;
+        FontSize->FontSizeEnumType = SizeCtx->SizeTypeEnum;
+        FontSize->PixelsPerMeter = SizeCtx->PixelsPerMeter;
         
-        font_slot_glyph_id SlotGlyphId = {};
-        SlotGlyphId.Codepoint = Codepoint;
-        SlotGlyphId.IndexInGlyphs = Glyphs.size();
-        Mapping[SlotIndex].push_back(SlotGlyphId);
+        // NOTE(Dima): Getting glyphs
+        char TempBuf[256];
         
-        int StbAdvance;
-        int StbLeftBearing;
-        stbtt_GetCodepointHMetrics(&StbFont, 
-                                   Codepoint, 
-                                   &StbAdvance, 
-                                   &StbLeftBearing);
+        stbsp_sprintf(TempBuf, "Glyphs[%d]", SizeIndex);
+        glyph* GlyphsArr = (glyph*)HelpBytes.GetPlace(TempBuf);
+        
+        stbsp_sprintf(TempBuf, "Ptrs[%d]", SizeIndex);
+        FontSize->Glyphs = (glyph**)HelpBytes.GetPlace(TempBuf);
+        
+        // NOTE(Dima): Copying glyphs ptrs
+        memcpy(GlyphsArr, &SizeCtx->Glyphs[0], NumGlyphs * sizeof(glyph));
+        
+        for (int GlyphIndex = 0;
+             GlyphIndex < NumGlyphs;
+             GlyphIndex++)
+        {
+            FontSize->Glyphs[GlyphIndex] = &GlyphsArr[GlyphIndex];
+        }
+    }
+    
+    Result->KerningPairs = (f32*)HelpBytes.GetPlace("Kerning");
+    Result->CodepointToSlot = (font_codepoint_slot_range*)HelpBytes.GetPlace("CodepointToSlot");
+    Result->SlotsGlyphsIds = (font_slot_glyph_id*)HelpBytes.GetPlace("SlotsGlyphsIds");
+    Result->Atlas = (image*)HelpBytes.GetPlace("AtlasImage");
+    
+    
+    // NOTE(Dima): Integrating glyph mapping
+    std::vector<font_slot_glyph_id> SlotsGlyphsIds;
+    std::vector<font_codepoint_slot_range> CodepointToSlot; 
+    for (int i = 0; i < FONT_MAPPING_SIZE; i++)
+    {
+        const vector<font_slot_glyph_id>& CurVector = Ctx->Mapping[i];
+        
+        font_codepoint_slot_range NewRange = {};
+        NewRange.Count = CurVector.size();
+        NewRange.StartIndexInSlotsGlyphsIds = SlotsGlyphsIds.size();
+        
+        for (font_slot_glyph_id GlyphIndex : CurVector)
+        {
+            SlotsGlyphsIds.push_back(GlyphIndex);
+        }
+        
+        CodepointToSlot.push_back(NewRange);
+    }
+    
+    memcpy(Result->CodepointToSlot, &CodepointToSlot[0],
+           sizeof(font_codepoint_slot_range) * FONT_MAPPING_SIZE);
+    memcpy(Result->SlotsGlyphsIds, &SlotsGlyphsIds[0], 
+           sizeof(font_slot_glyph_id) * NumGlyphs);
+    
+    // NOTE(Dima): Loading kerning
+    Assert(NumSizes > 0);
+    load_font_size_context* FirstSizeCtx = &Ctx->FontSizes[0];
+    for(int i = 0; i < NumGlyphs; i++)
+    {
+        for(int j = 0; j < NumGlyphs; j++)
+        {
+            int Index = i * NumGlyphs + j;
+            
+            u32 A = FirstSizeCtx->Glyphs[i].Codepoint;
+            u32 B = FirstSizeCtx->Glyphs[j].Codepoint;
+            
+            int ExtractedKern = stbtt_GetCodepointKernAdvance(&Ctx->StbFont, A, B);
+            
+            Result->KerningPairs[Index] = (f32)ExtractedKern;
+        }
+    }
+    
+    // NOTE(Dima): Placing glyphs characters into font atlas
+    memset(Result->Atlas, 0, sizeof(image));
+    AllocateImageInternal(Result->Atlas, 
+                          Ctx->Params.Font_AtlasWidth,
+                          Ctx->Params.Font_AtlasWidth,
+                          HelpBytes.GetPlace("AtlasData"));
+    ClearImage(Result->Atlas);
+    
+    for (int SizeIndex = 0;
+         SizeIndex < Result->NumSizes;
+         SizeIndex++)
+    {
+        font_size* FontSize = &Result->Sizes[SizeIndex];
+        
+        for(int GlyphIndex = 0;
+            GlyphIndex < NumGlyphs;
+            GlyphIndex++)
+        {
+            glyph* Glyph = FontSize->Glyphs[GlyphIndex];
+            
+            AddGlyphToAtlas(Ctx, Glyph);
+        }
+    }
+    
+    // NOTE(Dima): Freeing file buffer
+    if(Ctx->FileBufferToFree)
+    {
+        free(Ctx->FileBufferToFree);
+    }
+    Ctx->FileBufferToFree = 0;
+}
+
+INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
+{
+    glyph Glyph = {};
+    
+    int SlotIndex = Codepoint % FONT_MAPPING_SIZE;
+    
+    font_slot_glyph_id SlotGlyphId = {};
+    SlotGlyphId.Codepoint = Codepoint;
+    SlotGlyphId.IndexInGlyphs = Ctx->NumGlyphs++;
+    Ctx->Mapping[SlotIndex].push_back(SlotGlyphId);
+    
+    int StbAdvance;
+    int StbLeftBearing;
+    stbtt_GetCodepointHMetrics(&Ctx->StbFont, 
+                               Codepoint, 
+                               &StbAdvance, 
+                               &StbLeftBearing);
+    
+    for (int SizeIndex = 0;
+         SizeIndex < Ctx->FontSizes.size();
+         SizeIndex++)
+    {
+        load_font_size_context* SizeCtx = &Ctx->FontSizes[SizeIndex];
         
         int StbW, StbH;
         int StbXOffset, StbYOffset;
-        unsigned char* StbBitmap = stbtt_GetCodepointBitmap(&StbFont,
-                                                            0, Scale,
+        unsigned char* StbBitmap = stbtt_GetCodepointBitmap(&Ctx->StbFont,
+                                                            0, SizeCtx->Scale,
                                                             Codepoint,
                                                             &StbW, &StbH,
                                                             &StbXOffset, 
@@ -202,7 +511,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
             b32 ShouldPremultiplyAlpha = true;
             
             int Border = 3;
-            int ShadowOffset = Params.Font_ShadowOffset;
+            int ShadowOffset = Ctx->Params.Font_ShadowOffset;
             
             // NOTE(Dima): Creating image for regular font
             int RegularWidth = StbW + 2 * Border;
@@ -231,7 +540,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
                                        StbImage,
                                        Border + ShadowOffset,
                                        Border + ShadowOffset,
-                                       Params.Font_ShadowColor);
+                                       Ctx->Params.Font_ShadowColor);
             
             RenderOneBitmapIntoAnother(ShadowImage,
                                        StbImage,
@@ -284,7 +593,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
                                        StbImage,
                                        Border,
                                        Border,
-                                       Params.Font_OutlineColor);
+                                       Ctx->Params.Font_OutlineColor);
             
             for(int y = CellDist; y < OutlineImage->Height - CellDist; y++)
             {
@@ -308,7 +617,7 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
                     v4 Color = ColorClear();
                     if(NearAlphaSum >= 1.0f)
                     {
-                        Color = Params.Font_OutlineColor;
+                        Color = Ctx->Params.Font_OutlineColor;
                     }
                     
                     *At = PackRGBA(Color);
@@ -330,8 +639,8 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
             
             // NOTE(Dima): Setting other glyph information
             Glyph.Codepoint = Codepoint;
-            Glyph.Advance = (f32)StbAdvance * Scale;
-            Glyph.LeftBearing = (f32)StbLeftBearing * Scale;
+            Glyph.Advance = (f32)StbAdvance * SizeCtx->Scale;
+            Glyph.LeftBearing = (f32)StbLeftBearing * SizeCtx->Scale;
             
             Glyph.XOffset = StbXOffset - Border;
             Glyph.YOffset = StbYOffset - Border;
@@ -354,100 +663,28 @@ INTERNAL_FUNCTION font LoadFontFromBuffer(u8* Buffer,
             stbtt_FreeBitmap(StbBitmap, 0);
         }
         
-        Glyphs.push_back(Glyph);
+        SizeCtx->Glyphs.push_back(Glyph);
     }
-    
-    // NOTE(Dima): Copying glyphs
-    helper_byte_buffer HelpBytes;
-    HelpBytes.AddPlace("Ptrs", Glyphs.size(), sizeof(glyph*));
-    HelpBytes.AddPlace("Glyphs", Glyphs.size(), sizeof(glyph));
-    HelpBytes.Generate();
-    
-    glyph* GlyphsArr = (glyph*)HelpBytes.GetPlace("Glyphs");
-    glyph** Ptrs = (glyph**)HelpBytes.GetPlace("Ptrs");
-    
-    memcpy(GlyphsArr, &Glyphs[0], Glyphs.size() * sizeof(glyph));
-    
-    for (int GlyphIndex = 0;
-         GlyphIndex < Glyphs.size();
-         GlyphIndex++)
-    {
-        Ptrs[GlyphIndex] = &GlyphsArr[GlyphIndex];
-    }
-    
-    Result.Glyphs = Ptrs;
-    Result.GlyphCount = Glyphs.size();
-    
-    
-    // NOTE(Dima): Integrating glyph mapping
-    std::vector<font_slot_glyph_id> SlotsGlyphsIds;
-    std::vector<font_codepoint_slot_range> CodepointToSlot; 
-    for (int i = 0; i < FONT_MAPPING_SIZE; i++)
-    {
-        const vector<font_slot_glyph_id>& CurVector = Mapping[i];
-        
-        font_codepoint_slot_range NewRange = {};
-        NewRange.Count = CurVector.size();
-        NewRange.StartIndexInSlotsGlyphsIds = SlotsGlyphsIds.size();
-        
-        for (font_slot_glyph_id GlyphIndex : CurVector)
-        {
-            SlotsGlyphsIds.push_back(GlyphIndex);
-        }
-        
-        CodepointToSlot.push_back(NewRange);
-    }
-    
-    size_t SlotMappingSize = sizeof(font_codepoint_slot_range) * FONT_MAPPING_SIZE;
-    size_t SlotsGlyphsIdsSize = sizeof(font_slot_glyph_id) * Glyphs.size();
-    Result.CodepointToSlot = (font_codepoint_slot_range*)malloc(SlotMappingSize);
-    Result.SlotsGlyphsIds = (font_slot_glyph_id*)malloc(SlotsGlyphsIdsSize);
-    
-    memcpy(Result.CodepointToSlot, &CodepointToSlot[0], SlotMappingSize);
-    memcpy(Result.SlotsGlyphsIds, &SlotsGlyphsIds[0], SlotsGlyphsIdsSize);
-    
-    
-    // NOTE(Dima): Loading kerning
-    Result.KerningPairs = (f32*)malloc(Result.GlyphCount * Result.GlyphCount * sizeof(f32));
-    
-    for(int i = 0; i < Result.GlyphCount; i++)
-    {
-        for(int j = 0; j < Result.GlyphCount; j++)
-        {
-            int Index = i * Result.GlyphCount + j;
-            
-            u32 A = Glyphs[i].Codepoint;
-            u32 B = Glyphs[j].Codepoint;
-            
-            int ExtractedKern = stbtt_GetCodepointKernAdvance(&StbFont, A, B);
-            
-            if(ExtractedKern != 0)
-            {
-                int a = 1;
-            }
-            
-            Result.KerningPairs[Index] = Scale * (f32)ExtractedKern;
-            //Result.KerningPairs[Index] = 10.0f;
-        }
-    }
-    
-    return(Result);
 }
 
-INTERNAL_FUNCTION font LoadFontFile(char* FilePath, 
-                                    const loading_params& Params = DefaultLoadingParams())
+INTERNAL_FUNCTION font* LoadFontFile(char* FilePath, 
+                                     const loading_params& Params = DefaultLoadingParams())
 {
-    u8* Buffer = (u8*)StandardReadFile(FilePath, 0);
+    load_font_context Ctx = {};
     
-    font Result = {};
-    if(Buffer)
+    if (BeginFontLoading(&Ctx, FilePath, Params))
     {
-        Result = LoadFontFromBuffer(Buffer, Params);
+        for(int Codepoint = ' ';
+            Codepoint <= '~';
+            Codepoint++)
+        {
+            AddGlyphToFont(&Ctx, Codepoint);
+        }
+        
+        EndFontLoading(&Ctx);
     }
     
-    free(Buffer);
-    
-    return(Result);
+    return(Ctx.Result);
 }
 
 INTERNAL_FUNCTION mesh MakeMesh(const helper_mesh& HelperMesh)

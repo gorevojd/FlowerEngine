@@ -302,8 +302,8 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     
     // NOTE(Dima): Render everything
     render_commands* Commands = Global_RenderCommands;
-    Commands->Rects2D_Window->TextureAtlas = &Global_Assets->FontsAtlas;
-    Commands->Rects2D_Unit->TextureAtlas = 0;
+    //Commands->Rects2D_Window->TextureAtlas = 0;
+    //Commands->Rects2D_Unit->TextureAtlas = 0;
     Commands->VoxelAtlas = Global_Assets->VoxelAtlas;
     
     RenderAll();

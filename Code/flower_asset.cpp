@@ -1,74 +1,5 @@
 #include "flower_asset_load.cpp"
 
-INTERNAL_FUNCTION void AddGlyphToAtlas(font* Font, int GlyphIndex)
-{
-    image* Dst = &Global_Assets->FontsAtlas;
-    
-    glyph* Glyph = Font->Glyphs[GlyphIndex];
-    
-    int DstSize = Global_Assets->FontsAtlas.Width;
-    f32 OneOverSize = 1.0f / DstSize;
-    
-    for(int StyleIndex = 0; 
-        StyleIndex < FontStyle_Count;
-        StyleIndex++)
-    {
-        glyph_style* Style = &Glyph->Styles[StyleIndex];
-        
-        // NOTE(Dima): Getting image 
-        image* Src = Style->Image;
-        if(Src)
-        {
-            int SrcW = Src->Width;
-            int SrcH = Src->Height;
-            
-            int DstPx = std::ceil(Global_Assets->FontAtlasAtP.x);
-            int DstPy = std::ceil(Global_Assets->FontAtlasAtP.y);
-            
-            Style->MinUV = V2(DstPx, DstPy) * OneOverSize;
-            Style->MaxUV = V2(DstPx + SrcW, DstPy + SrcH) * OneOverSize;
-            
-            if(DstPx + SrcW >= DstSize)
-            {
-                DstPx = 0;
-                DstPy = Global_Assets->FontAtlasMaxRowY;
-            }
-            
-            Assert(DstPy + SrcH < DstSize);
-            
-            // NOTE(Dima): Copy pixels
-            for(int y = 0; y < SrcH; y++)
-            {
-                for(int x = 0; x < SrcW; x++)
-                {
-                    int DstPixelY = DstPy + y;
-                    int DstPixelX = DstPx + x;
-                    
-                    u32* DstPixel = (u32*)Dst->Pixels + DstPixelY * DstSize + DstPixelX;
-                    u32* SrcPixel = (u32*)Src->Pixels + y * SrcW + x;
-                    
-                    *DstPixel = *SrcPixel;
-                }
-            }
-            
-            Global_Assets->FontAtlasAtP = V2(DstPx + SrcW, DstPy);
-            Global_Assets->FontAtlasMaxRowY = std::max(Global_Assets->FontAtlasMaxRowY, DstPy + SrcH);
-        }
-    }
-}
-
-INTERNAL_FUNCTION void AddFontToAtlas(font* Font)
-{
-    for(int GlyphIndex = 0;
-        GlyphIndex < Font->GlyphCount;
-        GlyphIndex++)
-    {
-        glyph* Glyph = Font->Glyphs[GlyphIndex];
-        
-        AddGlyphToAtlas(Font, GlyphIndex);
-    }
-}
-
 INTERNAL_FUNCTION char* GenerateSpecialGUID(char* Buf, 
                                             int BufSize,
                                             const char* BaseGUID,
@@ -198,13 +129,6 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     Global_Assets->NameToAssetID = PushNew<std::unordered_map<std::string, asset_id>>(Arena);
     
     // NOTE(Dima): Font atlas initializing
-    int FontAtlasSize = 2048;
-    void* FontsAtlasMem = calloc(FontAtlasSize * FontAtlasSize * sizeof(u32), 1);
-    AllocateImageInternal(&Global_Assets->FontsAtlas,
-                          FontAtlasSize,
-                          FontAtlasSize,
-                          FontsAtlasMem);
-    
 #if 1
     loading_params VoxelAtlasParams = DefaultLoadingParams();
     VoxelAtlasParams.Image_FilteringIsClosest = true;
@@ -218,21 +142,14 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->Arial = LoadFontFile("c:/windows/fonts/arial.ttf");
 #endif
     
-    loading_params BerlinSansParams = DefaultLoadingParams();
-    BerlinSansParams.Font_PixelHeight = 60;
-    A->BerlinSans = LoadFontFile("../Data/Fonts/BerlinSans.ttf", BerlinSansParams);
-    
-    loading_params LibMonoParams = DefaultLoadingParams();
-    LibMonoParams.Font_PixelHeight = 24;
-    A->LiberationMono = LoadFontFile("../Data/Fonts/liberation-mono.ttf", LibMonoParams);
+    A->BerlinSans = LoadFontFile("../Data/Fonts/BerlinSans.ttf");
+    A->LiberationMono = LoadFontFile("../Data/Fonts/liberation-mono.ttf");
     
 #if 0    
     AddFontToAtlas(&A->TimesNewRoman);
     AddFontToAtlas(&A->LifeIsGoofy);
     AddFontToAtlas(&A->Arial);
 #endif
-    AddFontToAtlas(&A->BerlinSans);
-    AddFontToAtlas(&A->LiberationMono);
     
     // NOTE(Dima): Loading assets
     A->Cube = MakeUnitCube();
@@ -281,15 +198,16 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     A->Bear = LoadModel("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/bear.FBX", BearParams);
     A->Fox = LoadModel("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/Fox.FBX", FoxParams);
+    
     A->Supra = LoadModel("E:/Development/Modeling/Modeling challenge/ToyotaSupra/Supra.FBX");
+    A->Mustang = LoadModel("E:/Development/Modeling/Modeling challenge/MustangGTGen6/mustanggt6gen.fbx");
+    A->NissanGTR = LoadModel("E:/Development/Modeling/Modeling challenge/NissanGTR/NissanGTR.fbx");
+    A->Golf2 = LoadModel("E:/Development/Modeling/Modeling challenge/Golf2/golf2.fbx");
+    A->Aventador = LoadModel("E:/Development/Modeling/Modeling challenge/LambAventador/aventador.fbx");
     
-    loaded_animations BearSuccess = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
-    loaded_animations BearIdle = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
-    loaded_animations FoxTalk = LoadSkeletalAnimations("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
-    
-    A->BearSuccess = BearSuccess.Animations[0];
-    A->BearIdle = BearIdle.Animations[0];
-    A->FoxTalk = FoxTalk.Animations[0];
+    A->BearSuccess = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
+    A->BearIdle = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
+    A->FoxTalk = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
     
     // NOTE(Dima): Bear materials
     A->BearMaterial = {};
@@ -341,6 +259,11 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     // NOTE(Dima): Supra material
     A->Supra->Materials[0] = &A->PaletteMaterial;
+    A->Mustang->Materials[0] = &A->PaletteMaterial;
+    A->NissanGTR->Materials[0] = &A->PaletteMaterial;
+    A->Golf2->Materials[0] = &A->PaletteMaterial;
+    A->Aventador->Materials[0] = &A->PaletteMaterial;
+    
 #endif
     
 #if 0

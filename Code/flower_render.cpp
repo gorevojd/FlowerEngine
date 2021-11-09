@@ -219,7 +219,7 @@ inline void InitRectBuffer(batch_rect_buffer* Result, int NumRects)
     Result->Vertices = PushArray(Arena, rect_vertex, NumRects * 4);
     Result->Indices = PushArray(Arena, u32, NumRects * 6);
     Result->Colors = PushArray(Arena, u32, NumRects);
-    Result->Types = PushArray(Arena, u8, NumRects);
+    Result->TextureIndices = PushArray(Arena, u8, NumRects);
 }
 
 inline void ResetRectBuffer(batch_rect_buffer* RectBuffer)
@@ -227,6 +227,8 @@ inline void ResetRectBuffer(batch_rect_buffer* RectBuffer)
     RectBuffer->RectCount = 0;
     
     RectBuffer->ViewProjection = IdentityMatrix4();
+    
+    RectBuffer->TextureCount = 0;
 }
 
 inline void RectBufferSetMatrices(batch_rect_buffer* Buf, 
@@ -278,7 +280,7 @@ inline void PushCenteredImage(image* Img, v2 CenterP, f32 Height, v4 C = V4(1.0f
 
 INTERNAL_FUNCTION inline void PushRectInternal(batch_rect_buffer* RectBuffer,
                                                rect_vertex Verts[4],
-                                               u32 RectType,
+                                               u8 TextureIndex = RECT_VERTEX_UNTEXTURED,
                                                v4 C = ColorWhite())
 {
     Assert(RectBuffer->RectCount < RectBuffer->MaxRectCount);
@@ -300,7 +302,7 @@ INTERNAL_FUNCTION inline void PushRectInternal(batch_rect_buffer* RectBuffer,
     Indices[5] = VertexAt + 3;
     
     RectBuffer->Colors[RectBuffer->RectCount] = PackRGBA(PremultiplyAlpha(C));
-    RectBuffer->Types[RectBuffer->RectCount] = RectType;
+    RectBuffer->TextureIndices[RectBuffer->RectCount] = TextureIndex;
     
     RectBuffer->RectCount++;
 }
@@ -317,7 +319,7 @@ INTERNAL_FUNCTION inline void PushTriangle2D(batch_rect_buffer* RectBuffer,
     Verts[2] = { Point2, V2(0.0f, 0.0f)};
     Verts[3] = { Point2, V2(0.0f, 0.0f)};
     
-    PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
+    PushRectInternal(RectBuffer, Verts, RECT_VERTEX_UNTEXTURED, C);
 }
 
 INTERNAL_FUNCTION inline void PushQuadrilateral2D(batch_rect_buffer* RectBuffer,
@@ -333,7 +335,7 @@ INTERNAL_FUNCTION inline void PushQuadrilateral2D(batch_rect_buffer* RectBuffer,
     Verts[2] = { Point2, V2(0.0f, 0.0f)};
     Verts[3] = { Point3, V2(0.0f, 0.0f)};
     
-    PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
+    PushRectInternal(RectBuffer, Verts, RECT_VERTEX_UNTEXTURED, C);
 }
 
 INTERNAL_FUNCTION inline void PushCircleInternal2D(batch_rect_buffer* RectBuffer,
@@ -518,7 +520,7 @@ INTERNAL_FUNCTION inline void PushLineInternal2D(batch_rect_buffer* RectBuffer,
         Verts[2] = { LineBegin + Offset, V2(0.0f, 0.0f)};
         Verts[3] = { LineBegin - Offset, V2(0.0f, 0.0f)};
         
-        PushRectInternal(RectBuffer, Verts, Rect_Solid, C);
+        PushRectInternal(RectBuffer, Verts, RECT_VERTEX_UNTEXTURED, C);
     }
     
     v2 ArrowOffset = Thickness * 0.5 * ArrowThickness * PerpVector;
@@ -608,7 +610,7 @@ INTERNAL_FUNCTION inline void PushDashedLine2D(batch_rect_buffer* RectBuffer,
     
     while(At < Dist)
     {
-        f32 CurDashLen = std::min(DashMaxLen, Dist - At);
+        f32 CurDashLen = FlowerMin(DashMaxLen, Dist - At);
         
         // NOTE(Dima): Calculating line points
         v2 CurLineStart = Begin + OffsetNorm * At;
@@ -645,6 +647,7 @@ inline void PushGlyph(batch_rect_buffer* RectBuffer,
                       glyph* Glyph, 
                       v2 P, f32 Height, 
                       int StyleIndex,
+                      int TextureIndex,
                       v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     glyph_style* Style = &Glyph->Styles[StyleIndex];
@@ -659,7 +662,7 @@ inline void PushGlyph(batch_rect_buffer* RectBuffer,
     Verts[2] = { V2(P.x + Dim.x, P.y + Dim.y), V2(MaxUV.x, MaxUV.y)};
     Verts[3] = { V2(P.x, P.y + Dim.y), V2(MinUV.x, MaxUV.y)};
     
-    PushRectInternal(RectBuffer, Verts, Rect_Textured, C);
+    PushRectInternal(RectBuffer, Verts, TextureIndex, C);
 }
 
 INTERNAL_FUNCTION render_api_dealloc_entry* AllocateDeallocEntry()
@@ -936,6 +939,53 @@ INTERNAL_FUNCTION inline material_command_entry* AllocateMaterialCommandEntry()
     return(Result);
 }
 
+INTERNAL_FUNCTION inline 
+int FindFontInActiveFrameFonts(font* Font)
+{
+    int Result = -1;
+    
+    for (int i = 0; i < Global_RenderCommands->ActiveFrameUniqueFontsCount; i++)
+    {
+        if (Global_RenderCommands->ActiveFrameUniqueFonts[i] == Font->UniqueNameHash)
+        {
+            Result = i;
+            break;
+        }
+    }
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION inline 
+int GetFontTextureIndexInRectBuffer(font* Font, batch_rect_buffer* Buf)
+{
+    int TextureIndex = -1;
+    
+    render_commands* Commands = Global_RenderCommands;
+    
+    int IndexInActiveFrameFonts = FindFontInActiveFrameFonts(Font);
+    if (IndexInActiveFrameFonts == -1)
+    {
+        Assert(Commands->ActiveFrameUniqueFontsCount < 14);
+        Assert(Buf->TextureCount < 14);
+        Assert(Buf->TextureCount == Commands->ActiveFrameUniqueFontsCount);
+        
+        TextureIndex = Commands->ActiveFrameUniqueFontsCount;
+        
+        Commands->ActiveFrameUniqueFonts[TextureIndex] = Font->UniqueNameHash;
+        Buf->TextureAtlases[TextureIndex] = Font->Atlas;
+        Buf->TextureCount++;
+        
+        Commands->ActiveFrameUniqueFontsCount++;
+    }
+    else
+    {
+        TextureIndex = IndexInActiveFrameFonts;
+    }
+    
+    return TextureIndex;
+}
+
 INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
                                    f32 Time)
 {
@@ -978,6 +1028,12 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
                                                 500.0f,
                                                 0.5f));
     
+    // NOTE(Dima): Resetting current frame active fonts
+    for (int i = 0; i < ARC(Commands->ActiveFrameUniqueFonts); i++)
+    {
+        Commands->ActiveFrameUniqueFonts[i] = 0;
+    }
+    Commands->ActiveFrameUniqueFontsCount = 0;
 }
 
 INTERNAL_FUNCTION void EndRender()

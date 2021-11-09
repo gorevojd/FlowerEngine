@@ -1,7 +1,7 @@
 #ifndef FLOWER_ASSET_TYPES_H
 #define FLOWER_ASSET_TYPES_H
 
-struct asset_image
+struct asset_header_image
 {
     int Width;
     int Height;
@@ -10,7 +10,7 @@ struct asset_image
     u32 BlobDataOffset;
 };
 
-struct asset_skybox
+struct asset_header_skybox
 {
     asset_id Left;
     asset_id Right;
@@ -20,7 +20,7 @@ struct asset_skybox
     asset_id Down;
 };
 
-struct asset_mesh
+struct asset_header_mesh
 {
     int VertexCount;
     int IndexCount;
@@ -36,7 +36,7 @@ struct asset_mesh
     int MaterialIndexInModel;
 };
 
-struct asset_material
+struct asset_header_material
 {
     char Name[64];
     
@@ -45,7 +45,7 @@ struct asset_material
     asset_id TextureIDs[MAX_MATERIAL_TEXTURES];
 };
 
-struct asset_node_animation
+struct asset_header_node_animation
 {
     u32 BlobOffset_PosKeys;
     u32 BlobOffset_RotKeys;
@@ -62,7 +62,7 @@ struct asset_node_animation
     int NodeIndex;
 };
 
-struct asset_animation
+struct asset_header_animation
 {
     char Name[64];
     
@@ -75,7 +75,9 @@ struct asset_animation
     u32 OutsideBehaviour;
 };
 
-struct asset_font
+
+
+struct asset_header_font
 {
     u32 FirstGlyphID;
     int GlyphCount;
@@ -89,6 +91,29 @@ struct asset_font
     f32 LineGap;
     f32 LineAdvance;
     f32 PixelsPerMeter;
+    u32 UniqueNameHash;
+};
+
+struct asset_header_model
+{
+    asset_id* MeshIds;
+    asset_id* MaterialIds;
+    
+    u32 BlobOffset_MeshIds;
+    u32 BlobOffset_MaterialIds;
+    u32 BlobOffset_Nodes;
+    u32 BlobOffset_Node_ToParent;
+    u32 BlobOffset_Bone_InvBindPose;
+    u32 BlobOffset_Bone_NodeIndex;
+    u32 BlobOffset_NodesMeshIndices;
+    u32 BlobOffset_NodesChildIndices;
+    
+    int NumMeshes;
+    int NumMaterials;
+    int NumNodes;
+    int NumBones;
+    int NumNodesMeshIndices;
+    int NumNodesChildIndices;
 };
 
 #define ASSET_GUID_SIZE 64
@@ -101,14 +126,17 @@ struct asset
     
     union
     {
-        asset_image Image;
-        asset_skybox Skybox;
-        asset_mesh Mesh;
-        asset_material Material;
-        asset_animation Animation;
-        asset_node_animation NodeAnimation;
-        asset_font Font;
-    } Data;
+        asset_header_image* Image;
+        asset_header_skybox* Skybox;
+        asset_header_mesh* Mesh;
+        asset_header_material* Material;
+        asset_header_animation* Animation;
+        asset_header_node_animation* NodeAnimation;
+        asset_header_font* Font;
+        asset_header_model* Model;
+    } Header;
+    
+    
 };
 
 #endif //FLOWER_ASSET_TYPES_H

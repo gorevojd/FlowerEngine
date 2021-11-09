@@ -43,9 +43,13 @@ INTERNAL_FUNCTION helper_mesh CombineHelperMeshes(const helper_mesh* A, const he
 
 INTERNAL_FUNCTION inline void AllocateImageInternal(image* Image,
                                                     u32 Width, u32 Height, 
-                                                    void* PixData)
+                                                    void* PixData,
+                                                    b32 FilteringIsClosest = false)
 {
-	Image->Width = Width;
+    Image->Handle = {};
+    
+    Image->FilteringIsClosest = FilteringIsClosest;
+    Image->Width = Width;
 	Image->Height = Height;
     
 	Image->WidthOverHeight = (float)Width / (float)Height;
@@ -66,14 +70,41 @@ INTERNAL_FUNCTION image* AllocateImage(u32 Width, u32 Height,
     
     memset(ResultPixels, 0, DataSize);
     
-    AllocateImageInternal(Result, Width, Height, ResultPixels);
-    Result->FilteringIsClosest = FilteringIsClosest;
-    Result->Handle = {};
+    AllocateImageInternal(Result, Width, Height, ResultPixels, FilteringIsClosest);
     
     return(Result);
 }
 
-INTERNAL_FUNCTION inline v4 GetPixelColor(image* Image, int x, int y)
+INTERNAL_FUNCTION 
+void FillImageWithColor(image* Image, v4 ClearColor, b32 PremultiplyColorAlpha = true)
+{
+    v4 Color = ClearColor;
+    if (PremultiplyColorAlpha)
+    {
+        Color = PremultiplyAlpha(Color);
+    }
+    
+    u32 Packed = PackRGBA(Color);
+    
+    for (int y = 0; y < Image->Height; y++)
+    {
+        for (int x = 0; x < Image->Width; x++)
+        {
+            u32* Pixel = (u32*)Image->Pixels + y * Image->Width + x;
+            
+            *Pixel = Packed;
+        }
+    }
+}
+
+INTERNAL_FUNCTION
+void ClearImage(image* Image)
+{
+    FillImageWithColor(Image, V4(0.0f));
+}
+
+INTERNAL_FUNCTION inline 
+v4 GetPixelColor(image* Image, int x, int y)
 {
     Assert(x < Image->Width);
     Assert(y < Image->Height);
@@ -111,14 +142,7 @@ INTERNAL_FUNCTION void ConvertGrayscaleToRGBA(u32* RGBA, u8* Grayscale,
             f32 SrcValue = (f32)(*Src) * F_ONE_OVER_255;
             v4 DstColor = V4(SrcValue);
             
-            
-#if 1
             *Dst = PackRGBA(DstColor);
-#else
-            *Dst = PackRGBA(V4(0.0f, 1.0f, 0.0f, 1.0f));
-#endif
-            
-            
         }
     }
 }
@@ -135,4 +159,70 @@ INTERNAL_FUNCTION void ConvertGrayscaleToRGBA(image* Image,
 INTERNAL_FUNCTION inline void InvalidateImage(image* Image)
 {
     Image->Handle.Invalidated = true;
+}
+
+INTERNAL_FUNCTION u32 UTF8_Sequence_Size_For_UCS4(u32 u)
+{
+    // Returns number of bytes required to encode 'u'
+    static const u32 CharBounds[] = { 
+        0x0000007F, 
+        0x000007FF, 
+        0x0000FFFF, 
+        0x001FFFFF, 
+        0x03FFFFFF, 
+        0x7FFFFFFF, 
+        0xFFFFFFFF };
+    
+    u32 bi = 0;
+    while(CharBounds[bi] < u ){
+        ++bi;
+    }
+    return bi+1;
+}
+
+// NOTE(Dima): Thanx Alex Podverbny (BLK Dragon) 4 the code
+INTERNAL_FUNCTION u32 UTF16_To_UTF8(u16* UTF16String, 
+                                    u8* To, u32 ToLen, 
+                                    u32* OutToSize)
+{
+    u8*         s       = To;
+    u8*         s_end   = To + ToLen;
+    u16*  w       = UTF16String;
+    u32        len     = 0;
+    while(*w)
+    {
+        u32    ch = *w ;
+        u32    sz = UTF8_Sequence_Size_For_UCS4( ch );
+        if( s + sz >= s_end )
+            break;
+        if(sz == 1)
+        {
+            // just one byte, no header
+            *s = (u8)(ch);
+            ++s;
+        }
+        else
+        {
+            // write the bits 6 bits at a time, 
+            // except for the first one, which can be less than 6 bits
+            u32 shift = (sz-1) * 6;
+            *s = uint8_t(((ch >> shift) & 0x3F) | (0xFF << (8 - sz)));
+            shift -= 6;
+            ++s;
+            for(u32 i=1; i!=sz; ++i,shift-=6 )
+            {
+                *s = u8(((ch >> shift) & 0x3F) | 0x80);
+                ++s;
+            }
+        }
+        ++len;
+        ++w;
+    }
+    
+    *s = 0x00;
+    if(OutToSize){
+        *OutToSize = (s - To);
+    }
+    
+    return len;
 }

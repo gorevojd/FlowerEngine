@@ -31,10 +31,6 @@ struct asset_system
     //asset Assets[2048];
     int NumAssets;
     
-    image FontsAtlas;
-    v2 FontAtlasAtP;
-    int FontAtlasMaxRowY;
-    
     image* VoxelAtlas;
     
     // NOTE(Dima): Assets
@@ -53,8 +49,8 @@ struct asset_system
     font Arial;
 #endif
     
-    font BerlinSans;
-    font LiberationMono;
+    font* BerlinSans;
+    font* LiberationMono;
     
     image* BearDiffuse;
     image* BearNormal;
@@ -69,10 +65,14 @@ struct asset_system
     model* Bear;
     model* Fox;
     model* Supra;
+    model* Mustang;
+    model* NissanGTR;
+    model* Golf2;
+    model* Aventador;
     
-    animation BearSuccess;
-    animation BearIdle;
-    animation FoxTalk;
+    animation* BearSuccess;
+    animation* BearIdle;
+    animation* FoxTalk;
     
     material BearMaterial;
     material BearEyesMaterial;

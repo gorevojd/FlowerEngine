@@ -183,22 +183,21 @@ struct rect_vertex
     v2 UV;
 };
 
-enum rect_type
-{
-    Rect_Textured = 0,
-    Rect_Solid = 1,
-};
+#define RECT_VERTEX_UNTEXTURED 255
 
 struct batch_rect_buffer
 {
     rect_vertex* Vertices;
     u32* Indices;
     u32* Colors;
-    u8* Types;
+    
+    // If Texture index is 255 - it means that rect should be solid
+    u8* TextureIndices;
     
     m44 ViewProjection;
     
-    image* TextureAtlas;
+    image* TextureAtlases[14];
+    int TextureCount;
     
     int RectCount;
     int MaxRectCount;
@@ -346,6 +345,9 @@ struct render_commands
     
     //m44 ScreenOrthoProjection;
     dlist<batch_rect_buffer> RectBuffersPool;
+    
+    u32 ActiveFrameUniqueFonts[14];
+    int ActiveFrameUniqueFontsCount;
     
     batch_rect_buffer* Rects2D_Window;
     batch_rect_buffer* Rects2D_Unit;

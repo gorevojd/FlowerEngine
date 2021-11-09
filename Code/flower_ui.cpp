@@ -5,24 +5,37 @@ INTERNAL_FUNCTION inline ui_params* UIGetParams()
     return(Params);
 }
 
-INTERNAL_FUNCTION inline f32 GetLineBase()
+inline f32 GetLineBase(font* Font, font_size* FontSize, f32 Scale = 1.0f)
+{
+    f32 Result = Font->Ascent * FontSize->Scale * Scale;
+    
+    return Result;
+}
+
+inline f32 GetLineAdvance(font* Font, font_size* FontSize, f32 Scale = 1.0f)
+{
+    f32 Result = Font->LineAdvance * FontSize->Scale * Scale;
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION inline f32 UIGetLineBase()
 {
     ui_params* Params = UIGetParams();
     
-    f32 Result = Params->Font->Ascent * Params->Scale;
+    f32 Result = GetLineBase(Params->Font, Params->FontSize, Params->Scale);
     
     return(Result);
 }
 
-INTERNAL_FUNCTION inline f32 GetLineAdvance()
+INTERNAL_FUNCTION inline f32 UIGetLineAdvance()
 {
     ui_params* Params = UIGetParams();
     
-    f32 Result = Params->Font->LineAdvance * Params->Scale;
+    f32 Result = GetLineAdvance(Params->Font, Params->FontSize, Params->Scale);
     
     return(Result);
 }
-
 
 INTERNAL_FUNCTION inline f32 GetKerning(font* Font, u32 CodepointFirst, u32 CodepointSecond)
 {
@@ -37,7 +50,7 @@ INTERNAL_FUNCTION inline f32 GetKerning(font* Font, u32 CodepointFirst, u32 Code
     f32 Kerning = 0.0f;
     if(NextGlyphIndex != -1)
     {
-        Kerning = Font->KerningPairs[GlyphIndex * Font->GlyphCount + NextGlyphIndex];
+        Kerning = Font->KerningPairs[GlyphIndex * Font->NumGlyphs + NextGlyphIndex];
         
         if(Kerning > 0.0001f)
         {
@@ -54,7 +67,8 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
                                  v3 P, 
                                  v2 Offset, 
                                  u32 Flags,
-                                 f32 Scale = 1.0f, 
+                                 font_size* FontSize,
+                                 f32 Scale,
                                  v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     char* At = Text;
@@ -64,6 +78,9 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     batch_rect_buffer* Buffer = Global_RenderCommands->Rects2D_Window;
     
     //int IndexToTransformMatrix = Buffer->IdentityMatrixIndex;
+    
+    int TextureIndex = GetFontTextureIndexInRectBuffer(Font, 
+                                                       Global_RenderCommands->Rects2D_Window);
     
     u32 FontStyle = FontStyle_Regular;
     if(BoolFlag(Flags, PrintText_StyleShadow))
@@ -75,35 +92,20 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
         FontStyle = FontStyle_Outline;
     }
     
-    b32 Is3D = BoolFlag(Flags, PrintText_3D);
-    if(Is3D)
-    {
-        //Buffer = &Global_RenderCommands->Rects3D;
-        AtP = {};
-        
-        Scale *= 1.0f / Font->PixelsPerMeter;
-        
-        m44 TextTransform = Matrix4FromRows(V4(Left, 0.0f), 
-                                            V4(Up, 0.0f), 
-                                            V4(Forward, 0.0f),
-                                            V4(P.x, P.y, P.z, 1.0f));
-        //IndexToTransformMatrix = PushRectTransform(Buffer, TextTransform);
-    }
-    
     rc2 Bounds;
     Bounds.Min.x = AtP.x;
-    Bounds.Min.y = AtP.y - Font->Ascent * Scale;
-    Bounds.Max.y = AtP.y - Font->Descent * Scale;
+    Bounds.Min.y = AtP.y - Font->Ascent * FontSize->Scale * Scale;
+    Bounds.Max.y = AtP.y - Font->Descent * FontSize->Scale * Scale;
     
     while(*At)
     {
-        int GlyphIndex = GetGlyphByCodepoint(Font, *At);
+        int GlyphIndex = GetGlyphIndexByCodepoint(Font, *At);
         if (GlyphIndex == -1)
         {
-            GlyphIndex = GetGlyphByCodepoint(Font, '?');
+            GlyphIndex = GetGlyphIndexByCodepoint(Font, '?');
         }
         
-        glyph* Glyph = Font->Glyphs[GlyphIndex];
+        glyph* Glyph = FontSize->Glyphs[GlyphIndex];
         
         b32 IsGetSizePass = BoolFlag(Flags, PrintText_IsGetSizePass);
         
@@ -117,19 +119,18 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
                 f32 TargetHeight = (f32)Image->Height * Scale;
                 
                 v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;
-                if(!Is3D)
-                {
-                    PushGlyph(Buffer, Glyph, ImageP, 
-                              TargetHeight, 
-                              FontStyle, C);
-                }
+                PushGlyph(Buffer, Glyph, ImageP, 
+                          TargetHeight, 
+                          FontStyle, 
+                          TextureIndex,
+                          C);
             }
         }
         
         f32 Kerning = GetKerning(Font, *At, *(At + 1)); 
         
         //AtP.x += Glyph->Advance * Scale;
-        AtP.x += (Glyph->Advance + Kerning) * Scale;
+        AtP.x += (Glyph->Advance + Kerning * FontSize->Scale) * Scale;
         
         At++;
     }
@@ -152,6 +153,7 @@ INTERNAL_FUNCTION inline rc2 GetTextRect(char* Text, v2 P)
                             V3(P.x, P.y, 0.0f), 
                             V2(0.0f, 0.0f), 
                             PrintText_IsGetSizePass | FontStyleFlag, 
+                            Params->FontSize,
                             Params->Scale);
     
     return(Result);
@@ -164,71 +166,6 @@ INTERNAL_FUNCTION inline v2 GetTextSize(char* Text)
     v2 Result = GetDim(TextRect);
     
     return(Result);
-}
-
-INTERNAL_FUNCTION void PrintText3D(char* Text,
-                                   v3 P, 
-                                   v3 Left, v3 Up,
-                                   f32 Scale = 1.0f,
-                                   v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
-{
-    ui_params* Params = UIGetParams();
-    font* Font = Params->Font;
-    
-    u32 FontStyleFlag = UIGetPrintFlagsFromFontStyle(Params->FontStyle);
-    
-    PrintText_(Params->Font, 
-               Text, 
-               Left, Up, NOZ(Cross(Left, Up)),
-               P, 
-               V2(0.0f, 0.0f), 
-               PrintText_3D | FontStyleFlag, 
-               Scale, 
-               C);
-}
-
-INTERNAL_FUNCTION void PrintTextCentered3D(char* Text,
-                                           v3 P, 
-                                           v3 Normal,
-                                           f32 UnitHeight,
-                                           v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
-{
-    ui_params* Params = UIGetParams();
-    font* Font = Params->Font;
-    
-    u32 FontStyleFlag = UIGetPrintFlagsFromFontStyle(Params->FontStyle);
-    
-    
-    v2 Size = GetTextSize(Text) / Global_UI->Params.Font->PixelsPerMeter * UnitHeight;
-    
-    Normal = -Normal;
-    
-    v3 Up, Left;
-    if(Dot(Normal, V3_Up()) < 0.99999999f)
-    {
-        Left = NOZ(Cross(V3_Up(), Normal));
-        Up = NOZ(Cross(Normal, Left));
-    }
-    else
-    {
-        // TODO(Dima): Maybe pass another parameter that controls the angle
-        Left = V3_Left();
-        Up = V3_Back();
-    }
-    
-    Left = -Left;
-    Up = -Up;
-    
-    P -= Left * Size.x * 0.5f;
-    
-    PrintText_(Params->Font, 
-               Text, 
-               Left, Up, Normal,
-               P, 
-               V2(0.0f, 0.0f), 
-               PrintText_3D | FontStyleFlag, 
-               UnitHeight, 
-               C);
 }
 
 INTERNAL_FUNCTION inline f32 GetPrintHorizontalPosition(f32 Min, f32 Max, 
@@ -270,12 +207,13 @@ INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(f32 Min, f32 Max,
     f32 Result = Min;
     
     font* Font = Global_UI->Params.Font;
+    font_size* FontSize = Global_UI->Params.FontSize;
     
     switch(Align)
     {
         case TextAlign_Top:
         {
-            Result = Min + Font->Ascent * TextScale;
+            Result = Min + Font->Ascent * FontSize->Scale * TextScale;
         }break;
         
         case TextAlign_Bottom:
@@ -285,11 +223,11 @@ INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(f32 Min, f32 Max,
         
         case TextAlign_Center:
         {
-            f32 DimY = (Font->Ascent - Font->Descent) * TextScale;
+            f32 DimY = (Font->Ascent - Font->Descent) * FontSize->Scale * TextScale;
             
             f32 CenterY = Min + (Max - Min) * 0.5f;
             
-            Result = CenterY - DimY * 0.5f + Font->Ascent * TextScale;
+            Result = CenterY - DimY * 0.5f + Font->Ascent * FontSize->Scale * TextScale;
         }break;
         
         default:
@@ -318,6 +256,26 @@ INTERNAL_FUNCTION inline v2 GetPrintPositionInRect(rc2 Rect,
     return(Result);
 }
 
+INTERNAL_FUNCTION rc2 PrintTextWithFont(font* Font,
+                                        char* Text,
+                                        v2 P,
+                                        f32 PixelHeight = 25.0f,
+                                        v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+{
+    font_size* FontSize = FindBestFontSizeForPixelHeight(Font, PixelHeight);
+    f32 Scale = GetScaleForPixelHeight(FontSize, PixelHeight);
+    
+    rc2 Result = PrintText_(Font, Text, 
+                            V3_Left(), V3_Up(), V3_Forward(), 
+                            V3(P, 0.0f), V2(0.0f, 0.0f), 
+                            0, 
+                            FontSize,
+                            Scale,
+                            C);
+    
+    return(Result);
+}
+
 INTERNAL_FUNCTION rc2 PrintText(char* Text,
                                 v2 P,
                                 v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
@@ -331,6 +289,7 @@ INTERNAL_FUNCTION rc2 PrintText(char* Text,
                             V3_Left(), V3_Up(), V3_Forward(), 
                             V3(P, 0.0f), V2(0.0f, 0.0f), 
                             FontStyleFlag, 
+                            Params->FontSize,
                             Params->Scale, 
                             C);
     
@@ -502,9 +461,13 @@ INTERNAL_FUNCTION void UIBeginFrame(window_dimensions WindowDimensions)
 {
     ui_params ParamsUI = {};
     ParamsUI.Commands = Global_RenderCommands;
-    ParamsUI.Font = &Global_Assets->LiberationMono;
+    ParamsUI.Font = Global_Assets->LiberationMono;
     ParamsUI.WindowDimensions = WindowDimensions;
     ParamsUI.FontStyle = 2;
+    
+    ParamsUI.TextPixelHeight = 25;
+    ParamsUI.FontSize = FindBestFontSizeForPixelHeight(ParamsUI.Font, ParamsUI.TextPixelHeight);
+    ParamsUI.Scale = GetScaleForPixelHeight(ParamsUI.FontSize, ParamsUI.TextPixelHeight);
     
     UISetParams(ParamsUI);
     
@@ -927,7 +890,7 @@ INTERNAL_FUNCTION inline void BeginRowOrColumn(b32 IsRow,
     Dst->AdvanceBehaviour = AdvanceBehaviour;
     if(!AlreadyAdvanced)
     {
-        Dst->StartAt.x = Layout->InitAt.x + (f32)(Layout->CurrentTreeDepth * UI_TAB_SPACES) * GetLineBase();
+        Dst->StartAt.x = Layout->InitAt.x + (f32)(Layout->CurrentTreeDepth * UI_TAB_SPACES) * UIGetLineBase();
         Dst->AdvanceBehaviour = RowColumnAdvanceBehaviour_ShouldBeAdvanced;
     }
     
@@ -984,13 +947,13 @@ INTERNAL_FUNCTION inline void EndRowOrColumn(b32 IsRow)
         
         if(Dst->IsRow)
         {
-            Layout->At.x = Src->Bounds.Max.x + GetLineBase();
+            Layout->At.x = Src->Bounds.Max.x + UIGetLineBase();
             Layout->At.y = Src->StartAt.y;
         }
         else
         {
             Layout->At.x = Src->StartAt.x;
-            Layout->At.y = Src->Bounds.Max.y + GetLineBase();
+            Layout->At.y = Src->Bounds.Max.y + UIGetLineBase();
         }
     }
 }
@@ -1068,7 +1031,7 @@ INTERNAL_FUNCTION b32 BeginLayout(const char* Name)
         Found->CurrentElement = Found->Root;
     }
     
-    Found->At = Found->InitAt + V2(0.0f, GetLineBase());
+    Found->At = Found->InitAt + V2(0.0f, UIGetLineBase());
     
     // NOTE(Dima): Beginning column
     Found->RowOrColumnIndex = -1;
@@ -1095,7 +1058,7 @@ INTERNAL_FUNCTION inline void StepLittleY()
 {
     ui_layout* Layout = GetCurrentLayout();
     
-    Layout->At.y += GetLineBase() * 0.25f;
+    Layout->At.y += UIGetLineBase() * 0.25f;
 }
 
 INTERNAL_FUNCTION inline void PreAdvance()
@@ -1131,7 +1094,7 @@ INTERNAL_FUNCTION inline void PreAdvance()
     
     if(ShouldAdvance)
     {
-        HorizontalP = Layout->InitAt.x + (f32)(UIElementTreeDepth(Layout) * UI_TAB_SPACES) * GetLineBase();
+        HorizontalP = Layout->InitAt.x + (f32)(UIElementTreeDepth(Layout) * UI_TAB_SPACES) * UIGetLineBase();
         RowOrColumn->AdvanceBehaviour = RowColumnAdvanceBehaviour_Advanced;
     }
     
@@ -1159,11 +1122,11 @@ INTERNAL_FUNCTION inline void DescribeElement(rc2 ElementBounds)
         
         if(RowOrColumn->IsRow)
         {
-            Layout->At.x = ElementBounds.Max.x + GetLineBase();
+            Layout->At.x = ElementBounds.Max.x + UIGetLineBase();
         }
         else
         {
-            Layout->At.y = ElementBounds.Max.y + GetLineBase();
+            Layout->At.y = ElementBounds.Max.y + UIGetLineBase();
         }
     }
 }
@@ -1354,7 +1317,7 @@ INTERNAL_FUNCTION b32 BoolButton(const char* Name, b32* BoolSource,
     
     // NOTE(Dima): calculate button rectangle
     rc2 ButtonRect;
-    v2 RectMinP = V2(Layout->At.x, Layout->At.y - GetLineBase());
+    v2 RectMinP = V2(Layout->At.x, Layout->At.y - UIGetLineBase());
     if(PositiveTextSize.x > NegativeTextSize.x)
     {
         ButtonRect = RectMinDim(RectMinP, PositiveTextSize);

@@ -281,7 +281,7 @@ INTERNAL_FUNCTION void InitLighting(lighting* Lighting, memory_arena* Arena)
     Lighting->DirLit.Dir = NOZ(V3(-0.5f, -0.5f, -10.8f));
     //Lighting->DirLit.Dir = NOZ(V3(0.0f, -1.0f, 0.0f));
     Lighting->DirLit.C = V3(1.0f, 1.0f, 1.0f);
-    Lighting->DirLit.CalculateShadows = false;
+    Lighting->DirLit.CalculateShadows = true;
     
     Lighting->CascadeCount = 4;
     Lighting->ShadowMapRes = 1024;

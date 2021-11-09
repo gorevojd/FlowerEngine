@@ -192,8 +192,6 @@ struct animation
     
     f32 DurationTicks;
     f32 TicksPerSecond;
-    
-    void* Free;
 };
 
 enum font_style
@@ -203,6 +201,24 @@ enum font_style
     FontStyle_Outline,
     
     FontStyle_Count,
+};
+
+enum font_size_type
+{
+    FontSize_Small,
+    FontSize_Medium,
+    FontSize_Large,
+    FontSize_ExtraLarge,
+    
+    FontSize_Count,
+};
+
+static int Global_FontSizes[FontSize_Count] = 
+{
+    10,
+    25,
+    60,
+    150,
 };
 
 struct glyph_style
@@ -223,6 +239,11 @@ inline glyph_style CreateGlyphStyle(image* Image, int Width, int Height)
     
     return(Result);
 }
+
+struct glyph_size
+{
+    glyph_style Styles[FontStyle_Count];
+};
 
 struct glyph
 {
@@ -249,16 +270,20 @@ struct font_slot_glyph_id
     int IndexInGlyphs;
 };
 
+struct font_size
+{
+    u32 FontSizeEnumType;
+    
+    glyph** Glyphs;
+    
+    f32 PixelsPerMeter;
+    f32 Scale;
+};
+
 // TODO: Texture atlas per font
 struct font
 {
-    glyph** Glyphs;
-    int GlyphCount;
-    
-    float* KerningPairs;
-    
-    font_codepoint_slot_range* CodepointToSlot;
-    font_slot_glyph_id* SlotsGlyphsIds;
+    image* Atlas;
     
     f32 Ascent;
     f32 Descent;
@@ -266,10 +291,79 @@ struct font
     
     f32 LineAdvance;
     
-    f32 PixelsPerMeter;
+    float* KerningPairs;
+    
+    font_codepoint_slot_range* CodepointToSlot;
+    font_slot_glyph_id* SlotsGlyphsIds;
+    
+    u32 UniqueNameHash;
+    
+    font_size* Sizes;
+    int NumSizes;
+    int NumGlyphs;
 };
 
-inline int GetGlyphByCodepoint(font* Font, int Codepoint)
+inline f32 GetScaleForPixelHeight(font_size* FontSize, f32 PixelHeight)
+{
+    f32 HeightOriginal = Global_FontSizes[FontSize->FontSizeEnumType];
+    
+    f32 Result = PixelHeight / HeightOriginal;
+    
+    return Result;
+}
+
+inline font_size* FindBestFontSizeForPixelHeight(font* Font, f32 PixelHeight)
+{
+    font_size* Result = 0;
+    
+    f32 MinAbsDiff = 999999.0f;
+    
+    for (int SizeIndex = 0;
+         SizeIndex < Font->NumSizes;
+         SizeIndex++)
+    {
+        font_size* Size = &Font->Sizes[SizeIndex];
+        
+        f32 AbsDiff = FlowerAbs(Global_FontSizes[Size->FontSizeEnumType] - PixelHeight);
+        
+        if (AbsDiff < MinAbsDiff)
+        {
+            MinAbsDiff = AbsDiff;
+            Result = Size;
+        }
+    }
+    
+    return Result;
+}
+
+inline font_size* FindFontSizeForSizeType(font* Font, u32 FontSizeEnumType)
+{
+    font_size* Result = 0;
+    
+    Assert(Font->NumSizes > 0);
+    
+    for (int SizeIndex = 0;
+         SizeIndex < Font->NumSizes;
+         SizeIndex++)
+    {
+        font_size* Size = &Font->Sizes[SizeIndex];
+        
+        if (Size->FontSizeEnumType == FontSizeEnumType)
+        {
+            Result = Size;
+            break;
+        }
+    }
+    
+    if (!Result)
+    {
+        Result = &Font->Sizes[0];
+    }
+    
+    return Result;
+}
+
+inline int GetGlyphIndexByCodepoint(font* Font, int Codepoint)
 {
     font_codepoint_slot_range* SlotRange = &Font->CodepointToSlot[Codepoint % FONT_MAPPING_SIZE];
     
@@ -308,13 +402,6 @@ struct model
     mesh** Meshes;
     material** Materials;
     
-    int NumMeshes;
-    int NumMaterials;
-    int NumNodes;
-    int NumBones;
-    int NumNodesMeshIndices;
-    int NumNodesChildIndices;
-    
     // NOTE(Dima): Nodes
     model_node* Nodes;
     m44* Node_ToParent;
@@ -325,6 +412,13 @@ struct model
     
     int* NodesMeshIndices;
     int* NodesChildIndices;
+    
+    int NumMeshes;
+    int NumMaterials;
+    int NumNodes;
+    int NumBones;
+    int NumNodesMeshIndices;
+    int NumNodesChildIndices;
 };
 
 #endif //FLOWER_RENDER_PRIMITIVES_H

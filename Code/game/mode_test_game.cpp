@@ -15,7 +15,12 @@ struct testgame_state
     game_object* Bear1;
     game_object* Bear2;
     game_object* Fox;
+    
     game_object* Supra;
+    game_object* Mustang;
+    game_object* NissanGTR;
+    game_object* Golf2;
+    game_object* Aventador;
 };
 
 SCENE_INIT(TestGame)
@@ -31,18 +36,27 @@ SCENE_INIT(TestGame)
     State->Bear1 = CreateModelGameObject(Scene->Game, Global_Assets->Bear);
     State->Bear2 = CreateModelGameObject(Scene->Game, Global_Assets->Bear);
     State->Fox = CreateModelGameObject(Scene->Game, Global_Assets->Fox);
+    
     State->Supra = CreateModelGameObject(Scene->Game, Global_Assets->Supra);
+    State->Mustang = CreateModelGameObject(Scene->Game, Global_Assets->Mustang);
+    State->NissanGTR = CreateModelGameObject(Scene->Game, Global_Assets->NissanGTR);
+    State->Golf2 = CreateModelGameObject(Scene->Game, Global_Assets->Golf2);
+    State->Aventador = CreateModelGameObject(Scene->Game, Global_Assets->Aventador);
     
     State->Bear1->P = V3(0.0f, 0.0f, 0.0f);
-    State->Bear1->CompAnimator.PlayingAnimation = &Global_Assets->BearSuccess;
+    State->Bear1->CompAnimator.PlayingAnimation = Global_Assets->BearSuccess;
     
     State->Bear2->P = V3(2.0f, 0.0f, 0.0f);
-    State->Bear2->CompAnimator.PlayingAnimation = &Global_Assets->BearIdle;
+    State->Bear2->CompAnimator.PlayingAnimation = Global_Assets->BearIdle;
     
     State->Fox->P = V3(4.0f, 0.0f, 0.0f);
-    State->Fox->CompAnimator.PlayingAnimation = &Global_Assets->FoxTalk;
+    State->Fox->CompAnimator.PlayingAnimation = Global_Assets->FoxTalk;
     
     State->Supra->P = V3(6.0f, 0.0f, 0.0f);
+    State->Mustang->P = V3(10.0f, 0.0f, 0.0f);
+    State->NissanGTR->P = V3_Left() * 14.0f;
+    State->Golf2->P = V3_Left() * 18.0f;
+    State->Aventador->P = V3_Left() * 22.0f;
 }
 
 SCENE_UPDATE(TestGame)
@@ -85,7 +99,7 @@ SCENE_UPDATE(TestGame)
                      V3(1.0f));
 #else
             PushMesh(&Global_Assets->Plane,
-                     0, ScalingMatrix(10.0f), 
+                     0, ScalingMatrix(V3(40.0f, 20.0f, 20.0f)) * TranslationMatrix(V3(12.0f, 0.0f, 0.0f)), 
                      V3(0.6f));
 #endif
             
@@ -186,7 +200,6 @@ SCENE_UPDATE(TestGame)
     }
 #endif
     
-    
 #if 1    
     render_pass* OrthoPass = AddRenderPass();
     SetOrthographicPassData(OrthoPass,
@@ -211,6 +224,19 @@ SCENE_UPDATE(TestGame)
         RectAtX += 0.2f;
     }
 #endif
+    
+    
+    //PushImage(Global_Assets->BerlinSans->Atlas, V2(100), 1024);
+    PrintTextWithFont(Global_Assets->BerlinSans,
+                      "Hello world. My Name is Dima",
+                      V2(1000, 100),
+                      25.0f,
+                      ColorRed());
+    PrintTextWithFont(Global_Assets->LiberationMono,
+                      "And I love programming",
+                      V2(1000, 300),
+                      40.0f,
+                      ColorGreen());
     
 }
 

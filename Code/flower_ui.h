@@ -9,10 +9,9 @@
 
 enum print_text_flags
 {
-    PrintText_3D = (1 << 0),
-    PrintText_StyleShadow = (1 << 1),
-    PrintText_StyleOutline = (1 << 2),
-    PrintText_IsGetSizePass = (1 << 3),
+    PrintText_StyleShadow = (1 << 0),
+    PrintText_StyleOutline = (1 << 1),
+    PrintText_IsGetSizePass = (1 << 2),
 };
 
 enum text_align_type
@@ -112,6 +111,8 @@ struct ui_params
     font* Font;
     u32 FontStyle;
     f32 Scale;
+    font_size* FontSize;
+    f32 TextPixelHeight;
     
     f32 ScaleStack[64];
     int ScaleStackIndex;

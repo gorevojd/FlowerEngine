@@ -4,12 +4,12 @@ layout (location = 0) in vec4 InPosUV;
 
 out vec2 TexCoords;
 out vec4 Color;
-flat out int IsTextured;
+flat out int TextureIndex;
 
 uniform bool IsBatch;
 uniform vec4 MultColor;
 uniform usamplerBuffer RectsColors;
-uniform usamplerBuffer RectsTypes;
+uniform usamplerBuffer RectsTextureIndices;
 
 uniform mat4 ViewProjection;
 
@@ -33,12 +33,16 @@ void main()
 		float InColorA = float((InColor >> 24u) & 255u) * OneOver255;
 
 		ExtractedColor = vec4(InColorR, InColorG, InColorB, InColorA);
+
+		//NOTE(dima): Fetching rect texture index
+		uint RectTextureIndex = texelFetch(RectsTextureIndices, PerRectIndex).r;
+		TextureIndex = int(RectTextureIndex);
+	}
+	else
+	{
+		TextureIndex = 0;
 	}
 	
-	//NOTE(dima): Fetching glyph type
-	uint RectType = texelFetch(RectsTypes, PerRectIndex).r;
-
-	IsTextured = int(RectType == 0u);
 	Color = ExtractedColor;
 	TexCoords = InPosUV.zw;
 }

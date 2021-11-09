@@ -70,20 +70,6 @@ m44 GetViewMatrix(game_camera* Camera)
     return(Result);
 }
 
-void ShowLabel3D(game_camera* Camera,
-                 char* Text,
-                 v3 P,
-                 f32 UnitHeight = 0.2f,
-                 v4 Color = ColorWhite())
-{
-    v3 Normal = -Camera->Transform.Rows[2];
-    
-    PrintTextCentered3D(Text, P,
-                        Normal,
-                        UnitHeight,
-                        Color);
-}
-
 INTERNAL_FUNCTION void SetMatrices(game_camera* Camera, 
                                    render_pass* RenderPass)
 {

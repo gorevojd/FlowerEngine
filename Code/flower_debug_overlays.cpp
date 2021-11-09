@@ -56,9 +56,9 @@ INTERNAL_FUNCTION void ShowFramesSlider()
     if(UIElementIsOpenedInTree(Elem))
     {
         PreAdvance();
-        f32 DimX = UVToScreenPoint(1.0f, 0.0f).x - GetLineBase() - Layout->At.x;
+        f32 DimX = UVToScreenPoint(1.0f, 0.0f).x - UIGetLineBase() - Layout->At.x;
         
-        float ScaledAsc = GetLineBase();
+        float ScaledAsc = UIGetLineBase();
         v2 At = Layout->At - V2(0.0f, ScaledAsc);
         rc2 SliderRect = RectMinDim(At, V2(DimX, ScaledAsc * 4.0f));
         
@@ -323,7 +323,7 @@ INTERNAL_FUNCTION void ProfileShowMultiGraph(char* Name, float** Values, int Set
     {
         PreAdvance();
         
-        float ScaledAsc = GetLineBase();
+        float ScaledAsc = UIGetLineBase();
         
         v2 At = Layout->At - V2(0.0f, ScaledAsc);
         v2 Dim = V2(ScaledAsc * UI_GRAPH_WIDTH_UNITS, 
@@ -362,9 +362,9 @@ INTERNAL_FUNCTION void ShowFrameTimeSlider(b32 IsFrameTime = true)
     {
         PreAdvance();
         
-        f32 DimX = UVToScreenPoint(1.0f, 0.0f).x - GetLineBase() - Layout->At.x;
+        f32 DimX = UVToScreenPoint(1.0f, 0.0f).x - UIGetLineBase() - Layout->At.x;
         
-        float ScaledAsc = GetLineBase();
+        float ScaledAsc = UIGetLineBase();
         v2 At = Layout->At - V2(0.0f, ScaledAsc);
         rc2 SliderRect = RectMinDim(At, V2(DimX, ScaledAsc * 5.0f));
         
@@ -421,7 +421,7 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
         {
             PreAdvance();
             
-            f32 ScaledAsc = GetLineBase();
+            f32 ScaledAsc = UIGetLineBase();
             v2 At = Layout->At - V2(0.0f, ScaledAsc);
             v2 Dim = V2(ScaledAsc * UI_GRAPH_WIDTH_UNITS, 
                         ScaledAsc * UI_GRAPH_HEIGHT_BIG_UNITS);
@@ -437,7 +437,7 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
                 f32 FrameClocksElapsed = (f32)FrameClocksElapsed_;
                 
                 UIPushScale(0.65f);
-                v2 TextAt = At + V2(0.0f, GetLineBase());
+                v2 TextAt = At + V2(0.0f, UIGetLineBase());
                 for(int StatIndex = 0; 
                     StatIndex < Frame->ToSortStatsCount; 
                     StatIndex++)
@@ -501,9 +501,9 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
                     }
                     
                     PrintText(StatBuf, TextAt, TextColor);
-                    TextAt.y += GetLineAdvance();
+                    TextAt.y += UIGetLineAdvance();
                     
-                    if(TextAt.y - GetLineBase() > GraphRect.Max.y)
+                    if(TextAt.y - UIGetLineBase() > GraphRect.Max.y)
                     {
                         break;
                     }

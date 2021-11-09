@@ -26,6 +26,7 @@
 
 #define FlowerMin(a, b) ((a) < (b) ? (a) : (b))
 #define FlowerMax(a, b) ((a) > (b) ? (a) : (b))
+#define FlowerAbs(a) ((a) < 0 ? -(a) : (a))
 
 #define Kilobytes(count) ((count) * 1000)
 #define Megabytes(count) ((count) * 1000000)

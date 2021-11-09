@@ -1752,19 +1752,17 @@ INTERNAL_FUNCTION void OpenGLRenderImage(render_commands* Commands,
     
     // NOTE(Dima): Using program and setting uniforms
     Shader->Use();
-    Shader->SetMat4("Projection", OrthographicProjectionWindow(Commands->WindowDimensions.Width,
-                                                               Commands->WindowDimensions.Height));
+    Shader->SetMat4("ViewProjection", OrthographicProjectionWindow(Commands->WindowDimensions.Width,
+                                                                   Commands->WindowDimensions.Height));
     Shader->SetVec4("MultColor", C.r, C.g, C.b, C.a);
     Shader->SetBool("IsBatch", false);
     
-    b32 IsImage = Image != 0;
-    if(IsImage)
+    if(Image)
     {
         OpenGLInitImage(Image);
         
-        Shader->SetTexture2D("Image", Image->Handle.Image.TextureObject, 0);
+        Shader->SetTexture2D("Samplers[0]", Image->Handle.Image.TextureObject, 0);
     }
-    Shader->SetBool("IsImage", IsImage);
     
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     
@@ -2234,15 +2232,20 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
     Shader->SetVec4("MultColor", 1.0f, 1.0f, 1.0f, 1.0f);
     Shader->SetBool("IsBatch", true);
     
-    b32 IsImage = RectBuffer->TextureAtlas != 0;
-    if(IsImage)
+    for (int i = 0; i < RectBuffer->TextureCount; i++)
     {
-        OpenGLInitImage(RectBuffer->TextureAtlas);
+        char Buf[32];
+        stbsp_sprintf(Buf, "Samplers[%d]", i);
         
-        Shader->SetTexture2D("Image", RectBuffer->TextureAtlas->Handle.Image.TextureObject, 0);
+        image* Img = RectBuffer->TextureAtlases[i];
+        
+        if (Img)
+        {
+            OpenGLInitImage(Img);
+            
+            Shader->SetTexture2D(Buf, Img->Handle.Image.TextureObject, 2 + i);
+        }
     }
-    Shader->SetBool("IsImage", IsImage);
-    
     
     // NOTE(Dima): Creating and binding colors buffer
     renderer_handle ColorsTexBuf = {};
@@ -2250,16 +2253,16 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
                                      sizeof(u32) * RectBuffer->RectCount,
                                      &RectBuffer->Colors[0],
                                      GL_R32UI,
-                                     1,
+                                     0,
                                      Shader->GetLoc("RectsColors"));
     
-    // NOTE(Dima): Creating and binding geometry types buffer
-    renderer_handle TypesTexBuf = {};
-    OpenGLCreateAndBindTextureBuffer(&TypesTexBuf,
+    // NOTE(Dima): Creating and binding geometry TextureIndices buffer
+    renderer_handle TextureIndicesTexBuf = {};
+    OpenGLCreateAndBindTextureBuffer(&TextureIndicesTexBuf,
                                      sizeof(u8) * RectBuffer->RectCount,
-                                     &RectBuffer->Types[0],
-                                     GL_R8UI, 2, 
-                                     Shader->GetLoc("RectsTypes"));
+                                     &RectBuffer->TextureIndices[0],
+                                     GL_R8UI, 1, 
+                                     Shader->GetLoc("RectsTextureIndices"));
     
     
     glDrawElements(GL_TRIANGLES, RectBuffer->RectCount * 6, GL_UNSIGNED_INT, 0);
@@ -2269,7 +2272,7 @@ INTERNAL_FUNCTION void OpenGLRenderRectBuffer(render_commands* Commands,
     glDeleteBuffers(1, &EBO);
     
     OpenGLDeleteHandle(&ColorsTexBuf);
-    OpenGLDeleteHandle(&TypesTexBuf);
+    OpenGLDeleteHandle(&TextureIndicesTexBuf);
     
     glUseProgram(0);
 }

@@ -1541,32 +1541,7 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
     // NOTE(Dima): For DEBUG mode
     if(DebugMode)
     {
-        for(int x = 0; x < Cube->Dim; x++)
-        {
-            for(int y = 0; y < Cube->Dim; y++)
-            {
-                for(int z = 0; z < Cube->Dim; z++)
-                {
-                    if(RubiksIsOuter(Cube, x, y, z))
-                    {
-                        int CubieIndex = GetCubieIndex(Cube, x, y, z);
-                        int CubieCurrentIndex = Cube->Current[CubieIndex];
-                        
-                        int VisibleCubie = Cube->CubiesToVisible[CubieIndex];
-                        
-                        char Buf[16];
-                        IntegerToString(CubieCurrentIndex, Buf);
-                        
-                        v3 NumP = P + Vis->InitP[VisibleCubie];
-                        
-                        PrintTextCentered3D(Buf,
-                                            P + NumP,
-                                            V3_Back(),
-                                            0.25 / (f32)(Cube->Dim));
-                    }
-                }
-            }
-        }
+        
     }
     else
     {

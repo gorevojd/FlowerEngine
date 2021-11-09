@@ -2,20 +2,19 @@
 
 in vec2 TexCoords;
 in vec4 Color;
-flat in int IsTextured;
+flat in int TextureIndex;
 
 out vec4 OutColor;
 
 // Is image used for non-batch rendering
-uniform bool IsImage;
-uniform sampler2D Image;
+uniform sampler2D Samplers[14];
 
 void main()
 {
 	vec4 SampleColor = vec4(1.0f);
-	if(IsImage && (IsTextured != 0))
+	if(TextureIndex != 255)
 	{
-		SampleColor = texture2D(Image, TexCoords);
+		SampleColor = texture2D(Samplers[TextureIndex], TexCoords);
 	}
 
 	OutColor = SampleColor * Color;

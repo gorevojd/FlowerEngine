@@ -415,21 +415,13 @@ INTERNAL_FUNCTION void LoadModelMeshes(const aiScene* AssimpScene,
     Model->MeshesFree = Model->Meshes;
 }
 
-INTERNAL_FUNCTION animation ConvertToActualAnimation(loaded_animation* Load)
+INTERNAL_FUNCTION animation* ConvertToActualAnimation(loaded_animation* Load)
 {
     int NumNodeAnims = Load->NodeAnims.size();
     
-    animation Result = {};
-    
-    Result.DurationTicks = Load->DurationTicks;
-    Result.TicksPerSecond = Load->TicksPerSecond;
-    Result.Behaviour = Load->Behaviour;
-    Result.NumNodeAnims = NumNodeAnims;
-    
-    CopyStringsSafe(Result.Name, ArrayCount(Result.Name), (char*)Load->Name.c_str());
-    
     helper_byte_buffer Help = {};
     
+    Help.AddPlace("ResultPtr", 1, sizeof(animation));
     Help.AddPlace("NodeAnims", NumNodeAnims, sizeof(node_animation*));
     Help.AddPlace("NodeAnimsArr", NumNodeAnims, sizeof(node_animation));
     
@@ -458,7 +450,16 @@ INTERNAL_FUNCTION animation ConvertToActualAnimation(loaded_animation* Load)
     
     Help.Generate();;
     
-    Result.NodeAnims = (node_animation**)Help.GetPlace("NodeAnims");
+    animation* Result = (animation*)Help.GetPlace("ResultPtr");
+    
+    Result->DurationTicks = Load->DurationTicks;
+    Result->TicksPerSecond = Load->TicksPerSecond;
+    Result->Behaviour = Load->Behaviour;
+    Result->NumNodeAnims = NumNodeAnims;
+    
+    CopyStringsSafe(Result->Name, ArrayCount(Result->Name), (char*)Load->Name.c_str());
+    
+    Result->NodeAnims = (node_animation**)Help.GetPlace("NodeAnims");
     node_animation* NodeAnimsArr = (node_animation*)Help.GetPlace("NodeAnimsArr");
     
     for(int NodeAnimIndex = 0;
@@ -467,9 +468,9 @@ INTERNAL_FUNCTION animation ConvertToActualAnimation(loaded_animation* Load)
     {
         loaded_node_animation* Src = &Load->NodeAnims[NodeAnimIndex];
         
-        Result.NodeAnims[NodeAnimIndex] = &NodeAnimsArr[NodeAnimIndex];
+        Result->NodeAnims[NodeAnimIndex] = &NodeAnimsArr[NodeAnimIndex];
         
-        node_animation* NodeAnim = Result.NodeAnims[NodeAnimIndex];
+        node_animation* NodeAnim = Result->NodeAnims[NodeAnimIndex];
         
         NodeAnim->NumPos = Src->PositionKeys.size();
         NodeAnim->NumRot = Src->RotationKeys.size();
@@ -512,8 +513,6 @@ INTERNAL_FUNCTION animation ConvertToActualAnimation(loaded_animation* Load)
             NodeAnim->ScalingTimes[ScaIndex] = Src->ScalingTimes[ScaIndex];
         }
     }
-    
-    Result.Free = Help.Data;
     
     return(Result);
 }
@@ -632,7 +631,7 @@ INTERNAL_FUNCTION void LoadModel_ProcessInternals(const aiScene* AssimpScene,
 
 INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
 {
-    int AllocMaterialsCount = std::max(50, (int)Load->Materials.size());
+    int AllocMaterialsCount = FlowerMax(50, (int)Load->Materials.size());
     
     helper_byte_buffer Help = {};
     Help.AddPlace("ResultPtr", 1, sizeof(model));
@@ -815,7 +814,7 @@ model* LoadModel(char* FilePath,
 // NOTE(Dima): Use this function to load only 1 animation from file
 struct loaded_animations
 {
-    animation* Animations;
+    animation** Animations;
     int Count;
 };
 
@@ -835,7 +834,7 @@ loaded_animations LoadSkeletalAnimations(char* FilePath,
     
     if(Result.Count)
     {
-        Result.Animations = (animation*)malloc(sizeof(animation) * Result.Count);
+        Result.Animations = (animation**)malloc(sizeof(animation*) * Result.Count);
         
         for(int AnimIndex = 0;
             AnimIndex < Result.Count;
@@ -848,10 +847,39 @@ loaded_animations LoadSkeletalAnimations(char* FilePath,
     return(Result);
 }
 
+animation* LoadFirstSkeletalAnimation(char* FilePath, 
+                                      loading_params Params = DefaultLoadingParams())
+{
+    b32 LoadAnimations = true;
+    b32 LoadOnlyAnimations = true;
+    
+    loaded_model Loaded = LoadModelFileInternal(FilePath, Params, 
+                                                LoadAnimations, 
+                                                LoadOnlyAnimations);
+    
+    animation* Result = 0;
+    
+    if (Loaded.Animations.size() > 0)
+    {
+        Result = ConvertToActualAnimation(&Loaded.Animations[0]);
+    }
+    
+    return Result;
+}
+
 void FreeLoadedAnimations(loaded_animations* Animations)
 {
     if(Animations->Count)
     {
+        for (int AnimIndex = 0; 
+             AnimIndex < Animations->Count;
+             AnimIndex++)
+        {
+            if (Animations->Animations[AnimIndex])
+            {
+                free(Animations->Animations[AnimIndex]);
+            }
+        }
         
         free(Animations->Animations);
     }
