@@ -13,9 +13,10 @@ layout (location = 1) out vec3 Normal;
 layout (location = 2) out vec3 Positions;
 
 uniform bool MaterialMissing;
+uniform vec3 MultColor;
+
 uniform bool HasDiffuse;
 uniform sampler2D TexDiffuse;
-uniform vec3 MultColor;
 
 void main()
 {
@@ -23,7 +24,6 @@ void main()
 	
 	if(!MaterialMissing)
 	{
-		SampleDiffuse = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 		if(HasDiffuse)
 		{
 			SampleDiffuse = texture2D(TexDiffuse, FsIn.TexCoords);

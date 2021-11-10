@@ -79,13 +79,10 @@ void main()
 
 			float SampleDepth = GetLinearizedDepth(SampleProjected);
 
-			//float RangeCheck = abs(SampleDepth - Sample.z) < SSAORangeCheck ? 1.0f : 0.0f;
+			//float RangeCheck = step(abs(SampleDepth - Sample.z), SSAORangeCheck);
 			float RangeCheck = smoothstep(0.0f, 1.0f, SSAORangeCheck / abs(SampleDepth - Sample.z));
 
-			if(Sample.z > SampleDepth)
-			{
-				Occlusion += 1.0f * RangeCheck;
-			}
+			Occlusion += step(SampleDepth, Sample.z) * RangeCheck;
 		}
 	
 		OutOcclusion = 1.0 - Occlusion / SSAOKernelSamplesCount;

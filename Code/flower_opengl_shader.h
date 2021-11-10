@@ -45,6 +45,14 @@ struct opengl_shader
         glUseProgram(this->ID);
     }
     
+    static int GetCurrentProgram()
+    {
+        GLint CurrProgram;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &CurrProgram);
+        
+        return CurrProgram;
+    }
+    
     GLint GetAttribLoc(const char* AttribName)
     {
         GLint Location;
@@ -68,11 +76,12 @@ struct opengl_shader
             }
             
             uniform_name_entry New = {};
+            
             New.Name = AttribName;
             New.NameHash = Hash;
             New.Location = Location;
             
-            Name2Loc.insert(Hash, New);
+            Name2Attrib.insert(Hash, New);
         }
         
         return(Location);
@@ -102,6 +111,7 @@ struct opengl_shader
             }
             
             uniform_name_entry New = {};
+            
             New.Name = UniformName;
             New.NameHash = Hash;
             New.Location = Location;

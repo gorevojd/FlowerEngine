@@ -14,6 +14,78 @@ inline opengl_state* GetOpenGL(render_commands* Commands)
     return(Result);
 }
 
+#ifdef INTERNAL_BUILD
+
+void APIENTRY glDebugOutput(GLenum source, 
+                            GLenum type, 
+                            unsigned int id, 
+                            GLenum severity, 
+                            GLsizei length, 
+                            const char *message, 
+                            const void *userParam)
+{
+    // ignore non-significant error/warning codes
+    if(id == 131169 || id == 131185 || id == 131218 || id == 131204) return; 
+    
+    std::cout << "---------------" << std::endl;
+    std::cout << "Debug message id = " << id << ": " <<  message << std::endl;
+    
+    const char* SourceMsg = 0;
+    const char* TypeMsg = 0;
+    const char* SeverityMsg = 0;
+    
+    switch (source)
+    {
+        case GL_DEBUG_SOURCE_API:             SourceMsg = "Source: API"; break;
+        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   SourceMsg = "Source: Window System"; break;
+        case GL_DEBUG_SOURCE_SHADER_COMPILER: SourceMsg = "Source: Shader Compiler"; break;
+        case GL_DEBUG_SOURCE_THIRD_PARTY:     SourceMsg = "Source: Third Party"; break;
+        case GL_DEBUG_SOURCE_APPLICATION:     SourceMsg = "Source: Application"; break;
+        case GL_DEBUG_SOURCE_OTHER:           SourceMsg = "Source: Other"; break;
+    } 
+    
+    std::cout << SourceMsg << std::endl;
+    
+    switch (type)
+    {
+        case GL_DEBUG_TYPE_ERROR:               TypeMsg = "Type: Error"; break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: TypeMsg = "Type: Deprecated Behaviour"; break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  TypeMsg = "Type: Undefined Behaviour"; break; 
+        case GL_DEBUG_TYPE_PORTABILITY:         TypeMsg = "Type: Portability"; break;
+        case GL_DEBUG_TYPE_PERFORMANCE:         TypeMsg = "Type: Performance"; break;
+        case GL_DEBUG_TYPE_MARKER:              TypeMsg = "Type: Marker"; break;
+        case GL_DEBUG_TYPE_PUSH_GROUP:          TypeMsg = "Type: Push Group"; break;
+        case GL_DEBUG_TYPE_POP_GROUP:           TypeMsg = "Type: Pop Group"; break;
+        case GL_DEBUG_TYPE_OTHER:               TypeMsg = "Type: Other"; break;
+    } 
+    
+    std::cout << TypeMsg << std::endl;
+    
+    switch (severity)
+    {
+        case GL_DEBUG_SEVERITY_HIGH:         SeverityMsg = "Severity: high"; break;
+        case GL_DEBUG_SEVERITY_MEDIUM:       SeverityMsg = "Severity: medium"; break;
+        case GL_DEBUG_SEVERITY_LOW:          SeverityMsg = "Severity: low"; break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: SeverityMsg = "Severity: notification"; break;
+    } 
+    
+    std::cout << SeverityMsg << std::endl;
+    
+    std::cout << std::endl;
+}
+
+void OpenGL_InitDebugCallbacks()
+{
+    glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); 
+    glDebugMessageCallback(glDebugOutput, nullptr);
+    glDebugMessageControl(GL_DONT_CARE, 
+                          GL_DEBUG_TYPE_ERROR, 
+                          GL_DEBUG_SEVERITY_HIGH, 
+                          0, nullptr, GL_TRUE);
+}
+
+#endif
 
 INTERNAL_FUNCTION void OpenGLCheckError(char* File, int Line)
 {
@@ -1038,9 +1110,6 @@ INTERNAL_FUNCTION void OpenGL_InitShadowMaps(render_commands* Commands)
                    Lighting->ShadowMapRes,
                    Lighting->CascadeCount + 1); // +1 temp
     
-    OpenGLCheckError(__FILE__, __LINE__);
-    
-    
     // NOTE(Dima): Setting params
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -1254,15 +1323,21 @@ INTERNAL_FUNCTION void OpenGLInit(render_commands* Commands, memory_arena* Arena
     Commands->StateOfGraphicsAPI = OpenGL;
     OpenGL->Arena = Arena;
     
-    glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, 
-                  &OpenGL->MaxCombinedTextureUnits);
-    
     int Width = Commands->WindowDimensions.InitWidth;
     int Height = Commands->WindowDimensions.InitHeight;
     lighting* Lighting = &Commands->Lighting;
     
     glewExperimental = GL_TRUE;
     glewInit();
+    
+    
+#ifdef INTERNAL_BUILD
+    OpenGL_InitDebugCallbacks();
+#endif
+    
+    glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, 
+                  &OpenGL->MaxCombinedTextureUnits);
+    
     
     SDL_GL_SetSwapInterval(0);
     
@@ -1292,6 +1367,8 @@ INTERNAL_FUNCTION void OpenGLInit(render_commands* Commands, memory_arena* Arena
     OpenGL_InitShadowMaps(Commands);
     
     OpenGLLoadShaders(Commands, Arena);
+    
+    OpenGLCheckError(__FILE__, __LINE__);
 }
 
 INTERNAL_FUNCTION void OpenGLFree(render_commands* Commands)
@@ -1320,27 +1397,34 @@ INTERNAL_FUNCTION void OpenGLFree(render_commands* Commands)
     }
 }
 
-INTERNAL_FUNCTION void OpenGLInitMeshAttribs(mesh* Mesh, opengl_shader* Shader)
+INTERNAL_FUNCTION void OpenGL_InitMeshAttribs(mesh* Mesh, opengl_shader* Shader, b32 IsShadowShader)
 {
+    int CurrentProgramID = opengl_shader::GetCurrentProgram();
+    
+    Shader->Use();
+    
     // NOTE(Dima): Position
     InitAttribFloat(Shader->GetAttribLoc("InPosition"),
                     3, 3 * sizeof(float),
                     Mesh->Offsets.OffsetP);
     
-    // NOTE(Dima): TexCoords
-    InitAttribFloat(Shader->GetAttribLoc("InTexCoords"),
-                    2, 2 * sizeof(float),
-                    Mesh->Offsets.OffsetUV);
-    
-    // NOTE(Dima): Normal
-    InitAttribFloat(Shader->GetAttribLoc("InNormal"),
-                    3, 3 * sizeof(float),
-                    Mesh->Offsets.OffsetN);
-    
-    // NOTE(Dima): Color
-    InitAttribInt(Shader->GetAttribLoc("InColor"),
-                  1, sizeof(u32),
-                  Mesh->Offsets.OffsetC);
+    if (!IsShadowShader)
+    {
+        // NOTE(Dima): TexCoords
+        InitAttribFloat(Shader->GetAttribLoc("InTexCoords"),
+                        2, 2 * sizeof(float),
+                        Mesh->Offsets.OffsetUV);
+        
+        // NOTE(Dima): Normal
+        InitAttribFloat(Shader->GetAttribLoc("InNormal"),
+                        3, 3 * sizeof(float),
+                        Mesh->Offsets.OffsetN);
+        
+        // NOTE(Dima): Color
+        InitAttribInt(Shader->GetAttribLoc("InColor"),
+                      1, sizeof(u32),
+                      Mesh->Offsets.OffsetC);
+    }
     
     
     // NOTE(Dima): Setting skinning info
@@ -1356,11 +1440,16 @@ INTERNAL_FUNCTION void OpenGLInitMeshAttribs(mesh* Mesh, opengl_shader* Shader)
                         1, sizeof(u32),
                         Mesh->Offsets.OffsetBoneIndices);
     }
+    
+    if(CurrentProgramID != 0)
+    {
+        glUseProgram(CurrentProgramID);
+    }
 }
 
-INTERNAL_FUNCTION renderer_handle* OpenGLAllocateMesh(mesh* Mesh, 
-                                                      opengl_shader* Shader1,
-                                                      opengl_shader* Shader2)
+INTERNAL_FUNCTION renderer_handle* 
+OpenGL_AllocateMesh(opengl_state* OpenGL,
+                    mesh* Mesh)
 {
     renderer_handle* Result = &Mesh->Handle;
     
@@ -1394,15 +1483,8 @@ INTERNAL_FUNCTION renderer_handle* OpenGLAllocateMesh(mesh* Mesh,
                          Mesh->Indices, 
                          GL_STATIC_DRAW);
             
-            if(Shader1)
-            {
-                OpenGLInitMeshAttribs(Mesh, Shader1);
-            }
-            
-            if(Shader2)
-            {
-                OpenGLInitMeshAttribs(Mesh, Shader2);
-            }
+            OpenGL_InitMeshAttribs(Mesh, OpenGL->StdShader, false);
+            OpenGL_InitMeshAttribs(Mesh, OpenGL->StdShadowShader, true); 
             
             //glBindBuffer(GL_ARRAY_BUFFER, 0);
             glBindVertexArray(0);
@@ -1418,64 +1500,52 @@ INTERNAL_FUNCTION renderer_handle* OpenGLAllocateMesh(mesh* Mesh,
     return(Result);
 }
 
-INTERNAL_FUNCTION void OpenGLRenderMesh(render_commands* Commands,
-                                        opengl_shader* Shader,
-                                        render_pass* RenderPass,
-                                        mesh* Mesh,
-                                        material* Material,
-                                        v3 Color,
-                                        m44* SkinningMatrices,
-                                        int NumInstanceSkMat,
-                                        m44* InstanceModelTransforms,
-                                        int MeshInstanceCount,
-                                        b32 UseInstancing)
+INTERNAL_FUNCTION void OpenGL_RenderMesh(render_commands* Commands,
+                                         opengl_shader* Shader,
+                                         render_pass* RenderPass,
+                                         mesh* Mesh,
+                                         material* Material,
+                                         v3 Color,
+                                         m44* SkinningMatrices,
+                                         int NumInstanceSkMat,
+                                         m44* InstanceModelTransforms,
+                                         int MeshInstanceCount,
+                                         b32 UseInstancing)
 {
     FUNCTION_TIMING();
     
     opengl_state* OpenGL = GetOpenGL(Commands);
     
-    OpenGLAllocateMesh(Mesh, 
-                       OpenGL->StdShader, 
-                       OpenGL->StdShadowShader);
+    OpenGL_AllocateMesh(OpenGL, Mesh);
     
-    // NOTE(Dima): Render
-    glBindVertexArray(Mesh->Handle.Mesh.ArrayObject);
-    glBindBuffer(GL_ARRAY_BUFFER, Mesh->Handle.Mesh.BufferObject);
-    
+    // NOTE(Dima): Beginning use of shader
     Shader->Use();
     
     Shader->SetMat4("ViewProjection", RenderPass->ViewProjection);
-    Shader->SetMat4("Projection", RenderPass->Projection.e);
     Shader->SetMat4("View", RenderPass->View.e);
     Shader->SetMat4("Model", InstanceModelTransforms[0].e);
     Shader->SetVec3("MultColor", Color.r, Color.g, Color.b);
     Shader->SetBool("UseInstancing", UseInstancing);
     
     
-    // NOTE(Dima): Uniform skinning matrices
-    renderer_handle SkinningMatricesTexBuf = {};
-    if(Mesh->IsSkinned)
-    {
-        OpenGLCreateAndBindTextureBuffer(&SkinningMatricesTexBuf,
-                                         sizeof(m44) * NumInstanceSkMat * MeshInstanceCount,
-                                         SkinningMatrices,
-                                         GL_RGBA32F,
-                                         1,
-                                         Shader->GetLoc("SkinningMatrices"));
-    }
-    Shader->SetInt("SkinningMatricesCount", NumInstanceSkMat);
-    Shader->SetBool("MeshIsSkinned", Mesh->IsSkinned);
-    
-    int ModelTranLoc1 = Shader->GetAttribLoc("InInstanceModelTran1");
-    int ModelTranLoc2 = Shader->GetAttribLoc("InInstanceModelTran2");
-    int ModelTranLoc3 = Shader->GetAttribLoc("InInstanceModelTran3");
-    int ModelTranLoc4 = Shader->GetAttribLoc("InInstanceModelTran4");
+    // NOTE(Dima): Render
+    glBindVertexArray(Mesh->Handle.Mesh.ArrayObject);
+    glBindBuffer(GL_ARRAY_BUFFER, Mesh->Handle.Mesh.BufferObject);
     
     // NOTE(Dima): Instancing
+    int ModelTranLoc1;
+    int ModelTranLoc2;
+    int ModelTranLoc3;
+    int ModelTranLoc4;
+    
     GLuint InstanceModelBO;
-    GLuint InstanceModelTBO;
     if(UseInstancing)
     {
+        ModelTranLoc1 = Shader->GetAttribLoc("InInstanceModelTran1");
+        ModelTranLoc2 = Shader->GetAttribLoc("InInstanceModelTran2");
+        ModelTranLoc3 = Shader->GetAttribLoc("InInstanceModelTran3");
+        ModelTranLoc4 = Shader->GetAttribLoc("InInstanceModelTran4");
+        
         glGenBuffers(1, &InstanceModelBO);
         
         // NOTE(Dima): Generating buffer for holding instance model transforms and mesh
@@ -1503,7 +1573,8 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(render_commands* Commands,
                             InstanceModelTransforms);
         }
         
-        OpenGLInitMeshAttribs(Mesh, Shader);
+        OpenGL_InitMeshAttribs(Mesh, OpenGL->StdShader, false);
+        OpenGL_InitMeshAttribs(Mesh, OpenGL->StdShadowShader, true);
         
         // NOTE(Dima): Setting instance model transform attribs
         InitAttribFloat(ModelTranLoc1,
@@ -1527,47 +1598,66 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(render_commands* Commands,
         glVertexAttribDivisor(ModelTranLoc3, 1);
         glVertexAttribDivisor(ModelTranLoc4, 1);
     }
-    
-    // NOTE(Dima): Setting material
-    b32 MaterialMissing = true;
-    
-    if(Material != 0)
+    else
     {
-        MaterialMissing = false;
-        
-        switch(Material->Type)
-        {
-            case Material_SpecularDiffuse:
-            {
-                image* DiffuseTex = Material->Textures[MatTex_SpecularDiffuse_Diffuse];
-                Shader->SetBool("HasDiffuse", DiffuseTex != 0);
-                
-                if(DiffuseTex != 0)
-                {
-                    OpenGLInitImage(DiffuseTex);
-                    
-                    Shader->SetTexture2D("TexDiffuse", 
-                                         DiffuseTex->Handle.Image.TextureObject,
-                                         0);
-                }
-                
-            }break;
-            
-            case Material_PBR:
-            {
-                
-            }break;
-            
-            case Material_Solid:
-            {
-                
-            }break;
-        }
     }
     
-    Shader->SetBool("MaterialMissing", MaterialMissing);
+    // NOTE(Dima): Uniform skinning matrices
+    renderer_handle SkinningMatricesTexBuf = {};
+    if(Mesh->IsSkinned)
+    {
+        OpenGLCreateAndBindTextureBuffer(&SkinningMatricesTexBuf,
+                                         sizeof(m44) * NumInstanceSkMat * MeshInstanceCount,
+                                         SkinningMatrices,
+                                         GL_RGBA32F,
+                                         1,
+                                         Shader->GetLoc("SkinningMatrices"));
+    }
+    Shader->SetInt("SkinningMatricesCount", NumInstanceSkMat);
+    Shader->SetBool("MeshIsSkinned", Mesh->IsSkinned);
     
-    Shader->SetBool("HasClippingPlane", RenderPass->ClippingPlaneIsSet);
+    // NOTE(Dima): Setting material
+    if (!RenderPass->IsShadowPass)
+    {
+        b32 MaterialMissing = true;
+        
+        if(Material != 0)
+        {
+            MaterialMissing = false;
+            
+            switch(Material->Type)
+            {
+                case Material_SpecularDiffuse:
+                {
+                    image* DiffuseTex = Material->Textures[MatTex_SpecularDiffuse_Diffuse];
+                    Shader->SetBool("HasDiffuse", DiffuseTex != 0);
+                    
+                    if(DiffuseTex != 0)
+                    {
+                        OpenGLInitImage(DiffuseTex);
+                        
+                        Shader->SetTexture2D("TexDiffuse", 
+                                             DiffuseTex->Handle.Image.TextureObject,
+                                             0);
+                    }
+                    
+                }break;
+                
+                case Material_PBR:
+                {
+                    
+                }break;
+                
+                case Material_Solid:
+                {
+                    
+                }break;
+            }
+        }
+        
+        Shader->SetBool("MaterialMissing", MaterialMissing);
+    }
+    
     if(RenderPass->ClippingPlaneIsSet)
     {
         glEnable(GL_CLIP_DISTANCE0);
@@ -1602,11 +1692,13 @@ INTERNAL_FUNCTION void OpenGLRenderMesh(render_commands* Commands,
         glDisable(GL_CLIP_DISTANCE0);
     }
 }
-INTERNAL_FUNCTION void OpenGLRenderVoxelMesh(render_commands* Commands, 
-                                             opengl_shader* Shader,
-                                             render_pass* RenderPass,
-                                             render_command_voxel_mesh* Command,
-                                             image* VoxelAtlas)
+
+
+INTERNAL_FUNCTION void OpenGL_RenderVoxelMesh(render_commands* Commands, 
+                                              opengl_shader* Shader,
+                                              render_pass* RenderPass,
+                                              render_command_voxel_mesh* Command,
+                                              image* VoxelAtlas)
 {
     FUNCTION_TIMING();
     
@@ -1877,16 +1969,16 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pa
             {
                 render_command_mesh* MeshCommand = GetRenderCommand(Commands, CommandIndex, render_command_mesh);
                 
-                OpenGLRenderMesh(Commands,
-                                 StdShader,
-                                 RenderPass,
-                                 MeshCommand->Mesh,
-                                 MeshCommand->Material,
-                                 MeshCommand->C,
-                                 MeshCommand->SkinningMatrices,
-                                 MeshCommand->SkinningMatricesCount,
-                                 &MeshCommand->ModelToWorld, 1,
-                                 false);
+                OpenGL_RenderMesh(Commands,
+                                  StdShader,
+                                  RenderPass,
+                                  MeshCommand->Mesh,
+                                  MeshCommand->Material,
+                                  MeshCommand->C,
+                                  MeshCommand->SkinningMatrices,
+                                  MeshCommand->SkinningMatricesCount,
+                                  &MeshCommand->ModelToWorld, 1,
+                                  false);
             }break;
             
             case RenderCommand_InstancedMesh:
@@ -1894,17 +1986,17 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pa
                 render_command_instanced_mesh* MeshCommand = GetRenderCommand(Commands, CommandIndex, 
                                                                               render_command_instanced_mesh);
                 
-                OpenGLRenderMesh(Commands,
-                                 StdShader,
-                                 RenderPass,
-                                 MeshCommand->Mesh,
-                                 MeshCommand->Material,
-                                 MeshCommand->C,
-                                 MeshCommand->InstanceSkinningMatrices,
-                                 MeshCommand->NumSkinningMatricesPerInstance,
-                                 MeshCommand->InstanceMatrices, 
-                                 MeshCommand->InstanceCount,
-                                 true);
+                OpenGL_RenderMesh(Commands,
+                                  StdShader,
+                                  RenderPass,
+                                  MeshCommand->Mesh,
+                                  MeshCommand->Material,
+                                  MeshCommand->C,
+                                  MeshCommand->InstanceSkinningMatrices,
+                                  MeshCommand->NumSkinningMatricesPerInstance,
+                                  MeshCommand->InstanceMatrices, 
+                                  MeshCommand->InstanceCount,
+                                  true);
             }break;
             
             case RenderCommand_VoxelChunkMesh:
@@ -1921,11 +2013,11 @@ INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pa
                 
                 if(!IsCulled)
                 {
-                    OpenGLRenderVoxelMesh(Commands,
-                                          VoxelShader,
-                                          RenderPass,
-                                          MeshCommand,
-                                          Commands->VoxelAtlas);
+                    OpenGL_RenderVoxelMesh(Commands,
+                                           VoxelShader,
+                                           RenderPass,
+                                           MeshCommand,
+                                           Commands->VoxelAtlas);
                 }
             }break;
         }
@@ -2107,8 +2199,6 @@ INTERNAL_FUNCTION opengl_pp_framebuffer* OpenGL_DoLightingPass(render_commands* 
     
     glBindVertexArray(OpenGL->ScreenQuad.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    
-    OpenGLCheckError(__FILE__, __LINE__);
     
     return(Result);
 }
@@ -2366,10 +2456,10 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGLRender)
     // NOTE(Dima): Rendering to shadow buffer
     OpenGL_RenderShadowMaps(Commands);
     
-    OpenGLCheckError(__FILE__, __LINE__);
-    
     opengl_pp_framebuffer* WaterRenderResult = 0;
     opengl_pp_framebuffer* CombineRenderResult = 0;
+    
+    OpenGLCheckError(__FILE__, __LINE__);
     
 #if 1    
     opengl_pp_framebuffer* SceneRenderResult = 0; 

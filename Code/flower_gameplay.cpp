@@ -65,7 +65,7 @@ INTERNAL_FUNCTION inline void MoveCameraToViewTarget(game_camera* Camera)
 // NOTE(Dima): Look at matrix
 m44 GetViewMatrix(game_camera* Camera)
 {
-    m44 Result = LookAt(Camera->P, Camera->P + Camera->Transform.Rows[2], V3_Up());
+    m44 Result = LookAtViewMatrix(Camera->P, Camera->P + Camera->Transform.Rows[2], V3_Up());
     
     return(Result);
 }

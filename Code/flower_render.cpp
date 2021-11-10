@@ -808,8 +808,8 @@ INTERNAL_FUNCTION void SetOrthographicPassData(render_pass* RenderPass,
 {
     RenderPass->CameraP = CameraP;
     RenderPass->View = View;
-    RenderPass->Projection = OrthographicProjectionUnit(Width, Height,
-                                                        Far, Near);
+    RenderPass->Projection = OrthographicProjectionUnitRadius(Width, Height,
+                                                              Far, Near);
     RenderPass->ViewProjection = RenderPass->View * RenderPass->Projection;
     
     RenderPass->Far = Far;
@@ -890,10 +890,10 @@ INTERNAL_FUNCTION void PushWater(render_water_params Params,
     OppositeCameraForward = Reflect(OppositeCameraForward, 
                                     ReflectionPlane.ABC);
     
-    m44 OppositeView = LookAt(OppositeCameraP,
-                              OppositeCameraP + OppositeCameraForward,
-                              V3_Down(),
-                              true);
+    m44 OppositeView = LookAtViewMatrix(OppositeCameraP,
+                                        OppositeCameraP + OppositeCameraForward,
+                                        V3_Down(),
+                                        true);
     
     Water->ReflectionPass = AddRenderPass();
     SetPerspectivePassData(Water->ReflectionPass, 

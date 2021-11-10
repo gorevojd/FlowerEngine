@@ -183,9 +183,9 @@ shadow_cascade_info* GetDirLitCascades(lighting* Lighting,
         };
         
         v3 LitPosition = -DirLit->Dir * 100.0f;
-        m44 TempLightViewMatrix = LookAt(LitPosition,
-                                         LitPosition + DirLit->Dir, 
-                                         V3_Up());
+        m44 TempLightViewMatrix = LookAtViewMatrix(LitPosition,
+                                                   LitPosition + DirLit->Dir, 
+                                                   V3_Up());
         m44 TempLightToWorld = InverseMatrix4(TempLightViewMatrix);
         
         v2 MinMaxX = V2(9999999.0f, -9999999.0f);
@@ -260,12 +260,12 @@ shadow_cascade_info* GetDirLitCascades(lighting* Lighting,
         v4 DesiredLightPWorld = V4(DesiredLightP, 1.0f) * TempLightToWorld;
         Casc->P = DesiredLightPWorld.xyz;
         
-        Casc->Far = ViewZ + Lighting->CascadeSafeDistance;
+        Casc->Far = ViewZ + Lighting->CascadeSafeDistance * 2.0f;
         Casc->Near = 0.0f;
         
-        Casc->View = LookAt(Casc->P,
-                            Casc->P + DirLit->Dir, 
-                            V3_Up());
+        Casc->View = LookAtViewMatrix(Casc->P,
+                                      Casc->P + DirLit->Dir, 
+                                      V3_Up());
     }
     
     return(Lighting->Cascades);
@@ -284,8 +284,8 @@ INTERNAL_FUNCTION void InitLighting(lighting* Lighting, memory_arena* Arena)
     Lighting->DirLit.CalculateShadows = true;
     
     Lighting->CascadeCount = 4;
-    Lighting->ShadowMapRes = 1024;
-    Lighting->CascadeSafeDistance = 20.0f;
+    Lighting->ShadowMapRes = 2048;
+    Lighting->CascadeSafeDistance = 10.0f;
     Lighting->BlurVarianceShadowMaps = true;
     Lighting->VarianceShadowMapBlurRadius = 2;
     

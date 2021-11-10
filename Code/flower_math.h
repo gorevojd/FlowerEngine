@@ -1000,8 +1000,8 @@ inline quat Slerp(quat A, quat B, f32 t){
 }
 
 // NOTE(Dima): Matrices operations
-inline m44 LookAt(v3 Pos, v3 TargetPos, v3 WorldUp, 
-                  b32 InvertX = false)
+inline m44 LookAtViewMatrix(v3 Pos, v3 TargetPos, v3 WorldUp, 
+                            b32 InvertX = false)
 {
     m44 Result;
     
@@ -1236,7 +1236,7 @@ inline m44 InverseMatrix4(const m44& M)
         Dets[0] * M.e[0] - Dets[1] * M.e[1] +
         Dets[2] * M.e[2] - Dets[3] * M.e[3];
     
-    if(std::abs(Det) > 0.000000001f)
+    if(FlowerAbs(Det) > 0.000000001f)
     {
         f32 InvDet = 1.0f / Det;
         
@@ -1539,7 +1539,7 @@ inline quat QuatFromMatrix3(m33 Mat){
     return(Result);
 }
 
-inline quat LookRotation(v3 Front, v3 Up)
+inline quat LookRotation(v3 Front, v3 Up = V3_Up())
 {
     v3 Fwd = NOZ(Front);
     v3 Lft = NOZ(Cross(Up, Fwd));
@@ -1550,6 +1550,17 @@ inline quat LookRotation(v3 Front, v3 Up)
     quat Result = QuatFromMatrix3(Mat);
     
     return(Result);
+}
+
+inline m44 LookRotationMatrix(v3 Front, v3 Up = V3_Up())
+{
+    v3 Fwd = NOZ(Front);
+    v3 Lft = NOZ(Cross(Up, Fwd));
+    Up = Cross(Fwd, Lft);
+    
+    m44 Mat = Matrix4FromRows(Lft, Up, Fwd);
+    
+    return Mat;
 }
 
 inline v3 QuatToEuler(quat q)

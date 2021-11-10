@@ -21,7 +21,6 @@ out vs_out
 } VsOut;
 
 uniform mat4 ViewProjection;
-uniform mat4 Projection;
 uniform mat4 View;
 uniform mat4 Model;
 uniform bool UseInstancing;
@@ -30,7 +29,6 @@ uniform samplerBuffer SkinningMatrices;
 uniform int SkinningMatricesCount;
 uniform bool MeshIsSkinned;
 
-uniform bool HasClippingPlane;
 uniform vec4 ClippingPlane;
 out float gl_ClipDistance[1];
 
@@ -100,7 +98,8 @@ void main()
 
 	VsOut.Color = ExtractedColor;
 	VsOut.TexCoords = vec2(InTexCoords.x, 1.0f - InTexCoords.y);
-	VsOut.Normal = CalculatedN * mat3(transpose(inverse(Model))); 
+	VsOut.Normal = CalculatedN * transpose(inverse(mat3(Model))); 
 	VsOut.FragP = WorldSpaceVertex.xyz;
+	
 	gl_ClipDistance[0] = dot(CalculatedP, ClippingPlane);
 }

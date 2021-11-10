@@ -160,17 +160,28 @@ SCENE_UPDATE(TestGame)
     
     quat Rot = AxisAngle(RotAxis, 0.0f);
     
-    f32 RotCubeY = Cos(Global_Time->Time) * 0.9f;
+    
     
     PushMesh(&Global_Assets->Cube, 
              0,
-             QuaternionToMatrix4(Rot) * TranslationMatrix(V3(-2.5f, RotCubeY, 0.0f)), 
+             QuaternionToMatrix4(Rot) * TranslationMatrix(V3(-2.5f, 0.45f, 0.0f)), 
+             V3(1.0f, 0.5f, 0.0f));
+    
+    v3 Cube2P = V3(-4.0f, 
+                   Cos(Global_Time->Time) * 0.9f,
+                   0.0f);
+    
+    PushMesh(&Global_Assets->Cube, 
+             0,
+             QuaternionToMatrix4(Rot) * TranslationMatrix(Cube2P), 
              V3(1.0f, 1.0f, 0.0f));
     
+    v3 Cube3P = V3(-5.5f, 0.45f, 0.0f);
     PushMesh(&Global_Assets->Cube, 
              0,
-             QuaternionToMatrix4(Rot) * TranslationMatrix(V3(-4.0f, 0.45f, 0.0f)), 
+             LookRotationMatrix(Cube2P - Cube3P) * TranslationMatrix(Cube3P), 
              V3(1.0f, 0.5f, 0.0f));
+    
     
     // NOTE(Dima): SEtting camera matrices
     SetMatrices(&State->Camera, RenderPass);
