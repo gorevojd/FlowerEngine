@@ -75,13 +75,24 @@ struct asset_header_animation
     u32 OutsideBehaviour;
 };
 
-
+struct asset_header_font_size
+{
+    u32 FontSizeEnumType;
+    
+    asset_id FirstGlyphId;
+    
+    f32 PixelsPerMeter;
+    f32 Scale;
+};
 
 struct asset_header_font
 {
-    u32 FirstGlyphID;
-    int GlyphCount;
+    asset_id* SizesIds;
     
+    int NumSizes;
+    int NumGlyphs;
+    
+    u32 BlobOffset_SizesIds;
     u32 BlobOffset_Mapping;
     u32 BlobOffset_SlotsGlyphsIds;
     u32 BlobOffset_KerningPairs;
@@ -90,7 +101,6 @@ struct asset_header_font
     f32 Descent;
     f32 LineGap;
     f32 LineAdvance;
-    f32 PixelsPerMeter;
     u32 UniqueNameHash;
 };
 
@@ -123,6 +133,7 @@ struct asset
     char GUID[ASSET_GUID_SIZE];
     
     u32 Type;
+    u32 State;
     
     union
     {
@@ -133,9 +144,9 @@ struct asset
         asset_header_animation* Animation;
         asset_header_node_animation* NodeAnimation;
         asset_header_font* Font;
+        asset_header_font_size* FontSize;
         asset_header_model* Model;
     } Header;
-    
     
 };
 

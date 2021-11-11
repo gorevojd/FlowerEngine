@@ -280,7 +280,6 @@ struct font_size
     f32 Scale;
 };
 
-// TODO: Texture atlas per font
 struct font
 {
     image* Atlas;
@@ -288,15 +287,13 @@ struct font
     f32 Ascent;
     f32 Descent;
     f32 LineGap;
-    
     f32 LineAdvance;
+    u32 UniqueNameHash;
     
     float* KerningPairs;
     
     font_codepoint_slot_range* CodepointToSlot;
     font_slot_glyph_id* SlotsGlyphsIds;
-    
-    u32 UniqueNameHash;
     
     font_size* Sizes;
     int NumSizes;

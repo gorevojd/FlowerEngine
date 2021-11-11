@@ -722,7 +722,7 @@ INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
 }
 
 INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
-                                                     loading_params Params = DefaultLoadingParams(),
+                                                     loading_params Params = LoadingParams_Model(),
                                                      b32 LoadAnimations = true,
                                                      b32 LoadOnlyAnimations = false)
 {
@@ -754,12 +754,12 @@ INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
     // NOTE(Dima): Calculating transform
     m44 RootTran = AssimpToOurMatrix(Scene->mRootNode->mTransformation);
     m44 InvRootTran = InverseTransformMatrix(RootTran);
-    m44 AdditionalScale = ScalingMatrix(Params.Model_DefaultScale);
+    m44 AdditionalScale = ScalingMatrix(Params.Model.DefaultScale);
     
     InvRootTran = AdditionalScale * InvRootTran;
     
     // NOTE(Dima): Applying additional rotation
-    if(Params.Model_FixInvalidRotation)
+    if(Params.Model.FixInvalidRotation)
     {
         m44 AdditionalRotation = RotationMatrixX(90.0f * F_DEG2RAD);
         
@@ -799,7 +799,7 @@ INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
 
 // NOTE(Dima): Pass LoadAnimations = true to get all animations that were in this file
 model* LoadModel(char* FilePath,
-                 loading_params Params = DefaultLoadingParams())
+                 loading_params Params = LoadingParams_Model())
 {
     b32 LoadOnlyAnimations = false;
     b32 LoadAnimations = false;
@@ -819,7 +819,7 @@ struct loaded_animations
 };
 
 loaded_animations LoadSkeletalAnimations(char* FilePath, 
-                                         loading_params Params = DefaultLoadingParams())
+                                         loading_params Params = LoadingParams_Model())
 {
     
     b32 LoadAnimations = true;
@@ -848,7 +848,7 @@ loaded_animations LoadSkeletalAnimations(char* FilePath,
 }
 
 animation* LoadFirstSkeletalAnimation(char* FilePath, 
-                                      loading_params Params = DefaultLoadingParams())
+                                      loading_params Params = LoadingParams_Model())
 {
     b32 LoadAnimations = true;
     b32 LoadOnlyAnimations = true;

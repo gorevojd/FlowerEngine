@@ -233,7 +233,7 @@ void main()
 
 	Color = vec4(ResultColor, 1.0);
 
-	//Color = vec4(vec3(texture2D(SSAOTex, FragUV).r), 1.0f);
+	Color = vec4(vec3(texture2D(SSAOTex, FragUV).r), 1.0f);
 	//Color = vec4(vec3(GetLinearizedDepth(FragUV) / 1500.0f), 1.0f);
 	//Color = vec4(SamplePosition, 1.0f);
 	//Color = vec4(SampleColorSpec.rgb, 1.0f);

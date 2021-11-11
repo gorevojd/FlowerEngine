@@ -7,50 +7,93 @@ struct loading_params
 {
     u32 AssetType;
     
-    b32 Image_FlipVertically;
-    b32 Image_FilteringIsClosest;
-    
-    f32 Model_DefaultScale;
-    b32 Model_FixInvalidRotation;
-    
-    v4 Font_ShadowColor;
-    v4 Font_OutlineColor;
-    int Font_ShadowOffset;
-    int Font_AtlasWidth;
-    u32 Font_SizesFlags;
+    union
+    {
+        struct 
+        {
+            b32 FlipVertically;
+            b32 FilteringIsClosest;
+        }Image;
+        
+        struct 
+        {
+            
+            v4 ShadowColor;
+            v4 OutlineColor;
+            int ShadowOffset;
+            int AtlasWidth;
+            u32 SizesFlags;
+        }Font;
+        
+        struct 
+        {
+            f32 DefaultScale;
+            b32 FixInvalidRotation;
+        }Model;
+    };
 };
 
-inline loading_params DefaultLoadingParams()
+inline loading_params LoadingParams(u32 AssetType)
 {
     loading_params Result = {};
-    
-    // NOTE(Dima): Image
-    Result.Image_FlipVertically = true;
-    Result.Image_FilteringIsClosest = false;
-    
-    // NOTE(Dima): Model
-    Result.Model_FixInvalidRotation = false;
-    Result.Model_DefaultScale = 1.0f;
-    
-    // NOTE(Dima): Font
-    Result.Font_ShadowOffset = 1;
-    Result.Font_ShadowColor = ColorBlack();
-    Result.Font_OutlineColor = ColorBlack();
-    Result.Font_AtlasWidth = 2048;
-    Result.Font_SizesFlags = 0;
     
     return(Result);
 }
 
+inline loading_params LoadingParams_Internal(u32 AssetType)
+{
+    loading_params Result = {};
+    
+    Result.AssetType = AssetType;
+    
+    return Result;
+}
+
+inline loading_params LoadingParams_Image()
+{
+    loading_params Result = LoadingParams_Internal(Asset_Image);
+    
+    // NOTE(Dima): Image
+    Result.Image.FlipVertically = true;
+    Result.Image.FilteringIsClosest = false;
+    
+    return Result;
+}
+
+inline loading_params LoadingParams_Font()
+{
+    loading_params Result = LoadingParams_Internal(Asset_Font);
+    
+    // NOTE(Dima): Font
+    Result.Font.ShadowOffset = 1;
+    Result.Font.ShadowColor = ColorBlack();
+    Result.Font.OutlineColor = ColorBlack();
+    Result.Font.AtlasWidth = 2048;
+    Result.Font.SizesFlags = 0;
+    
+    return Result;
+}
+
+inline loading_params LoadingParams_Model()
+{
+    loading_params Result = LoadingParams_Internal(Asset_Model);
+    
+    // NOTE(Dima): Model
+    Result.Model.FixInvalidRotation = false;
+    Result.Model.DefaultScale = 1.0f;
+    
+    return Result;
+}
+
 INTERNAL_FUNCTION image* LoadImageFile(char* FilePath, 
-                                       const loading_params& Params = DefaultLoadingParams())
+                                       const loading_params& Params = LoadingParams_Image())
 {
     int Width;
     int Height;
     int Channels;
     
     b32 FlipVert = true;
-    if(Params.Image_FlipVertically)
+    if(Params.Image.FlipVertically)
     {
         FlipVert = false;
     }
@@ -78,7 +121,7 @@ INTERNAL_FUNCTION image* LoadImageFile(char* FilePath,
         void* ResultPixels = (u8*)ResultMem + OffsetToPixelsData;
         
         AllocateImageInternal(Result, Width, Height, ResultPixels);
-        Result->FilteringIsClosest = Params.Image_FilteringIsClosest;
+        Result->FilteringIsClosest = Params.Image.FilteringIsClosest;
         
         for(int PixelIndex = 0;
             PixelIndex < PixCount;
@@ -203,7 +246,7 @@ BeginFontLoading(load_font_context* Ctx, char* FilePath,
         CopyStringsSafe(Ctx->UniqueName, ARC(Ctx->UniqueName), Buf);
         Ctx->UniqueNameHash = StringHashFNV(Ctx->UniqueName);
         
-        std::vector<u32> SizesToLoad = ExtractFontSizesToLoad(Params.Font_SizesFlags);
+        std::vector<u32> SizesToLoad = ExtractFontSizesToLoad(Params.Font.SizesFlags);
         
         for (u32 FontSizeIndex : SizesToLoad)
         {
@@ -286,7 +329,7 @@ EndFontLoading(load_font_context* Ctx)
 {
     int NumGlyphs = Ctx->NumGlyphs;
     int NumSizes = Ctx->FontSizes.size();
-    int AtlasWidth = Ctx->Params.Font_AtlasWidth;
+    int AtlasWidth = Ctx->Params.Font.AtlasWidth;
     
     // NOTE(Dima): Copying glyphs
     helper_byte_buffer HelpBytes;
@@ -420,8 +463,8 @@ EndFontLoading(load_font_context* Ctx)
     // NOTE(Dima): Placing glyphs characters into font atlas
     memset(Result->Atlas, 0, sizeof(image));
     AllocateImageInternal(Result->Atlas, 
-                          Ctx->Params.Font_AtlasWidth,
-                          Ctx->Params.Font_AtlasWidth,
+                          Ctx->Params.Font.AtlasWidth,
+                          Ctx->Params.Font.AtlasWidth,
                           HelpBytes.GetPlace("AtlasData"));
     ClearImage(Result->Atlas);
     
@@ -511,7 +554,7 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
             b32 ShouldPremultiplyAlpha = true;
             
             int Border = 3;
-            int ShadowOffset = Ctx->Params.Font_ShadowOffset;
+            int ShadowOffset = Ctx->Params.Font.ShadowOffset;
             
             // NOTE(Dima): Creating image for regular font
             int RegularWidth = StbW + 2 * Border;
@@ -540,7 +583,7 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
                                        StbImage,
                                        Border + ShadowOffset,
                                        Border + ShadowOffset,
-                                       Ctx->Params.Font_ShadowColor);
+                                       Ctx->Params.Font.ShadowColor);
             
             RenderOneBitmapIntoAnother(ShadowImage,
                                        StbImage,
@@ -593,7 +636,7 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
                                        StbImage,
                                        Border,
                                        Border,
-                                       Ctx->Params.Font_OutlineColor);
+                                       Ctx->Params.Font.OutlineColor);
             
             for(int y = CellDist; y < OutlineImage->Height - CellDist; y++)
             {
@@ -617,7 +660,7 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
                     v4 Color = ColorClear();
                     if(NearAlphaSum >= 1.0f)
                     {
-                        Color = Ctx->Params.Font_OutlineColor;
+                        Color = Ctx->Params.Font.OutlineColor;
                     }
                     
                     *At = PackRGBA(Color);
@@ -668,7 +711,7 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
 }
 
 INTERNAL_FUNCTION font* LoadFontFile(char* FilePath, 
-                                     const loading_params& Params = DefaultLoadingParams())
+                                     const loading_params& Params = LoadingParams_Font())
 {
     load_font_context Ctx = {};
     

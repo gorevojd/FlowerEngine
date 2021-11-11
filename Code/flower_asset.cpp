@@ -28,9 +28,11 @@ struct asset_pack
     vector<asset> Assets;
 };
 
-INTERNAL_FUNCTION asset_pack* CreateAssetPack(char* Name)
+#include <memory>
+
+INTERNAL_FUNCTION std::shared_ptr<asset_pack> CreateAssetPack(char* Name)
 {
-    asset_pack* Pack = new asset_pack;
+    std::shared_ptr<asset_pack> Pack (new asset_pack);
     
     ClearString(Pack->PackFileName, ArrayCount(Pack->PackFileName));
     AppendToString(Pack->PackFileName, ArrayCount(Pack->PackFileName), Name);
@@ -41,6 +43,12 @@ INTERNAL_FUNCTION asset_pack* CreateAssetPack(char* Name)
     AppendToString(Pack->PackBlobName, ArrayCount(Pack->PackBlobName), ".blob");
     
     return Pack;
+}
+
+INTERNAL_FUNCTION void 
+WriteAssetPackToFile(asset_pack* Pack)
+{
+    
 }
 
 INTERNAL_FUNCTION asset_id AddAssetInternal(asset_pack* Pack, 
@@ -60,14 +68,16 @@ INTERNAL_FUNCTION asset_id AddAssetInternal(asset_pack* Pack,
     return(NewAssetID);
 }
 
-INTERNAL_FUNCTION asset_id AddAssetBitmap(const char* GUID, 
-                                          const char* Path,
-                                          const loading_params& Params)
+INTERNAL_FUNCTION asset_id AddAssetImage(asset_pack* Pack, 
+                                         const char* GUID, 
+                                         const char* Path,
+                                         const loading_params& Params = DefaultLoadingParams())
 {
-    
+    image* Image = 
 }
 
-INTERNAL_FUNCTION asset_id AddAssetSkybox(const char* GUID,
+INTERNAL_FUNCTION asset_id AddAssetSkybox(asset_pack* Pack,
+                                          const char* GUID,
                                           asset_id LeftID,
                                           asset_id RightID,
                                           asset_id FrontID,
@@ -80,7 +90,8 @@ INTERNAL_FUNCTION asset_id AddAssetSkybox(const char* GUID,
     
 }
 
-INTERNAL_FUNCTION asset_id AddAssetSkybox(const char* GUID,
+INTERNAL_FUNCTION asset_id AddAssetSkybox(asset_pack* Pack,
+                                          const char* GUID,
                                           const char* LeftPath,
                                           const char* RightPath,
                                           const char* FrontPath,
@@ -130,8 +141,8 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     // NOTE(Dima): Font atlas initializing
 #if 1
-    loading_params VoxelAtlasParams = DefaultLoadingParams();
-    VoxelAtlasParams.Image_FilteringIsClosest = true;
+    loading_params VoxelAtlasParams = LoadingParams_Image();
+    VoxelAtlasParams.Image.FilteringIsClosest = true;
     A->VoxelAtlas = LoadImageFile("../Data/Textures/minc_atlas2.png", VoxelAtlasParams);
     //A->VoxelAtlas = LoadImageFile("../Data/Textures/minc_atlas1.jpg", VoxelAtlasParams);
     
@@ -176,8 +187,8 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");
     A->PlaneTexture = LoadImageFile("E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png");
-    loading_params PaletteParams = DefaultLoadingParams();
-    PaletteParams.Image_FilteringIsClosest = true;
+    loading_params PaletteParams = LoadingParams_Image();
+    PaletteParams.Image.FilteringIsClosest = true;
     A->Palette = LoadImageFile("E:/Development/Modeling/Pallette/MyPallette.png", PaletteParams);
     
     A->BearDiffuse = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear.tga");
@@ -190,9 +201,9 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     A->FoxEyesDiffuse = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Eye Green.tga");
     A->FoxEyesShine = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Eye Shine.tga");
     
-    loading_params BearParams = DefaultLoadingParams();
-    BearParams.Model_DefaultScale = 0.01f;
-    BearParams.Model_FixInvalidRotation = true;
+    loading_params BearParams = LoadingParams_Model();
+    BearParams.Model.DefaultScale = 0.01f;
+    BearParams.Model.FixInvalidRotation = true;
     
     loading_params FoxParams = BearParams;
     
@@ -291,22 +302,13 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
         AddAssetImage(Pack, "Image_Palette", 
                       "../Data/Textures/MyPallette.png");
         
-        loading_params BerlinSansParams = DefaultLoadingParams();
-        BerlinSansParams.Font_PixelHeight = 60;
-        AddAssetFont("Font_BerlinSans", 
-                     "../Data/Fonts/BerlinSans.ttf",
-                     BerlinSansParams);
+        AddAssetFont(Pack, "Font_BerlinSans", "../Data/Fonts/BerlinSans.ttf");
+        AddAssetFont(Pack, "Font_LiberationMono", "../Data/Fonts/liberation-mono.ttf");
         
-        loading_params LibMonoParams = DefaultLoadingParams();
-        LibMonoParams.Font_PixelHeight = 24;
-        AddAssetFont("Font_LiberationMono", 
-                     "../Data/Fonts/liberation-mono.ttf",
-                     LibMonoParams);
+        AddAssetInternal(Pack, "Mesh_Cube", Asset_Mesh, &A->Cube);
+        AddAssetInternal(Pack, "Mesh_Plane", Asset_Mesh, &A->Plane);
         
-        AddAssetInternal("Mesh_Cube", Asset_Mesh, &A->Cube);
-        AddAssetInternal("Mesh_Plane", Asset_Mesh, &A->Plane);
-        
-        AddAssetSkybox("Skybox_Default", 
+        AddAssetSkybox(Pack, "Skybox_Default", 
                        "../Data/Textures/Cubemaps/Pink/left.png",
                        "../Data/Textures/Cubemaps/Pink/right.png",
                        "../Data/Textures/Cubemaps/Pink/front.png",

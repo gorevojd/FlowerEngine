@@ -9,14 +9,15 @@ enum asset_type
 {
     Asset_None,
     
-    Asset_Font,
     Asset_Image,
+    Asset_Skybox,
     Asset_Mesh,
+    Asset_Material,
     Asset_Animation,
     Asset_NodeAnimation,
-    Asset_Material,
+    Asset_Font,
+    Asset_FontSize,
     Asset_Model,
-    Asset_Skybox,
     
     Asset_Count,
 };
