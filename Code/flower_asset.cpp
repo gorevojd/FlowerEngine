@@ -1,4 +1,3 @@
-#include "flower_asset_load.cpp"
 
 INTERNAL_FUNCTION char* GenerateSpecialGUID(char* Buf, 
                                             int BufSize,
@@ -14,35 +13,117 @@ INTERNAL_FUNCTION char* GenerateSpecialGUID(char* Buf,
     
     ConcatBunchOfStrings(Buf, BufSize, 
                          StringsToConcat,
-                         ARC(StringsToConcat));
+                         ArrLen(StringsToConcat));
     
     return (Buf);
 }
 
-#if 0
-struct asset_pack
-{
-    char PackFileName[256];
-    char PackBlobName[256];
-    
-    vector<asset> Assets;
-};
 
-#include <memory>
-
-INTERNAL_FUNCTION std::shared_ptr<asset_pack> CreateAssetPack(char* Name)
+INTERNAL_FUNCTION inline 
+asset* GetAssetByID(asset_storage* Storage, asset_id ID)
 {
-    std::shared_ptr<asset_pack> Pack (new asset_pack);
+    asset* Asset = &Storage->Assets[ID];
     
-    ClearString(Pack->PackFileName, ArrayCount(Pack->PackFileName));
-    AppendToString(Pack->PackFileName, ArrayCount(Pack->PackFileName), Name);
-    AppendToString(Pack->PackFileName, ArrayCount(Pack->PackFileName), ".json");
+    return Asset;
+}
+
+INTERNAL_FUNCTION 
+asset_id AddAssetToStorage(asset_storage* Storage, 
+                           char* GUID,
+                           u32 Type)
+{
+    asset_id NewAssetID = Storage->NumAssets++;
+    asset* NewAsset = GetAssetByID(Storage, NewAssetID);
     
-    ClearString(Pack->PackFileName, ArrayCount(Pack->PackFileName));
-    AppendToString(Pack->PackBlobName, ArrayCount(Pack->PackBlobName), Name);
-    AppendToString(Pack->PackBlobName, ArrayCount(Pack->PackBlobName), ".blob");
+    NewAsset->Type = Type;
+    CopyStringsSafe(NewAsset->GUID, ArrLen(NewAsset->GUID), GUID);
+    
+    
+    // NOTE(Dima): Adding asset to (Guid to AssetID) mapping
+    u32 GuidHash = StringHashFNV(GUID);
+    asset_hashmap_entry* FoundEntry = Storage->GuidToID.find(GuidHash);
+    
+    /*
+    // NOTE(Dima): When inserting asset to hashmap we have to make sure 
+that asset with the same GUID has not been inserted into asset storage before.
+*/
+    Assert(!FoundEntry);
+    
+    asset_hashmap_entry NewEntry = {};
+    NewEntry.AssetGuidHash = GuidHash;
+    NewEntry.AssetID = NewAssetID;
+    
+    Storage->GuidToID.insert(GuidHash, NewEntry);
+    
+    // TODO(Dima): Maybe allocate header here
+    
+    return NewAssetID;
+}
+
+INTERNAL_FUNCTION void InitAssetStorage(asset_storage* Storage)
+{
+    Assert(Storage->NumAssets == 0);
+    Assert(Storage->Initialized == false);
+    
+    AddAssetToStorage(Storage, "NullAsset", Asset_None);
+    
+    Storage->Initialized = true;
+    Storage->NumAssets = 0;
+    Storage->Arena = {};
+    Storage->GuidToID = hashmap<asset_hashmap_entry, ASSET_STORAGE_HASHMAP_SIZE>(&Storage->Arena);
+}
+
+INTERNAL_FUNCTION void InitAssetLoadingContext(asset_loading_context* Ctx)
+{
+    for (int PackIndex = 0;
+         PackIndex < MAX_ASSET_PACKS;
+         PackIndex++)
+    {
+        asset_pack* Pack = &Ctx->Packs[PackIndex];
+        
+        Pack->InUse = false;
+        Pack->IndexInPacks = -1;
+    }
+}
+
+INTERNAL_FUNCTION asset_pack* CreateAssetPack(asset_loading_context* Ctx, char* PackName)
+{
+    asset_pack* Pack = 0;
+    
+    for (int PackIndex = 0;
+         PackIndex < MAX_ASSET_PACKS;
+         PackIndex++)
+    {
+        asset_pack* CurPack = &Ctx->Packs[PackIndex];
+        
+        if (CurPack->InUse == false)
+        {
+            Pack = CurPack;
+            Pack->IndexInPacks = PackIndex;
+            break;
+        }
+    }
+    
+    Assert(Pack);
+    
+    InitAssetStorage(&Pack->AssetStorage);
+    
+    ClearString(Pack->PackFileName, ArrLen(Pack->PackFileName));
+    AppendToString(Pack->PackBlobName, ArrLen(Pack->PackBlobName), PackName);
+    AppendToString(Pack->PackBlobName, ArrLen(Pack->PackBlobName), ".pack");
     
     return Pack;
+}
+
+INTERNAL_FUNCTION void FreeAssetPack(asset_pack* Pack)
+{
+    Assert(Pack->InUse);
+    
+    Pack->InUse = false;
+    Pack->IndexInPacks = -1;
+    
+    // TODO(Dima): Free all assets in asset pack
+    
 }
 
 INTERNAL_FUNCTION void 
@@ -51,6 +132,7 @@ WriteAssetPackToFile(asset_pack* Pack)
     
 }
 
+#if 0
 INTERNAL_FUNCTION asset_id AddAssetInternal(asset_pack* Pack, 
                                             const char* GUID, 
                                             u32 Type, 
@@ -71,9 +153,9 @@ INTERNAL_FUNCTION asset_id AddAssetInternal(asset_pack* Pack,
 INTERNAL_FUNCTION asset_id AddAssetImage(asset_pack* Pack, 
                                          const char* GUID, 
                                          const char* Path,
-                                         const loading_params& Params = DefaultLoadingParams())
+                                         const loading_params& Params = LoadingParams_Image())
 {
-    image* Image = 
+    image* Image = ;
 }
 
 INTERNAL_FUNCTION asset_id AddAssetSkybox(asset_pack* Pack,
@@ -84,8 +166,7 @@ INTERNAL_FUNCTION asset_id AddAssetSkybox(asset_pack* Pack,
                                           asset_id BackID,
                                           asset_id RightID,
                                           asset_id UpID,
-                                          asset_id DownID,
-                                          const loading_params& Params)
+                                          asset_id DownID)
 {
     
 }
@@ -98,36 +179,44 @@ INTERNAL_FUNCTION asset_id AddAssetSkybox(asset_pack* Pack,
                                           const char* BackPath,
                                           const char* UpPath,
                                           const char* DownPath,
-                                          const loading_params& Params)
+                                          const loading_params& ImagesParams = LoadingParams_Image())
 {
     char GuidBuf[128];
     
     GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Left");
-    asset_id LeftID = AddAssetBitmap(GuidBuf, LeftPath);
+    asset_id LeftID = AddAssetImage(Pack, GuidBuf, LeftPath, ImagesParams);
     
     GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Right");
-    asset_id RightID = AddAssetBitmap(GuidBuf, RightPath);
+    asset_id RightID = AddAssetImage(Pack, GuidBuf, RightPath, ImagesParams);
     
     GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Front");
-    asset_id FrontID = AddAssetBitmap(GuidBuf, FrontPath);
+    asset_id FrontID = AddAssetImage(Pack, GuidBuf, FrontPath, ImagesParams);
     
     GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Back");
-    asset_id BackID = AddAssetBitmap(GuidBuf, BackPath);
+    asset_id BackID = AddAssetImage(Pack, GuidBuf, BackPath, ImagesParams);
     
     GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Up");
-    asset_id UpID = AddAssetBitmap(GuidBuf, UpPath);
+    asset_id UpID = AddAssetImage(Pack, GuidBuf, UpPath, ImagesParams);
     
     GenerateSpecialGUID(GuidBuf, ARC(GuidBuf), GUID, "Down");
-    asset_id DownID = AddAssetBitmap(GuidBuf, DownPath);
+    asset_id DownID = AddAssetImage(Pack, GuidBuf, DownPath, ImagesParams);
     
-    asset_id Result = AddAssetSkybox(GUID,
+    asset_id Result = AddAssetSkybox(Pack, GUID,
                                      LeftID, RightID,
                                      FrontID, BackID,
-                                     UpID, DownID,
-                                     Params);
+                                     UpID, DownID);
     
     return Result;
 }
+
+INTERNAL_FUNCTION asset_system AddAssetModel(asset_pack* Pack,
+                                             const char* GUID,
+                                             const char* FilePath,
+                                             const loading_params& Params)
+{
+    
+}
+
 #endif
 
 INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
@@ -136,8 +225,6 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     Global_Assets->Arena = Arena;
     
     asset_system* A = Global_Assets;
-    
-    Global_Assets->NameToAssetID = PushNew<std::unordered_map<std::string, asset_id>>(Arena);
     
     // NOTE(Dima): Font atlas initializing
 #if 1
@@ -340,3 +427,4 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     AddAsset("Model_Supra", Asset_Model, &A->Supra);
 #endif
 }
+

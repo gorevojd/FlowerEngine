@@ -14,8 +14,7 @@
 
 #define InvalidCodePath Assert(!"Invalid code path")
 
-#define ArrayCount(arr) (sizeof(arr) / sizeof((arr)[0]))
-#define ARC(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define ArrLen(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #define GlobalVariable static
 #define InternalFunction static
@@ -58,6 +57,8 @@ typedef int b32;
 
 typedef float f32;
 typedef double f64;
+
+typedef u32 asset_id;
 
 // NOTE(Dima): Memory index
 typedef size_t mi;

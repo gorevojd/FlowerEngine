@@ -1206,7 +1206,7 @@ INTERNAL_FUNCTION minc_temp_mesh* GetFreeTempMesh(minecraft* Mine, int VerticesC
     minc_temp_mesh* Result = 0;
     
     for(int ListIndex = 0;
-        ListIndex < ARC(Mine->TempMeshLists);
+        ListIndex < ArrLen(Mine->TempMeshLists);
         ListIndex++)
     {
         minc_temp_mesh* At = Mine->TempMeshLists[ListIndex];
@@ -1650,7 +1650,7 @@ INTERNAL_FUNCTION void MincInitTempMeshLists(minecraft* Mine)
     int Divisor = CurrentBlocksCount / InitRelativeCountBlocks;
     
     for(int ListIndex = 0;
-        ListIndex < ARC(Mine->TempMeshLists);
+        ListIndex < ArrLen(Mine->TempMeshLists);
         ListIndex++)
     {
         int VertCount = InitVerts[ListIndex] * Divisor;

@@ -245,7 +245,7 @@ game_object* CreateGameObject(game* Game, u32 Type,
     else
     {
         CopyStringsSafe(Result->Name, 
-                        ARC(Result->Name),
+                        ArrLen(Result->Name),
                         Name);
     }
     

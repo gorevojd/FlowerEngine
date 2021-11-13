@@ -1075,11 +1075,11 @@ INTERNAL_FUNCTION void InitGameCodeFromDll()
 {
 #if defined(PLATFORM_IS_WINDOWS)
     GetFullPathNameA("../Build/Flower.dll",
-                     ArrayCount(App->GameDllFullPath),
+                     ArrLen(App->GameDllFullPath),
                      App->GameDllFullPath, 0);
     
     GetFullPathNameA("../Build/FlowerTemp.dll",
-                     ArrayCount(App->TempDllFullPath),
+                     ArrLen(App->TempDllFullPath),
                      App->TempDllFullPath, 0);
     
     b32 GetTimeResult = GetLastWriteTimeToGameDLL(App->GameDllFullPath, &App->LastGameDllWriteTime);

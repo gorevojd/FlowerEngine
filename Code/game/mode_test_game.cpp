@@ -149,7 +149,7 @@ SCENE_UPDATE(TestGame)
     }
     
     PushClear(V3(1.0f, 0.0f, 1.0f));
-    PushSky(&Global_Assets->Sky);
+    PushSky(Global_Assets->Sky);
     
     UpdateGameObjects(Scene->Game);
     

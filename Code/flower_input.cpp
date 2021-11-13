@@ -251,7 +251,7 @@ INTERNAL_FUNCTION inline void AddGamepadToController(int ControllerIndex, int Ga
 
 INTERNAL_FUNCTION inline controller* AddController(u32 Type)
 {
-    Assert(Global_Input->ControllerCount < ArrayCount(Global_Input->Controllers));
+    Assert(Global_Input->ControllerCount < ArrLen(Global_Input->Controllers));
     
     controller* Result = &Global_Input->Controllers[Global_Input->ControllerCount++];
     

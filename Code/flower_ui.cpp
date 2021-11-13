@@ -383,10 +383,10 @@ INTERNAL_FUNCTION void InitUI(memory_arena* Arena)
     
     // NOTE(Dima): Init sentinels
     CopyStringsSafe(Global_UI->ElementsFreeSentinel.DisplayName,
-                    ArrayCount(Global_UI->ElementsFreeSentinel.DisplayName),
+                    ArrLen(Global_UI->ElementsFreeSentinel.DisplayName),
                     "SentinelFree");
     CopyStringsSafe(Global_UI->ElementsUseSentinel.DisplayName,
-                    ArrayCount(Global_UI->ElementsUseSentinel.DisplayName),
+                    ArrLen(Global_UI->ElementsUseSentinel.DisplayName),
                     "SentinelUse");
     DLIST_REFLECT_PTRS(Global_UI->ElementsFreeSentinel, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Global_UI->ElementsUseSentinel, NextAlloc, PrevAlloc);
@@ -405,7 +405,7 @@ inline void UIPushScale(f32 Scale)
 {
     ui_params* Params = UIGetParams();
     
-    Assert(Params->ScaleStackIndex < ArrayCount(Params->ScaleStack));
+    Assert(Params->ScaleStackIndex < ArrLen(Params->ScaleStack));
     
     Params->ScaleStack[Params->ScaleStackIndex++] = Scale;
     Params->Scale = Scale;
@@ -433,7 +433,7 @@ inline void UIPushFont(font* Font)
 {
     ui_params* Params = UIGetParams();
     
-    Assert(Params->FontStackIndex < ArrayCount(Params->FontStack));
+    Assert(Params->FontStackIndex < ArrLen(Params->FontStack));
     
     Params->FontStack[Params->FontStackIndex++] = Font;
     Params->Font = Font;
@@ -631,10 +631,10 @@ INTERNAL_FUNCTION inline void UIInitChildSentinel(ui_element* Parent)
     
     char* Name = "ChildSentinel";
     CopyStringsSafe(ChildSentinel->DisplayName,
-                    ArrayCount(ChildSentinel->DisplayName),
+                    ArrLen(ChildSentinel->DisplayName),
                     Name);
     CopyStringsSafe(ChildSentinel->IdName,
-                    ArrayCount(ChildSentinel->IdName),
+                    ArrLen(ChildSentinel->IdName),
                     Name);
     ChildSentinel->IdNameHash = StringHashFNV(Name);
 }
@@ -1157,7 +1157,7 @@ INTERNAL_FUNCTION int ShowText(const char* fmt, ...)
     va_list args;
     va_start(args, fmt);
     int Result = stbsp_vsnprintf(Global_UI->StringFormatBuffer, 
-                                 ArrayCount(Global_UI->StringFormatBuffer), 
+                                 ArrLen(Global_UI->StringFormatBuffer), 
                                  fmt, args);
     va_end(args);
     
@@ -1342,7 +1342,7 @@ INTERNAL_FUNCTION b32 BoolButton(const char* Name, b32* BoolSource,
     }
     
     CopyStringsSafe(Element->DisplayName, 
-                    ArrayCount(Element->DisplayName), 
+                    ArrLen(Element->DisplayName), 
                     DisplayText);
     b32 Pressed = TextElement(ButtonFlags, 0, ButtonRect,
                               TextAlign_Center,

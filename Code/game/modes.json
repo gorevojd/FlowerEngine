@@ -14,5 +14,9 @@
 
 	"Minecraft": {
 		"FileName": "game/mode_minecraft.cpp"
+	},
+
+	"TicTacToe": {
+		"FileName": "game/mode_tic_tac_toe.cpp"
 	}
 }

@@ -1,6 +1,7 @@
 #ifndef FLOWER_ASSET_TYPES_H
 #define FLOWER_ASSET_TYPES_H
 
+
 struct asset_header_image
 {
     int Width;
@@ -10,7 +11,7 @@ struct asset_header_image
     u32 BlobDataOffset;
 };
 
-struct asset_header_skybox
+struct asset_header_cubemap
 {
     asset_id Left;
     asset_id Right;
@@ -126,28 +127,19 @@ struct asset_header_model
     int NumNodesChildIndices;
 };
 
-#define ASSET_GUID_SIZE 64
 
-struct asset
+union asset_header
 {
-    char GUID[ASSET_GUID_SIZE];
-    
-    u32 Type;
-    u32 State;
-    
-    union
-    {
-        asset_header_image* Image;
-        asset_header_skybox* Skybox;
-        asset_header_mesh* Mesh;
-        asset_header_material* Material;
-        asset_header_animation* Animation;
-        asset_header_node_animation* NodeAnimation;
-        asset_header_font* Font;
-        asset_header_font_size* FontSize;
-        asset_header_model* Model;
-    } Header;
-    
+    asset_header_image* Image;
+    asset_header_cubemap* Cubemap;
+    asset_header_mesh* Mesh;
+    asset_header_material* Material;
+    asset_header_animation* Animation;
+    asset_header_node_animation* NodeAnimation;
+    asset_header_font* Font;
+    asset_header_font_size* FontSize;
+    asset_header_model* Model;
 };
+
 
 #endif //FLOWER_ASSET_TYPES_H

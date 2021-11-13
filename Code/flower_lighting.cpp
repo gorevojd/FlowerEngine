@@ -58,7 +58,7 @@ INTERNAL_FUNCTION void GeneratePCF_PoissonSamples(lighting* Lighting,
     }
     
     random_generation Random = SeedRandom(12);
-    for(int i = 0; i < ARC(PCF_Samples->Rotations); i++)
+    for(int i = 0; i < ArrLen(PCF_Samples->Rotations); i++)
     {
         PCF_Samples->Rotations[i] = RandomUnilateral(&Random) * 2.0f * F_PI;
     }

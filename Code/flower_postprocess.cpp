@@ -1,7 +1,7 @@
 INTERNAL_FUNCTION void InitSSAO(postprocessing* PP)
 {
     // NOTE(Dima): Init SSAO kernel
-    for(int i = 0; i < ARC(PP->SSAO_Kernel); i++)
+    for(int i = 0; i < ArrLen(PP->SSAO_Kernel); i++)
     {
         v3 RandomVector = NOZ(V3(RandomBilateral(&PP->Random),
                                  RandomBilateral(&PP->Random),
@@ -14,7 +14,7 @@ INTERNAL_FUNCTION void InitSSAO(postprocessing* PP)
     }
     
     // NOTE(Dima): Init SSAO noise
-    for(int i = 0; i < ARC(PP->SSAO_Noise); i++)
+    for(int i = 0; i < ArrLen(PP->SSAO_Noise); i++)
     {
         
         PP->SSAO_Noise[i] = Normalize(V3(RandomBilateral(&PP->Random), 

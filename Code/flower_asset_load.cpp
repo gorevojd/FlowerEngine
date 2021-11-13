@@ -3,88 +3,6 @@
 
 #include <array>
 
-struct loading_params
-{
-    u32 AssetType;
-    
-    union
-    {
-        struct 
-        {
-            b32 FlipVertically;
-            b32 FilteringIsClosest;
-        }Image;
-        
-        struct 
-        {
-            
-            v4 ShadowColor;
-            v4 OutlineColor;
-            int ShadowOffset;
-            int AtlasWidth;
-            u32 SizesFlags;
-        }Font;
-        
-        struct 
-        {
-            f32 DefaultScale;
-            b32 FixInvalidRotation;
-        }Model;
-    };
-};
-
-inline loading_params LoadingParams(u32 AssetType)
-{
-    loading_params Result = {};
-    
-    return(Result);
-}
-
-inline loading_params LoadingParams_Internal(u32 AssetType)
-{
-    loading_params Result = {};
-    
-    Result.AssetType = AssetType;
-    
-    return Result;
-}
-
-inline loading_params LoadingParams_Image()
-{
-    loading_params Result = LoadingParams_Internal(Asset_Image);
-    
-    // NOTE(Dima): Image
-    Result.Image.FlipVertically = true;
-    Result.Image.FilteringIsClosest = false;
-    
-    return Result;
-}
-
-inline loading_params LoadingParams_Font()
-{
-    loading_params Result = LoadingParams_Internal(Asset_Font);
-    
-    // NOTE(Dima): Font
-    Result.Font.ShadowOffset = 1;
-    Result.Font.ShadowColor = ColorBlack();
-    Result.Font.OutlineColor = ColorBlack();
-    Result.Font.AtlasWidth = 2048;
-    Result.Font.SizesFlags = 0;
-    
-    return Result;
-}
-
-inline loading_params LoadingParams_Model()
-{
-    loading_params Result = LoadingParams_Internal(Asset_Model);
-    
-    // NOTE(Dima): Model
-    Result.Model.FixInvalidRotation = false;
-    Result.Model.DefaultScale = 1.0f;
-    
-    return Result;
-}
-
 INTERNAL_FUNCTION image* LoadImageFile(char* FilePath, 
                                        const loading_params& Params = LoadingParams_Image())
 {
@@ -142,21 +60,21 @@ INTERNAL_FUNCTION image* LoadImageFile(char* FilePath,
     return(Result);
 }
 
-INTERNAL_FUNCTION cubemap LoadCubemap(const char* Left,
-                                      const char* Right,
-                                      const char* Front,
-                                      const char* Back,
-                                      const char* Up,
-                                      const char* Down)
+INTERNAL_FUNCTION cubemap* LoadCubemap(const char* Left,
+                                       const char* Right,
+                                       const char* Front,
+                                       const char* Back,
+                                       const char* Up,
+                                       const char* Down)
 {
-    cubemap Result = {};
+    cubemap* Result = (cubemap*)malloc(sizeof(cubemap));
     
-    Result.Left = LoadImageFile((char*)Left);
-    Result.Right = LoadImageFile((char*)Right);
-    Result.Front = LoadImageFile((char*)Front);
-    Result.Back = LoadImageFile((char*)Back);
-    Result.Top = LoadImageFile((char*)Up);
-    Result.Down = LoadImageFile((char*)Down);
+    Result->Left = LoadImageFile((char*)Left);
+    Result->Right = LoadImageFile((char*)Right);
+    Result->Front = LoadImageFile((char*)Front);
+    Result->Back = LoadImageFile((char*)Back);
+    Result->Top = LoadImageFile((char*)Up);
+    Result->Down = LoadImageFile((char*)Down);
     
     return(Result);
 }
@@ -243,7 +161,7 @@ BeginFontLoading(load_font_context* Ctx, char* FilePath,
         }
         Buf[FontNameLength] = 0;
         
-        CopyStringsSafe(Ctx->UniqueName, ARC(Ctx->UniqueName), Buf);
+        CopyStringsSafe(Ctx->UniqueName, ArrLen(Ctx->UniqueName), Buf);
         Ctx->UniqueNameHash = StringHashFNV(Ctx->UniqueName);
         
         std::vector<u32> SizesToLoad = ExtractFontSizesToLoad(Params.Font.SizesFlags);
@@ -736,7 +654,7 @@ INTERNAL_FUNCTION mesh MakeMesh(const helper_mesh& HelperMesh)
     
     // NOTE(Dima): Copy name
     const char* SrcName = HelperMesh.Name.c_str();
-    CopyStringsSafe(Result.Name, ArrayCount(Result.Name), (char*)SrcName);
+    CopyStringsSafe(Result.Name, ArrLen(Result.Name), (char*)SrcName);
     
     render_mesh_offsets* Offsets = &Result.Offsets;
     helper_byte_buffer Help = {};

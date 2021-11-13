@@ -32,7 +32,7 @@ inline void OutputLog(const char* Format, ...)
     
     va_list va;
     va_start(va, Format);
-    stbsp_vsnprintf(Buf, ARC(Buf), Format, va);
+    stbsp_vsnprintf(Buf, ArrLen(Buf), Format, va);
     va_end(va);
     
     PlatformAPI.Log(Buf);
@@ -42,6 +42,11 @@ inline void OutputLog(const char* Format, ...)
 #include "flower_jobs.cpp"
 #include "flower_random.cpp"
 #include "flower_input.cpp"
+
+// TODO(Dima): Maybe delete this here when asset loader implemented
+// TODO(Dima): Because this file only contains information that is needed in the asset loader(packer).
+#include "flower_asset_load.cpp"
+
 #include "flower_asset.cpp"
 #include "flower_render.cpp"
 #include "flower_ui.cpp"
@@ -65,7 +70,7 @@ INTERNAL_FUNCTION inline void InitScene(game* Game, int SceneIndex)
 {
     scene* Scene = &Game->Scenes[SceneIndex];
     
-    CopyStringsSafe(Scene->Name, ArrayCount(Scene->Name), (char*)MetaScene_Names[SceneIndex]);
+    CopyStringsSafe(Scene->Name, ArrLen(Scene->Name), (char*)MetaScene_Names[SceneIndex]);
     
     InitSceneMethods(Game, SceneIndex);
     
@@ -80,7 +85,7 @@ INTERNAL_FUNCTION int FindSceneByName(char* Name)
     int Result = 0;
     
     for(int SceneIndex = 0;
-        SceneIndex < ArrayCount(MetaScene_Names);
+        SceneIndex < ArrLen(MetaScene_Names);
         SceneIndex++)
     {
         if(StringsAreEqual(Name, (char*)MetaScene_Names[SceneIndex]))
@@ -95,9 +100,9 @@ INTERNAL_FUNCTION int FindSceneByName(char* Name)
 
 INTERNAL_FUNCTION void InitGameModes(game* Game)
 {
-    int NumNames = ArrayCount(MetaScene_Names);
-    int NumInitFunctions = ArrayCount(MetaScene_InitFunctions);
-    int NumUpdateFunctions = ArrayCount(MetaScene_UpdateFunctions);
+    int NumNames = ArrLen(MetaScene_Names);
+    int NumInitFunctions = ArrLen(MetaScene_InitFunctions);
+    int NumUpdateFunctions = ArrLen(MetaScene_UpdateFunctions);
     
     Assert(NumNames == NumInitFunctions &&
            NumNames == NumUpdateFunctions);

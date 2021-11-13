@@ -334,7 +334,7 @@ INTERNAL_FUNCTION opengl_shader* OpenGLLoadShader(opengl_state* OpenGL,
         SDL_Log("%s shader loaded successfully!\n", ShaderName);
     }
     
-    CopyStringsSafe(Result->Name, ArrayCount(Result->Name), ShaderName);
+    CopyStringsSafe(Result->Name, ArrLen(Result->Name), ShaderName);
     
     // NOTE(Dima): Adding this shader to LoadedShaders
     opengl_loaded_shader* LoadedShader = PushStruct(OpenGL->Arena, opengl_loaded_shader);
@@ -952,7 +952,7 @@ INTERNAL_FUNCTION void OpenGL_GBufferInit(opengl_g_buffer* GBuf, int Width, int 
         GL_COLOR_ATTACHMENT1, 
         GL_COLOR_ATTACHMENT2, 
     };
-    glDrawBuffers(ARC(Attachments), Attachments);
+    glDrawBuffers(ArrLen(Attachments), Attachments);
     
     // NOTE(Dima): Init Depth texture
     glGenTextures(1, &GBuf->Depth);

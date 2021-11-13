@@ -286,7 +286,7 @@ mesh ConvertAssimpMesh(const aiScene* AssimpScene,
     
     std::string MeshName = std::string(AssimpMesh->mName.C_Str());
     
-    CopyStringsSafe(Result.Name, ArrayCount(Result.Name), (char*)MeshName.c_str());
+    CopyStringsSafe(Result.Name, ArrLen(Result.Name), (char*)MeshName.c_str());
     Result.MaterialIndexInModel = AssimpMesh->mMaterialIndex;
     
     return(Result);
@@ -457,7 +457,7 @@ INTERNAL_FUNCTION animation* ConvertToActualAnimation(loaded_animation* Load)
     Result->Behaviour = Load->Behaviour;
     Result->NumNodeAnims = NumNodeAnims;
     
-    CopyStringsSafe(Result->Name, ArrayCount(Result->Name), (char*)Load->Name.c_str());
+    CopyStringsSafe(Result->Name, ArrLen(Result->Name), (char*)Load->Name.c_str());
     
     Result->NodeAnims = (node_animation**)Help.GetPlace("NodeAnims");
     node_animation* NodeAnimsArr = (node_animation*)Help.GetPlace("NodeAnimsArr");
@@ -700,7 +700,7 @@ INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
         
         Node->ParentIndex = Src->ParentNodeIndex;
         
-        CopyStringsSafe(Node->Name, ArrayCount(Node->Name), (char*)Src->Name.c_str());
+        CopyStringsSafe(Node->Name, ArrLen(Node->Name), (char*)Src->Name.c_str());
         Node->NumChildIndices = Src->ChildNodesIndices.size();
         Node->NumMeshIndices = Src->MeshIndices.size();
         Node->StartInMeshIndices = Src->StartInMeshIndices;

@@ -659,7 +659,7 @@ INTERNAL_FUNCTION void ShowTopClocks(b32 IncludingChildren)
             };
             
             ProfileShowMultiGraph("Selected function frame time", 
-                                  DataSets, ArrayCount(DataSets),
+                                  DataSets, ArrLen(DataSets),
                                   NewColors,
                                   OldColors,
                                   33,

@@ -706,7 +706,7 @@ INTERNAL_FUNCTION void DeallocateDeallocEntry(render_api_dealloc_entry* Entry)
 
 INTERNAL_FUNCTION inline render_pass* AddRenderPass(b32 IsShadowPass = false)
 {
-    Assert(Global_RenderCommands->RenderPassCount < ARC(Global_RenderCommands->RenderPasses));
+    Assert(Global_RenderCommands->RenderPassCount < ArrLen(Global_RenderCommands->RenderPasses));
     render_pass* Result = &Global_RenderCommands->RenderPasses[Global_RenderCommands->RenderPassCount++];
     
     Result->ClippingPlaneIsSet = false;
@@ -1029,7 +1029,7 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
                                                 0.5f));
     
     // NOTE(Dima): Resetting current frame active fonts
-    for (int i = 0; i < ARC(Commands->ActiveFrameUniqueFonts); i++)
+    for (int i = 0; i < ArrLen(Commands->ActiveFrameUniqueFonts); i++)
     {
         Commands->ActiveFrameUniqueFonts[i] = 0;
     }
