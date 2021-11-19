@@ -1,4 +1,22 @@
-INTERNAL_FUNCTION void InitSSAO(postprocessing* PP)
+#include "flower_postprocess_shared.cpp"
+
+inline post_proc_effect* PostProcEffect_Add(post_processing* PP,
+                                            char* GUID, 
+                                            u32 EffectType)
+{
+    Assert(PP->NumEffects < POST_PROC_MAX_EFFECTS);
+    post_proc_effect* Effect = &PP->Effects[PP->NumEffects++];
+    
+    Effect->EffectType = EffectType;
+    Effect->Enabled = true;
+    CopyStringsSafe(Effect->GUID, ArrLen(Effect->GUID), GUID);
+    
+    PostProcEffect_DefaultParams(&Effect->Params, EffectType);
+    
+    return Effect;
+}
+
+INTERNAL_FUNCTION void InitSSAO(post_processing* PP)
 {
     // NOTE(Dima): Init SSAO kernel
     for(int i = 0; i < ArrLen(PP->SSAO_Kernel); i++)
@@ -21,15 +39,25 @@ INTERNAL_FUNCTION void InitSSAO(postprocessing* PP)
                                          RandomBilateral(&PP->Random), 
                                          RandomBilateral(&PP->Random)));
     }
-    
-    PP->SSAO_Params = PP_SSAO_DefaultParams();
 }
 
-INTERNAL_FUNCTION void InitPostprocessing(postprocessing* PP)
+INTERNAL_FUNCTION void InitPostprocessing(post_processing* PP)
 {
     PP->Random = SeedRandom(62313);
     
     InitSSAO(PP);
     
-    PP->DOF_Params = PP_DepthOfFieldDefaultParams();
+    // NOTE(Dima): Add standard post proc effects
+    post_proc_effect* MainSSAO = PostProcEffect_Add(PP, "MainSSAO", 
+                                                    PostProcEffect_SSAO);
+    
+    post_proc_effect* InWaterSSAO = PostProcEffect_Add(PP, "InWaterSSAO", 
+                                                       PostProcEffect_SSAO);
+    
+    
+    post_proc_effect* MainDOF = PostProcEffect_Add(PP, "MainDOF", 
+                                                   PostProcEffect_DOF);
+    
+    post_proc_effect* MainDOFBlur = PostProcEffect_Add(PP, "MainDOF_Blur", 
+                                                       PostProcEffect_BoxBlur);
 }

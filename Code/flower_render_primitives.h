@@ -139,6 +139,7 @@ struct image
     float WidthOverHeight;
     
     b32 FilteringIsClosest;
+    v2 Align;
     
     renderer_handle Handle;
 };
@@ -212,6 +213,8 @@ enum font_size_type
     
     FontSize_Count,
 };
+
+// TODO(Dima): Use Stb rect pack to pack glyphs into atlas
 
 static int Global_FontSizes[FontSize_Count] = 
 {

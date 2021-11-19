@@ -1,24 +1,56 @@
 #ifndef FLOWER_POSTPROCESS_H
 #define FLOWER_POSTPROCESS_H
 
-enum pp_resolution
+enum post_proc_resolution
 {
-    PostProcessResolution_Normal,
-    PostProcessResolution_Half,
-    PostProcessResolution_Quater,
+    PostProcResolution_Normal,
+    PostProcResolution_Half,
+    PostProcResolution_Quater,
+    
+    PostProcResolution_Count,
 };
 
-struct pp_dilation_params
+GLOBAL_VARIABLE int Global_PostProcResolutionDivisors[PostProcResolution_Count] =
+{
+    1,
+    2,
+    4,
+};
+
+enum post_proc_effect_type
+{
+    PostProcEffect_Posterize,
+    PostProcEffect_BoxBlur,
+    PostProcEffect_Dilation,
+    PostProcEffect_DOF,
+    PostProcEffect_SSAO,
+};
+
+struct posterize_params
+{
+    int Levels;
+    
+    post_proc_resolution Resolution;
+};
+
+struct box_blur_params
+{
+    int RadiusSize;
+    post_proc_resolution Resolution;
+    b32 EnableCheapMode;
+};
+
+struct dilation_params
 {
     int Size;
     
     f32 MinThreshold;
     f32 MaxThreshold;
     
-    pp_resolution Resolution;
+    post_proc_resolution Resolution;
 };
 
-struct pp_depth_of_field_params
+struct dof_params
 {
     f32 MinDistance;
     f32 MaxDistance;
@@ -26,75 +58,107 @@ struct pp_depth_of_field_params
     f32 FocusZ;
 };
 
-struct pp_ssao_params
+struct ssao_params
 {
     int KernelSize;
     f32 KernelRadius;
     f32 Contribution;
     f32 RangeCheck;
+    
+    b32 BlurEnabled;
     int BlurRadius;
     
-    b32 Enabled;
-    pp_resolution Resolution;
+    post_proc_resolution Resolution;
 };
 
-inline pp_ssao_params PP_SSAO_DefaultParams()
+struct post_proc_params
 {
-    pp_ssao_params Result = {};
+    union
+    {
+        posterize_params Posterize;
+        box_blur_params BoxBlur;
+        dilation_params Dilation;
+        dof_params DOF;
+        ssao_params SSAO;
+    } Union;
+};
+
+struct post_proc_effect
+{
+#define POST_PROC_EFFECT_GUID_SIZE 128
+    char GUID[POST_PROC_EFFECT_GUID_SIZE];
     
-    Result.KernelSize = 64;
-    Result.KernelRadius = 0.6f;
-    //Result.Contribution = 1.0f;
-    Result.Contribution = 1.0f;
-    Result.RangeCheck = 0.25f;
-    Result.BlurRadius = 1;
+    u32 EffectType;
     
-    Result.Enabled = true;
-    Result.Resolution = PostProcessResolution_Half;
-    
-    return(Result);
+    b32 Enabled;
+    post_proc_params Params;
+};
+
+inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 EffectType)
+{
+    switch(EffectType)
+    {
+        case PostProcEffect_Posterize:
+        {
+            posterize_params* Posterize = &ParamsBase->Union.Posterize;
+            
+            Posterize->Levels = 7;
+            Posterize->Resolution = PostProcResolution_Normal;
+        }break;
+        
+        case PostProcEffect_BoxBlur:
+        {
+            box_blur_params* BoxBlur = &ParamsBase->Union.BoxBlur;
+            
+            BoxBlur->RadiusSize = 2;
+            BoxBlur->EnableCheapMode = false;
+            BoxBlur->Resolution = PostProcResolution_Normal;
+        }break;
+        
+        case PostProcEffect_Dilation:
+        {
+            dilation_params* Dilation = &ParamsBase->Union.Dilation;
+            
+            Dilation->Size = 2;
+            Dilation->MinThreshold = 0.1f;
+            Dilation->MaxThreshold = 0.3f;
+            Dilation->Resolution = PostProcResolution_Normal;
+        }break;
+        
+        case PostProcEffect_DOF:
+        {
+            dof_params* DOF = &ParamsBase->Union.DOF;
+            
+            DOF->MinDistance = 300.0f;
+            DOF->MaxDistance = 1200.0f;
+            DOF->FocusZ = 0.0f;
+        }break;
+        
+        case PostProcEffect_SSAO:
+        {
+            ssao_params* SSAO = &ParamsBase->Union.SSAO;
+            
+            SSAO->KernelSize = 64;
+            
+            SSAO->KernelRadius = 0.6f;
+            SSAO->Contribution = 1.0f;
+            SSAO->RangeCheck = 0.25f;
+            SSAO->BlurRadius = 2;
+            SSAO->Resolution = PostProcResolution_Normal;
+        }break;
+    }
 }
 
-inline pp_dilation_params PP_DilationDefaultParams()
-{
-    pp_dilation_params Result = {};
-    
-    Result.Size = 2;
-    Result.MinThreshold = 0.1f;
-    Result.MaxThreshold = 0.3f;
-    Result.Resolution = PostProcessResolution_Half;
-    
-    return(Result);
-}
-
-inline pp_depth_of_field_params PP_DepthOfFieldDefaultParams()
-{
-    pp_depth_of_field_params Result = {};
-    
-    //Result.MinDistance = 120.0f;
-    //Result.MaxDistance = 280.0f;
-    
-#if 1    
-    Result.MinDistance = 300.0f;
-    Result.MaxDistance = 1200.0f;
-#else
-    Result.MinDistance = 50;
-    Result.MaxDistance = 100;
-#endif
-    Result.FocusZ = 0.0f;
-    
-    return(Result);
-}
-
-struct postprocessing
+struct post_processing
 {
     random_generation Random;
     
     v3 SSAO_Kernel[128];
     v3 SSAO_Noise[16];
-    pp_ssao_params SSAO_Params;
     
-    pp_depth_of_field_params DOF_Params;
+#define POST_PROC_MAX_EFFECTS 32
+    post_proc_effect Effects[POST_PROC_MAX_EFFECTS];
+    int NumEffects;
 };
 
 #endif //FLOWER_POSTPROCESS_H

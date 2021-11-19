@@ -15,6 +15,9 @@ struct opengl_framebuffer
     
     int Width;
     int Height;
+    
+    int ResolutionIndex;
+    int IndexInUse;
 };
 
 struct opengl_array_object
@@ -24,17 +27,17 @@ struct opengl_array_object
     u32 EBO;
 };
 
-struct opengl_pp_framebuffer
+struct opengl_framebuffer_pool
 {
-    opengl_framebuffer FB;
+    int Width;
+    int Height;
     
-    b32 IsInUseNow;
-};
-
-struct opengl_pp_framebuffer_pool
-{
-    opengl_pp_framebuffer* Framebuffers;
-    int Count;
+#define MAX_FRAMEBUFFERS_IN_FRAMEBUFFER_POOL 128
+    opengl_framebuffer* UseFramebuffers[MAX_FRAMEBUFFERS_IN_FRAMEBUFFER_POOL];
+    opengl_framebuffer* FreeFramebuffers[MAX_FRAMEBUFFERS_IN_FRAMEBUFFER_POOL];
+    
+    int NumUse;
+    int NumFree;
 };
 
 struct opengl_g_buffer
@@ -105,9 +108,7 @@ struct opengl_state
     int InitCascadesCount;
     
     // NOTE(Dima): Framebuffer pools
-    opengl_pp_framebuffer_pool FramebufPoolNormalRes;
-    opengl_pp_framebuffer_pool FramebufPoolHalfRes;
-    opengl_pp_framebuffer_pool FramebufPoolQuaterRes;
+    opengl_framebuffer_pool FramebufferPoolResolutions[PostProcResolution_Count];
     
     int MaxCombinedTextureUnits;
 };

@@ -26,6 +26,37 @@ inline void PushClear(v3 Color, u32 Flags = RenderClear_Color | RenderClear_Dept
     Global_RenderCommands->ClearCommand.Flags = Flags;
 }
 
+
+inline void PushImage(image* Img, 
+                      v2 P, 
+                      f32 Height, 
+                      v2 Align = V2(0.0f),
+                      v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f),
+                      b32 DisableDepthTest = true)
+{
+    render_command_image* Entry = PushRenderCommand(RenderCommand_Image, render_command_image);
+    
+    v2 Dim = V2(Height * Img->WidthOverHeight, Height);
+    v2 OffsetToNeededPos = Hadamard(Dim, Img->Align);
+    v2 ResultP = P - OffsetToNeededPos;
+    
+    Entry->Image = Img;
+    Entry->P = ResultP;
+    Entry->C = PremultiplyAlpha(C);
+    Entry->Dim = Dim;
+    Entry->DisableDepthTest = DisableDepthTest;
+}
+
+inline void PushRectBuffer(batch_rect_buffer* RectBuffer,
+                           b32 DisableDepthTest = true)
+{
+    render_command_rect_buffer* Entry = PushRenderCommand(RenderCommand_RectBuffer, 
+                                                          render_command_rect_buffer);
+    
+    Entry->RectBuffer = RectBuffer;
+    Entry->DisableDepthTest = DisableDepthTest;
+}
+
 inline void PushMesh(mesh* Mesh, 
                      material* Material, 
                      const m44& ModelToWorld = IdentityMatrix4(),
@@ -208,20 +239,6 @@ inline void PushSky(v3 Color)
     Global_RenderCommands->SkyType = RenderSky_SolidColor;
 }
 
-inline void InitRectBuffer(batch_rect_buffer* Result, int NumRects)
-{
-    Result->MaxRectCount = NumRects;
-    Result->RectCount = 0;
-    Result->ViewProjection = IdentityMatrix4();
-    
-    memory_arena* Arena = Global_RenderCommands->Arena;
-    
-    Result->Vertices = PushArray(Arena, rect_vertex, NumRects * 4);
-    Result->Indices = PushArray(Arena, u32, NumRects * 6);
-    Result->Colors = PushArray(Arena, u32, NumRects);
-    Result->TextureIndices = PushArray(Arena, u8, NumRects);
-}
-
 inline void ResetRectBuffer(batch_rect_buffer* RectBuffer)
 {
     RectBuffer->RectCount = 0;
@@ -231,6 +248,20 @@ inline void ResetRectBuffer(batch_rect_buffer* RectBuffer)
     RectBuffer->TextureCount = 0;
 }
 
+inline void InitRectBuffer(batch_rect_buffer* Result, int NumRects)
+{
+    Result->MaxRectCount = NumRects;
+    
+    memory_arena* Arena = Global_RenderCommands->Arena;
+    
+    Result->Vertices = PushArray(Arena, rect_vertex, NumRects * 4);
+    Result->Indices = PushArray(Arena, u32, NumRects * 6);
+    Result->Colors = PushArray(Arena, u32, NumRects);
+    Result->TextureIndices = PushArray(Arena, u8, NumRects);
+    
+    ResetRectBuffer(Result);
+}
+
 inline void RectBufferSetMatrices(batch_rect_buffer* Buf, 
                                   const m44& View,
                                   const m44& Projection)
@@ -238,44 +269,9 @@ inline void RectBufferSetMatrices(batch_rect_buffer* Buf,
     Buf->ViewProjection = View * Projection;
 }
 
-inline void PushImage(image* Img, v2 P, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
-{
-    if(Global_RenderCommands->ImageFree.Next == &Global_RenderCommands->ImageFree)
-    {
-        int ToAddCount = 128;
-        
-        render_command_image* Pool = PushArray(Global_RenderCommands->Arena, 
-                                               render_command_image, 
-                                               ToAddCount);
-        
-        for(int i = 0; i < ToAddCount; i++)
-        {
-            DLIST_INSERT_BEFORE_SENTINEL(&Pool[i], 
-                                         Global_RenderCommands->ImageFree, 
-                                         Next, Prev);
-        }
-    }
-    
-    render_command_image* Entry = Global_RenderCommands->ImageFree.Next;
-    
-    DLIST_REMOVE(Entry, Next, Prev);
-    DLIST_INSERT_BEFORE_SENTINEL(Entry, 
-                                 Global_RenderCommands->ImageUse,
-                                 Next, Prev);
-    
-    Entry->Image = Img;
-    Entry->P = P;
-    Entry->C = PremultiplyAlpha(C);
-    Entry->Dim = V2(Height * Img->WidthOverHeight, Height);
-}
-
 inline void PushCenteredImage(image* Img, v2 CenterP, f32 Height, v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    f32 Width = Height * Img->WidthOverHeight;
-    
-    v2 PushP = CenterP - V2(Width, Height) * 0.5f;
-    
-    PushImage(Img, PushP, Height, C);
+    PushImage(Img, CenterP, Height, V2(0.5f), C);
 }
 
 INTERNAL_FUNCTION inline void PushRectInternal(batch_rect_buffer* RectBuffer,
@@ -433,13 +429,23 @@ INTERNAL_FUNCTION inline void PushRect(batch_rect_buffer* RectBuffer,
                         C);
 }
 
+INTERNAL_FUNCTION inline void PushCenteredQuad(batch_rect_buffer* RectBuffer,
+                                               v2 CenterP,
+                                               f32 QuadWidth,
+                                               v4 C = ColorWhite())
+{
+    rc2 Rect = RectCenterDim(CenterP, V2(QuadWidth));
+    
+    PushRect(RectBuffer, Rect, C);
+}
+
 INTERNAL_FUNCTION inline void PushFullscreenRect(v4 C = ColorWhite())
 {
     rc2 Rect = RectMinDim(V2(0.0f, 0.0f), 
                           V2(Global_RenderCommands->WindowDimensions.Width,
                              Global_RenderCommands->WindowDimensions.Height));
     
-    PushRect(Global_RenderCommands->Rects2D_Window, Rect, C);
+    PushRect(Global_RenderCommands->DEBUG_Rects2D_Window, Rect, C);
 }
 
 INTERNAL_FUNCTION inline void PushRectOutline(batch_rect_buffer* RectBuffer,
@@ -802,14 +808,14 @@ INTERNAL_FUNCTION inline void SetClippingPlane(render_pass* RenderPass, v4 Clipp
 INTERNAL_FUNCTION void SetOrthographicPassData(render_pass* RenderPass,
                                                v3 CameraP,
                                                const m44& View,
-                                               f32 Far, f32 Near,
                                                f32 Width, 
-                                               f32 Height)
+                                               f32 Height,
+                                               f32 Far, 
+                                               f32 Near)
 {
     RenderPass->CameraP = CameraP;
     RenderPass->View = View;
-    RenderPass->Projection = OrthographicProjectionUnitRadius(Width, Height,
-                                                              Far, Near);
+    RenderPass->Projection = OrthographicProjectionUnitRadius(Width, Height, Far, Near);
     RenderPass->ViewProjection = RenderPass->View * RenderPass->Projection;
     
     RenderPass->Far = Far;
@@ -834,9 +840,10 @@ INTERNAL_FUNCTION void UpdateShadowCascades(render_pass* MainRenderPass)
         
         SetOrthographicPassData(Cascade->RenderPass,
                                 Cascade->P, Cascade->View,
-                                Cascade->Far, Cascade->Near,
                                 Cascade->ViewRadiusW,
-                                Cascade->ViewRadiusH);
+                                Cascade->ViewRadiusH,
+                                Cascade->Far, 
+                                Cascade->Near);
     }
     
 }
@@ -914,31 +921,6 @@ INTERNAL_FUNCTION void RenderPushDeallocateHandle(renderer_handle* Handle)
     Entry->Handle = Handle;
 }
 
-INTERNAL_FUNCTION inline material_command_entry* AllocateMaterialCommandEntry()
-{
-    if(Global_RenderCommands->FirstFreeCommandEntry == 0)
-    {
-        int CountToAlloc = 1024;
-        material_command_entry* NewEntries = PushArray(&Global_RenderCommands->CommandsBuffer, 
-                                                       material_command_entry, CountToAlloc);
-        
-        for(int EntryIndex = 0;
-            EntryIndex < CountToAlloc;
-            EntryIndex++)
-        {
-            NewEntries[EntryIndex].Next = Global_RenderCommands->FirstFreeCommandEntry;
-            
-            Global_RenderCommands->FirstFreeCommandEntry = &NewEntries[EntryIndex];
-        }
-    }
-    
-    material_command_entry* Result = Global_RenderCommands->FirstFreeCommandEntry;
-    
-    Global_RenderCommands->FirstFreeCommandEntry = Global_RenderCommands->FirstFreeCommandEntry->Next;
-    
-    return(Result);
-}
-
 INTERNAL_FUNCTION inline 
 int FindFontInActiveFrameFonts(font* Font)
 {
@@ -1004,29 +986,20 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
     Commands->WaterIsSet = false;
     Commands->Water = {};
     
-    Commands->FirstFreeCommandEntry = 0;
-    
     // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();
     
     
     // NOTE(Dima): Setting default rect buffers matrices
-    RectBufferSetMatrices(Commands->Rects2D_Window,
+    RectBufferSetMatrices(Commands->DEBUG_Rects2D_Window,
                           IdentityMatrix4(),
                           OrthographicProjectionWindow(Commands->WindowDimensions.Width,
                                                        Commands->WindowDimensions.Height));
     
-    RectBufferSetMatrices(Commands->Rects2D_Unit,
+    RectBufferSetMatrices(Commands->DEBUG_Rects2D_Unit,
                           IdentityMatrix4(),
                           OrthographicProjectionUnit(Commands->WindowDimensions.Width,
                                                      Commands->WindowDimensions.Height));
-    
-    RectBufferSetMatrices(Commands->Rects3D,
-                          IdentityMatrix4(),
-                          PerspectiveProjection(Commands->WindowDimensions.Width,
-                                                Commands->WindowDimensions.Height,
-                                                500.0f,
-                                                0.5f));
     
     // NOTE(Dima): Resetting current frame active fonts
     for (int i = 0; i < ArrLen(Commands->ActiveFrameUniqueFonts); i++)
@@ -1043,14 +1016,11 @@ INTERNAL_FUNCTION void EndRender()
     FreeArena(&Commands->CommandsBuffer, true);
     Commands->CommandCount = 0;
     
-    ResetRectBuffer(Commands->Rects2D_Window);
-    ResetRectBuffer(Commands->Rects2D_Unit);
-    ResetRectBuffer(Commands->Rects3D);
+    ResetRectBuffer(Commands->DEBUG_Rects2D_Window);
+    ResetRectBuffer(Commands->DEBUG_Rects2D_Unit);
     
     Commands->Sky = 0;
     Commands->ClearCommand.Set = false;
-    
-    DLIST_REMOVE_ENTIRE_LIST(&Commands->ImageUse, &Commands->ImageFree, Next, Prev);
 }
 
 INTERNAL_FUNCTION void RenderAll()
@@ -1072,27 +1042,17 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensi
     Comms->WindowDimensions = Dimensions;
     
     // NOTE(Dima): Allocating main rect buffers
-    Comms->RectBuffersPool = dlist<batch_rect_buffer>(Arena);
-    dlist_entry<batch_rect_buffer>* Buf1 = Comms->RectBuffersPool.allocate();
-    dlist_entry<batch_rect_buffer>* Buf2 = Comms->RectBuffersPool.allocate();
-    dlist_entry<batch_rect_buffer>* Buf3 = Comms->RectBuffersPool.allocate();
-    
-    Comms->Rects2D_Window = &Buf1->Data;
-    Comms->Rects2D_Unit = &Buf2->Data;
-    Comms->Rects3D = &Buf3->Data;
+    Comms->DEBUG_Rects2D_Window = PushStruct(Arena, batch_rect_buffer);
+    Comms->DEBUG_Rects2D_Unit = PushStruct(Arena, batch_rect_buffer);
     
     // NOTE(Dima): Initialize batched rect buffers
-    InitRectBuffer(Comms->Rects2D_Window, 30000);
-    InitRectBuffer(Comms->Rects2D_Unit, 10000);
+    InitRectBuffer(Comms->DEBUG_Rects2D_Window, 30000);
+    InitRectBuffer(Comms->DEBUG_Rects2D_Unit, 10000);
     
     // NOTE(Dima): Init dealloc list
     InitTicketMutex(&Comms->DeallocEntriesMutex);
     DLIST_REFLECT_PTRS(Comms->UseDealloc, Next, Prev);
     DLIST_REFLECT_PTRS(Comms->FreeDealloc, Next, Prev);
-    
-    // NOTE(Dima): Init images list
-    DLIST_REFLECT_PTRS(Comms->ImageUse, Next, Prev);
-    DLIST_REFLECT_PTRS(Comms->ImageFree, Next, Prev);
     
     // NOTE(Dima): Init other stuff
     InitLighting(&Comms->Lighting, Arena);

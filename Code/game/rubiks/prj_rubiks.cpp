@@ -1602,7 +1602,7 @@ INTERNAL_FUNCTION void ShowSides(rubiks_cube* Cube,
             
             rc2 QuadieRc = RectMinDim(QuadieShowP,
                                       OneQuadieDim);
-            PushRect(Global_RenderCommands->Rects2D_Window,
+            PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
                      QuadieRc, Color);
         }
         

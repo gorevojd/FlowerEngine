@@ -75,12 +75,12 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     
     v2 AtP = V2(P.x, P.y);
     
-    batch_rect_buffer* Buffer = Global_RenderCommands->Rects2D_Window;
+    batch_rect_buffer* Buffer = Global_RenderCommands->DEBUG_Rects2D_Window;
     
     //int IndexToTransformMatrix = Buffer->IdentityMatrixIndex;
     
     int TextureIndex = GetFontTextureIndexInRectBuffer(Font, 
-                                                       Global_RenderCommands->Rects2D_Window);
+                                                       Global_RenderCommands->DEBUG_Rects2D_Window);
     
     u32 FontStyle = FontStyle_Regular;
     if(BoolFlag(Flags, PrintText_StyleShadow))
@@ -168,9 +168,39 @@ INTERNAL_FUNCTION inline v2 GetTextSize(char* Text)
     return(Result);
 }
 
+
+INTERNAL_FUNCTION inline rc2 GetTextRectWithFont(font* Font,
+                                                 char* Text, 
+                                                 f32 PixelHeight,
+                                                 v2 P)
+{
+    font_size* FontSize = FindBestFontSizeForPixelHeight(Font, PixelHeight);
+    f32 Scale = GetScaleForPixelHeight(FontSize, PixelHeight);
+    
+    rc2 Result = PrintText_(Font, 
+                            Text, 
+                            V3_Left(), V3_Up(), V3_Forward(), 
+                            V3(P.x, P.y, 0.0f), V2(0.0f, 0.0f), 
+                            0, 
+                            FontSize,
+                            Scale);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline v2 GetTextSizeWithFont(font* Font, 
+                                                char* Text,
+                                                f32 PixelHeight)
+{
+    rc2 TextRect = GetTextRectWithFont(Font, Text, PixelHeight, V2(0.0f, 0.0f));
+    
+    v2 Result = GetDim(TextRect);
+    
+    return(Result);
+}
+
 INTERNAL_FUNCTION inline f32 GetPrintHorizontalPosition(f32 Min, f32 Max, 
-                                                        f32 TextDimX, u32 Align,
-                                                        f32 TextScale)
+                                                        f32 TextDimX, u32 Align)
 {
     f32 Result = Min;
     
@@ -200,14 +230,12 @@ INTERNAL_FUNCTION inline f32 GetPrintHorizontalPosition(f32 Min, f32 Max,
     return(Result);
 }
 
-INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(f32 Min, f32 Max, 
+INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(font* Font, font_size* FontSize, 
+                                                      f32 Min, f32 Max, 
                                                       f32 TextDimY, u32 Align, 
                                                       f32 TextScale)
 {
     f32 Result = Min;
-    
-    font* Font = Global_UI->Params.Font;
-    font_size* FontSize = Global_UI->Params.FontSize;
     
     switch(Align)
     {
@@ -218,7 +246,7 @@ INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(f32 Min, f32 Max,
         
         case TextAlign_Bottom:
         {
-            Result = Max + Font->Descent * TextScale;
+            Result = Max + Font->Descent * FontSize->Scale * TextScale;
         }break;
         
         case TextAlign_Center:
@@ -239,19 +267,23 @@ INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(f32 Min, f32 Max,
     return(Result);
 }
 
-INTERNAL_FUNCTION inline v2 GetPrintPositionInRect(rc2 Rect,
+INTERNAL_FUNCTION inline v2 GetPrintPositionInRect(font* Font,
+                                                   font_size* FontSize,
+                                                   f32 TextPixelHeight,
+                                                   rc2 Rect,
                                                    v2 TextDim,
                                                    u32 AlignX,
                                                    u32 AlignY)
 {
+    f32 Scale = GetScaleForPixelHeight(FontSize, TextPixelHeight);
+    
     v2 Result;
-    
-    ui_params* Params = UIGetParams();
-    
     Result.x = GetPrintHorizontalPosition(Rect.Min.x, Rect.Max.x,
-                                          TextDim.x, AlignX, Params->Scale);
-    Result.y = GetPrintVerticalPosition(Rect.Min.y, Rect.Max.y,
-                                        TextDim.y, AlignY, Params->Scale);
+                                          TextDim.x, AlignX);
+    Result.y = GetPrintVerticalPosition(Font, FontSize,
+                                        Rect.Min.y, Rect.Max.y,
+                                        TextDim.y, AlignY, 
+                                        Scale);
     
     return(Result);
 }
@@ -274,6 +306,45 @@ INTERNAL_FUNCTION rc2 PrintTextWithFont(font* Font,
                             C);
     
     return(Result);
+}
+
+INTERNAL_FUNCTION rc2 PrintTextWithFontAligned(font* Font,
+                                               char* Text,
+                                               rc2 Rect,
+                                               f32 PixelHeight = 25.0f,
+                                               u32 AlignX = TextAlign_Center,
+                                               u32 AlignY = TextAlign_Center,
+                                               v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+{
+    font_size* FontSize = FindBestFontSizeForPixelHeight(Font, PixelHeight);
+    
+    v2 TextSize = GetTextSizeWithFont(Font, Text, PixelHeight);
+    
+    v2 PrintP = GetPrintPositionInRect(Font, FontSize,
+                                       PixelHeight,
+                                       Rect, TextSize,
+                                       AlignX, AlignY);
+    
+    rc2 Result = PrintTextWithFont(Font, Text, PrintP, PixelHeight, C);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION rc2 PrintTextWithFontAligned(font* Font,
+                                               char* Text,
+                                               v2 P,
+                                               f32 PixelHeight = 25.0f,
+                                               u32 AlignX = TextAlign_Center,
+                                               u32 AlignY = TextAlign_Center,
+                                               v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+{
+    rc2 Result = PrintTextWithFontAligned(Font, Text,
+                                          RectMinMax(P, P),
+                                          PixelHeight,
+                                          AlignX, AlignY,
+                                          C);
+    
+    return Result;
 }
 
 INTERNAL_FUNCTION rc2 PrintText(char* Text,
@@ -302,9 +373,14 @@ INTERNAL_FUNCTION rc2 PrintTextAligned(char* Text,
                                        u32 AlignY = TextAlign_Center,
                                        v4 C = ColorWhite())
 {
+    ui_params* Params = UIGetParams();
+    
     v2 TextSize = GetTextSize(Text);
     
-    v2 PrintP = GetPrintPositionInRect(Rect, TextSize,
+    v2 PrintP = GetPrintPositionInRect(Params->Font,
+                                       Params->FontSize,
+                                       Params->TextPixelHeight,
+                                       Rect, TextSize,
                                        AlignX, AlignY);
     
     rc2 Result = PrintText(Text, PrintP, C);
@@ -1239,7 +1315,7 @@ INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree,
                 BackgroundColor = UIGetColor(UIColor_ButtonBackground);
             }
             
-            PushRect(Global_RenderCommands->Rects2D_Window,
+            PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
                      Bounds, BackgroundColor);
         }
         

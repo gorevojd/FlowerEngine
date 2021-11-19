@@ -259,7 +259,11 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         // NOTE(Dima): SSAO enable/disable
         if(GetKeyDown(Key_I))
         {
-            Global_RenderCommands->PostProcessing.SSAO_Params.Enabled = !Global_RenderCommands->PostProcessing.SSAO_Params.Enabled;
+            post_processing* PP = &Global_RenderCommands->PostProcessing;
+            
+            b32 NewSSAOEnabled = !PostProcEffect_IsEnabled(PP, "MainSSAO");
+            PostProcEffect_SetEnabled(PP, "MainSSAO", NewSSAOEnabled);
+            PostProcEffect_SetEnabled(PP, "InWaterSSAO", NewSSAOEnabled);
         }
         
         if(GetKeyDown(Key_N))

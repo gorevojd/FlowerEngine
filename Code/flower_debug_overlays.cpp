@@ -15,7 +15,7 @@ INTERNAL_FUNCTION void PrintWebForBaredGraph(int BarsCount,
 {
     float WidthPerOneBar = GetDim(TotalRect).x / (float)BarsCount;
     
-    batch_rect_buffer* RectBuffer = Global_RenderCommands->Rects2D_Window;
+    batch_rect_buffer* RectBuffer = Global_RenderCommands->DEBUG_Rects2D_Window;
     
     // NOTE(Dima): Printing black web
     PushRectOutline(RectBuffer, TotalRect, 2, Color);
@@ -92,7 +92,7 @@ INTERNAL_FUNCTION void ShowFramesSlider()
         PrintWebForBaredGraph(DEBUG_PROFILED_FRAMES_COUNT,
                               SliderRect, UIGetColor(UIColor_Borders));
         
-        batch_rect_buffer* RectBuf = Global_RenderCommands->Rects2D_Window;
+        batch_rect_buffer* RectBuf = Global_RenderCommands->DEBUG_Rects2D_Window;
         // NOTE(Dima): Printing collation frame bar
         PushRect(RectBuf,
                  GetBarRectHorz(SliderRect, 
@@ -247,7 +247,7 @@ INTERNAL_FUNCTION void ProfileShowGraphValuesInRect(f32* Values,
             
             if(!LineJustStarted && !LineIsAboveGraph)
             {
-                PushLine2D(Global_RenderCommands->Rects2D_Window,
+                PushLine2D(Global_RenderCommands->DEBUG_Rects2D_Window,
                            CurrentP, LastPoint, Lerp(4, 2, Age), LineColor);
             }
             else{
@@ -265,7 +265,7 @@ INTERNAL_FUNCTION void ProfileShowGraphValuesInRect(f32* Values,
             v2 ViewFrameDim = V2(OneFramePixels, Dim.y);
             rc2 ViewFrameRect = RectCenterDim(ViewFrameCenter, ViewFrameDim);
             
-            PushRect(Global_RenderCommands->Rects2D_Window,
+            PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
                      ViewFrameRect, V4(UIGetColor(UIColor_GraphFrameView).rgb, 0.6f));
             
             LastWasGreaterThanMax = false;
@@ -283,7 +283,7 @@ INTERNAL_FUNCTION void ProfileShowMultiGraphInRect(char* Name, float** Values, i
                                                    f32 AscendersHeight = UI_GRAPH_HEIGHT_SMALL_UNITS,
                                                    f32 AscendersWidth = UI_GRAPH_WIDTH_UNITS)
 {
-    PushRect(Global_RenderCommands->Rects2D_Window,
+    PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
              GraphRect, UIGetColor(UIColor_GraphBackground));
     
     for(int SetIndex = 0;
@@ -302,7 +302,7 @@ INTERNAL_FUNCTION void ProfileShowMultiGraphInRect(char* Name, float** Values, i
                      UIGetColor(UIColor_Text));
     UIPopScale();
     
-    PushRectOutline(Global_RenderCommands->Rects2D_Window,
+    PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
                     GraphRect, 2, UIGetColor(UIColor_Borders));
 }
 
@@ -368,7 +368,7 @@ INTERNAL_FUNCTION void ShowFrameTimeSlider(b32 IsFrameTime = true)
         v2 At = Layout->At - V2(0.0f, ScaledAsc);
         rc2 SliderRect = RectMinDim(At, V2(DimX, ScaledAsc * 5.0f));
         
-        PushRect(Global_RenderCommands->Rects2D_Window,
+        PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
                  SliderRect, UIGetColor(UIColor_GraphBackground));
         
         f32* Values = Global_Debug->Menus.FPSGraph_FPSValues;
@@ -391,7 +391,7 @@ INTERNAL_FUNCTION void ShowFrameTimeSlider(b32 IsFrameTime = true)
                          UIGetColor(UIColor_Text));
         UIPopScale();
         
-        PushRectOutline(Global_RenderCommands->Rects2D_Window,
+        PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
                         SliderRect, 2, UIGetColor(UIColor_Borders));
         DescribeElement(SliderRect);
     }
@@ -427,7 +427,7 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
                         ScaledAsc * UI_GRAPH_HEIGHT_BIG_UNITS);
             rc2 GraphRect = RectMinDim(At, Dim);
             
-            PushRect(Global_RenderCommands->Rects2D_Window,
+            PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
                      GraphRect, UIGetColor(UIColor_GraphBackground));
             
             {
@@ -496,7 +496,7 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
                         rc2 LineRect = RectMinDim(ThisTextRect.Min, 
                                                   V2(Dim.x, GetDim(ThisTextRect).y));
                         
-                        PushRect(Global_RenderCommands->Rects2D_Window,
+                        PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
                                  LineRect, UIGetColor(UIColor_ButtonBackground));
                     }
                     
@@ -512,7 +512,7 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
                 UIPopScale();
             }
             
-            PushRectOutline(Global_RenderCommands->Rects2D_Window,
+            PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
                             GraphRect, 2, UIGetColor(UIColor_Borders));
             
             DescribeElement(GraphRect);

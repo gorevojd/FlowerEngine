@@ -222,9 +222,9 @@ SCENE_UPDATE(RubiksCube)
     if(GetKeyDown(Key_V))
     {
         CameraBehaviourIndex = !CameraBehaviourIndex;
+        
+        ChangeCameraState(&State->Camera, CameraStates[CameraBehaviourIndex]);
     }
-    State->Camera.State = CameraStates[CameraBehaviourIndex];
-    
     
     // NOTE(Dima): Rendering
     render_pass* RenderPass = AddRenderPass();
@@ -237,19 +237,4 @@ SCENE_UPDATE(RubiksCube)
     {
         ModeUpdateCube(State, i);
     }
-    
-    
-    
-#if 0    
-    ShowSides(&State->Cubes[0], V2(10), 240);
-    
-    ShowLabel3D(&State->Camera, 
-                "Hello world this is the cube",
-                V3_Up() * 1.5f,
-                0.25f,
-                ColorRed());
-    PushImage(&Global_Assets->FontsAtlas, V2(0.0f), 1300);
-#endif
-    
-    SetMatrices(&State->Camera, RenderPass);
 }

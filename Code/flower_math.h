@@ -73,7 +73,17 @@ union v4
         {
             struct
             {
-                f32 x, y, z;
+                union
+                {
+                    v2 xy;
+                    
+                    struct 
+                    {
+                        f32 x, y;
+                    };
+                };
+                
+                f32 z;
             };
             
             v3 xyz;

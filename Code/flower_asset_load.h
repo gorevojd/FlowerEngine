@@ -11,6 +11,7 @@ struct loading_params
         {
             b32 FlipVertically;
             b32 FilteringIsClosest;
+            v2 Align;
         }Image;
         
         struct 
@@ -54,6 +55,7 @@ inline loading_params LoadingParams_Image()
     // NOTE(Dima): Image
     Result.Image.FlipVertically = true;
     Result.Image.FilteringIsClosest = false;
+    Result.Image.Align = V2(0.0f, 0.0f);
     
     return Result;
 }

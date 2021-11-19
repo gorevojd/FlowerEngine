@@ -41,6 +41,8 @@ INTERNAL_FUNCTION image* LoadImageFile(char* FilePath,
         AllocateImageInternal(Result, Width, Height, ResultPixels);
         Result->FilteringIsClosest = Params.Image.FilteringIsClosest;
         
+        Result->Align = Params.Image.Align;
+        
         for(int PixelIndex = 0;
             PixelIndex < PixCount;
             PixelIndex++)
@@ -210,9 +212,6 @@ INTERNAL_FUNCTION void AddGlyphToAtlas(load_font_context* Ctx, glyph* Glyph)
             int DstPx = std::ceil(Ctx->FontAtlasAtP.x);
             int DstPy = std::ceil(Ctx->FontAtlasAtP.y);
             
-            Style->MinUV = V2(DstPx, DstPy) * OneOverSize;
-            Style->MaxUV = V2(DstPx + SrcW, DstPy + SrcH) * OneOverSize;
-            
             if(DstPx + SrcW >= DstSize)
             {
                 DstPx = 0;
@@ -220,6 +219,9 @@ INTERNAL_FUNCTION void AddGlyphToAtlas(load_font_context* Ctx, glyph* Glyph)
             }
             
             Assert(DstPy + SrcH < DstSize);
+            
+            Style->MinUV = V2(DstPx, DstPy) * OneOverSize;
+            Style->MaxUV = V2(DstPx + SrcW, DstPy + SrcH) * OneOverSize;
             
             // NOTE(Dima): Copy pixels
             for(int y = 0; y < SrcH; y++)

@@ -213,7 +213,7 @@ int main(int ArgsCount, char** Args)
     parse_scene_context SceneCtx = InitParseSceneContext(ModesFileName);
     
     ParseScenes(&SceneCtx);
-    OutputScenesMeta(&SceneCtx, "../Code/meta_scenes.cpp");
+    OutputScenesMeta(&SceneCtx, "../Code/Game/meta_scenes.cpp");
     std::cout << "Parsing " << ModesFileName << " scenes successfully!" << std::endl;
     
     return(0);

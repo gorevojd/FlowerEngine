@@ -121,6 +121,7 @@ struct asset_system
     
     font* BerlinSans;
     font* LiberationMono;
+    font* Dimbo;
     
     image* BearDiffuse;
     image* BearNormal;

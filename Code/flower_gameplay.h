@@ -6,11 +6,14 @@ enum camera_state
     Camera_FlyAround,
     Camera_RotateAround,
     Camera_ShowcaseRotateZ,
+    Camera_Follow2D,
 };
 
 struct game_camera
 {
     v3 P;
+    v3 TargetP;
+    v3 OffsetToCameraFromTarget;
     v3 EulerAngles;
     
     m33 Transform;
@@ -25,6 +28,9 @@ struct game_camera
     f32 ViewRadiusMax;
     v3 ViewCenterP;
     f32 ShowcaseRotateTime;
+    
+    // NOTE(Dima): Context of Follow2D camera
+    f32 WidthRadius;
     
     u32 State;
 };

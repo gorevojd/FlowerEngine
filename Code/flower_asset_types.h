@@ -8,6 +8,9 @@ struct asset_header_image
     int Height;
     b32 FilteringIsNearest;
     
+    f32 AlignX;
+    f32 AlignY;
+    
     u32 BlobDataOffset;
 };
 

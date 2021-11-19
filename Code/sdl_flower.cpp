@@ -28,6 +28,8 @@ platform_api PlatformAPI;
 renderer_api RenderAPI;
 GLOBAL_VARIABLE job_system* Global_Jobs;
 
+// NOTE(Dima): On windows we are using DLL trick to load game code
+// NOTE(Dima): So no need to include flower.cpp here
 #if !defined(PLATFORM_IS_WINDOWS)
 #include "flower.cpp"
 #else
@@ -1115,8 +1117,8 @@ int main(int ArgsCount, char** Args)
     PlatformAPI.Log = SDLOutputLog;
     
     // NOTE(Dima): Render API
-    RenderAPI.Render = OpenGLRender;
-    RenderAPI.Present = OpenGLPresent;
+    RenderAPI.Render = OpenGL_Render;
+    RenderAPI.Present = OpenGL_Present;
     
     memory_arena GameArena = {};
     App = PushStruct(&GameArena, app_state);
@@ -1182,7 +1184,7 @@ int main(int ArgsCount, char** Args)
     
     App->OpenGLContext = SDL_GL_CreateContext(App->Window);
     
-    OpenGLInit(Game->RenderCommands, &GameArena);
+    OpenGL_Init(Game->RenderCommands, &GameArena);
     
     Global_Time->Time = 0.0f;
     Global_Time->DeltaTime = 0.001f;
@@ -1226,7 +1228,7 @@ int main(int ArgsCount, char** Args)
         END_TIMING();
     }
     
-    OpenGLFree(Game->RenderCommands);
+    OpenGL_Free(Game->RenderCommands);
     
     SDL_GL_DeleteContext(App->OpenGLContext);
     SDL_DestroyWindow(App->Window);

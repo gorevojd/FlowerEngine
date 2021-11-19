@@ -1,17 +1,45 @@
-inline void InitCamera(game_camera* Cam, u32 State,
-                       f32 Near = 0.5f,
-                       f32 Far = 500.0f)
+inline void ChangeCameraState(game_camera* Cam, u32 State)
 {
     Cam->State = State;
     
+    switch(State)
+    {
+        case Camera_ShowcaseRotateZ:
+        case Camera_RotateAround:
+        {
+            // NOTE(Dima): Camera rotation context
+            Cam->ViewRadiusMax = 20.0f;
+            Cam->ViewRadiusMin = 1.0f;
+            Cam->ViewRadius = 15.0f;
+            Cam->ViewTargetRadius = 7.0f;
+            Cam->ShowcaseRotateTime = 12.0f;
+        }break;
+        
+        case Camera_Follow2D:
+        {
+            // NOTE(Dima): Context of Follow2D camera
+            Cam->WidthRadius = 2.0f;
+            
+            Cam->P = V3(0.0f, 0.0f, Cam->NearClipPlane + 1.0f);
+            
+            v3 Front = V3_Back();
+            v3 Up = V3_Up();
+            v3 Left = V3_Right();
+            
+            Cam->Transform = Matrix3FromRows(Left, Up, Front);
+        }break;
+    }
+}
+
+inline void InitCamera(game_camera* Cam, 
+                       u32 State,
+                       f32 Near = 0.5f,
+                       f32 Far = 500.0f)
+{
     Cam->NearClipPlane = Near;
     Cam->FarClipPlane = Far;
     
-    Cam->ViewRadiusMax = 20.0f;
-    Cam->ViewRadiusMin = 1.0f;
-    Cam->ViewRadius = 15.0f;
-    Cam->ViewTargetRadius = 7.0f;
-    Cam->ShowcaseRotateTime = 12.0f;
+    ChangeCameraState(Cam, State);
 }
 
 // NOTE(Dima): Updating camera rotation 
@@ -33,7 +61,6 @@ void UpdateCameraRotation(game_camera* Camera,
     float Yaw = Camera->EulerAngles.Yaw * F_DEG2RAD;
     float Pitch = Camera->EulerAngles.Pitch * F_DEG2RAD;
     
-#if 1
     Front.x = Sin(Yaw) * Cos(Pitch);
     Front.y = Sin(Pitch);
     Front.z = Cos(Yaw) * Cos(Pitch);
@@ -43,23 +70,51 @@ void UpdateCameraRotation(game_camera* Camera,
     v3 Up = NOZ(Cross(Front, Left));
     
     Camera->Transform = Matrix3FromRows(Left, Up, Front);
-#else
-    
-    m44 RotYaw = RotationMatrixY(Yaw);
-    m44 RotPitch = RotationMatrixX(Pitch);
-    
-    Camera->Transform = Matrix4ToMatrix3(RotPitch * RotYaw);
-#endif
 }
 
-INTERNAL_FUNCTION inline void MoveCameraToViewTarget(game_camera* Camera)
+INTERNAL_FUNCTION inline void MoveCameraToViewTarget(game_camera* Camera, f32 CamSpeed)
 {
-    Camera->ViewTargetRadius -= Global_Input->MouseScroll * 0.4f;
-    Camera->ViewTargetRadius = Clamp(Camera->ViewTargetRadius, 
-                                     Camera->ViewRadiusMin, 
-                                     Camera->ViewRadiusMax);
-    
-    Camera->ViewRadius = Lerp(Camera->ViewRadius, Camera->ViewTargetRadius, 5.0f * Global_Time->DeltaTime);
+    switch(Camera->State)
+    {
+        case Camera_FlyAround:
+        {
+            f32 HorzMove = GetAxis(Axis_Horizontal);
+            f32 VertMove = GetAxis(Axis_Vertical);
+            
+            v3 Moves = NOZ(V3(HorzMove, 0.0f, VertMove));
+            
+            v3 MoveVector = Moves * Global_Time->DeltaTime;
+            
+            v3 TransformedMoveVector = CamSpeed * MoveVector * Camera->Transform;
+            
+            if(Global_Input->CapturingMouse)
+            {
+                Camera->P += TransformedMoveVector;
+            }
+        }break;
+        
+        case Camera_RotateAround:
+        case Camera_ShowcaseRotateZ:
+        {
+            Camera->ViewTargetRadius -= Global_Input->MouseScroll * 0.4f;
+            Camera->ViewTargetRadius = Clamp(Camera->ViewTargetRadius, 
+                                             Camera->ViewRadiusMin, 
+                                             Camera->ViewRadiusMax);
+            
+            Camera->ViewRadius = Lerp(Camera->ViewRadius, 
+                                      Camera->ViewTargetRadius, 
+                                      5.0f * Global_Time->DeltaTime);
+            
+            Camera->P = Camera->ViewCenterP - Camera->Transform.Rows[2] * Camera->ViewRadius;
+        }break;
+        
+        case Camera_Follow2D:
+        {
+            Camera->P.xy = Lerp(Camera->P.xy, 
+                                Camera->TargetP.xy, 
+                                5.0f * Global_Time->DeltaTime);
+        }break;
+    }
 }
 
 // NOTE(Dima): Look at matrix
@@ -70,20 +125,37 @@ m44 GetViewMatrix(game_camera* Camera)
     return(Result);
 }
 
-INTERNAL_FUNCTION void SetMatrices(game_camera* Camera, 
-                                   render_pass* RenderPass)
+INTERNAL_FUNCTION void SetRenderPassDataFromCamera(render_pass* RenderPass,
+                                                   game_camera* Camera)
 {
     window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
     
     m44 View = GetViewMatrix(Camera);
     
-    SetPerspectivePassData(RenderPass,
-                           Camera->P,
-                           View, 
-                           WndDims->Width,
-                           WndDims->Height,
-                           Camera->FarClipPlane,
-                           Camera->NearClipPlane);
+    b32 IsMode2D = Camera->State == Camera_Follow2D;
+    
+    if (IsMode2D)
+    {
+        f32 WidthOverHeight = (f32)WndDims->Width / (f32)WndDims->Height;
+        
+        SetOrthographicPassData(RenderPass,
+                                Camera->P,
+                                View,
+                                Camera->WidthRadius,
+                                Camera->WidthRadius / WidthOverHeight,
+                                Camera->FarClipPlane,
+                                Camera->NearClipPlane);
+    }
+    else
+    {
+        SetPerspectivePassData(RenderPass,
+                               Camera->P,
+                               View, 
+                               WndDims->Width,
+                               WndDims->Height,
+                               Camera->FarClipPlane,
+                               Camera->NearClipPlane);
+    }
 }
 
 
@@ -92,7 +164,9 @@ void UpdateCamera(game_camera* Camera, render_pass* RenderPass, f32 CamSpeed = 1
     f32 MouseDeltaX = 0.0f;
     f32 MouseDeltaY = 0.0f;
     
-    if(Global_Input->CapturingMouse)
+    b32 Is2DMode = Camera->State == Camera_Follow2D;
+    
+    if(Global_Input->CapturingMouse && !Is2DMode)
     {
         MouseDeltaX = GetAxis(Axis_MouseX);
         MouseDeltaY = GetAxis(Axis_MouseY);
@@ -110,41 +184,9 @@ void UpdateCamera(game_camera* Camera, render_pass* RenderPass, f32 CamSpeed = 1
     }
     
     UpdateCameraRotation(Camera, MouseDeltaY, MouseDeltaX, 0.0f);
+    MoveCameraToViewTarget(Camera, CamSpeed);
     
-    if(Camera->State == Camera_FlyAround)
-    {
-        f32 HorzMove = GetAxis(Axis_Horizontal);
-        f32 VertMove = GetAxis(Axis_Vertical);
-        
-        v3 Moves = NOZ(V3(HorzMove, 0.0f, VertMove));
-        
-        v3 MoveVector = Moves * Global_Time->DeltaTime;
-        
-        v3 TransformedMoveVector = CamSpeed * MoveVector * Camera->Transform;
-        
-        if(Global_Input->CapturingMouse)
-        {
-            Camera->P += TransformedMoveVector;
-        }
-    }
-    else if(Camera->State == Camera_RotateAround)
-    {
-        MoveCameraToViewTarget(Camera);
-        
-        v3 CamFront = Camera->Transform.Rows[2];
-        
-        Camera->P = Camera->ViewCenterP - CamFront * Camera->ViewRadius;
-    }
-    else if(Camera->State == Camera_ShowcaseRotateZ)
-    {
-        MoveCameraToViewTarget(Camera);
-        
-        v3 CamFront = Camera->Transform.Rows[2];
-        
-        Camera->P = Camera->ViewCenterP - CamFront * Camera->ViewRadius;
-    }
-    
-    SetMatrices(Camera, RenderPass);
+    SetRenderPassDataFromCamera(RenderPass, Camera);
 }
 
 

@@ -242,6 +242,7 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     A->BerlinSans = LoadFontFile("../Data/Fonts/BerlinSans.ttf");
     A->LiberationMono = LoadFontFile("../Data/Fonts/liberation-mono.ttf");
+    A->Dimbo = LoadFontFile("../Data/Fonts/Dimbo Regular.ttf");
     
 #if 0    
     AddFontToAtlas(&A->TimesNewRoman);

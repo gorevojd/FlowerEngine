@@ -183,8 +183,6 @@ SCENE_UPDATE(TestGame)
              V3(1.0f, 0.5f, 0.0f));
     
     
-    // NOTE(Dima): SEtting camera matrices
-    SetMatrices(&State->Camera, RenderPass);
     
     directional_light* DirLit = &Global_RenderCommands->Lighting.DirLit;
     
@@ -216,11 +214,11 @@ SCENE_UPDATE(TestGame)
     SetOrthographicPassData(OrthoPass,
                             V3(0.0f),
                             IdentityMatrix4(),
-                            500, 0.1f,
                             Global_RenderCommands->WindowDimensions.Width,
-                            Global_RenderCommands->WindowDimensions.Height);
+                            Global_RenderCommands->WindowDimensions.Height,
+                            500, 0.1f);
     
-    RectBufferSetMatrices(Global_RenderCommands->Rects2D_Unit,
+    RectBufferSetMatrices(Global_RenderCommands->DEBUG_Rects2D_Unit,
                           IdentityMatrix4(),
                           OrthographicProjectionUnit(Global_RenderCommands->WindowDimensions.Width,
                                                      Global_RenderCommands->WindowDimensions.Height));
@@ -228,7 +226,7 @@ SCENE_UPDATE(TestGame)
     f32 RectAtX = -1.0f;
     for (int i = 0; i < 10; i++)
     {
-        PushRect(Global_RenderCommands->Rects2D_Unit, 
+        PushRect(Global_RenderCommands->DEBUG_Rects2D_Unit, 
                  RectMinDim(V2(RectAtX, 1.5f), V2(0.1f)),
                  ColorRed());
         

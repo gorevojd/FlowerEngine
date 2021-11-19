@@ -18,7 +18,7 @@ ECHO **************
 
 cl /FePreproc %COMP_OPTS% ..\Code\preprocessor.cpp /link /SUBSYSTEM:CONSOLE /NOLOGO /INCREMENTAL:no
 
-start Preproc.exe "..\Code\modes.json"
+start Preproc.exe "..\Code\Game\modes.json"
 
 ECHO _____________
 ECHO *************

@@ -80,6 +80,8 @@ inline culling_info CullingInfoAABB(v3 Center, v3 HalfDim)
 enum render_command_type
 {
     RenderCommand_Clear,
+    RenderCommand_Image,
+    RenderCommand_RectBuffer,
     RenderCommand_Mesh,
     RenderCommand_RectBatch,
     RenderCommand_InstancedMesh,
@@ -111,9 +113,14 @@ struct render_command_image
     v2 P;
     v2 Dim;
     v4 C;
+    b32 DisableDepthTest;
+};
+
+struct render_command_rect_buffer
+{
+    struct batch_rect_buffer* RectBuffer;
     
-    render_command_image* Next;
-    render_command_image* Prev;
+    b32 DisableDepthTest;
 };
 
 struct render_command_mesh
@@ -318,40 +325,18 @@ enum render_sky_type
     RenderSky_Skybox,
 };
 
-struct material_command_entry
-{
-    render_command_header Header;
-    
-    material_command_entry* Next;
-};
-
-struct material_commands
-{
-    u32 MaterialID;
-    
-    material_command_entry* FirstEntry;
-};
-
-struct sorted_by_material_commands
-{
-    material_commands MaterialCommands[128];
-    int Count;
-};
-
 struct render_commands
 {
     memory_arena CommandsBuffer;
     memory_arena* Arena;
     
-    //m44 ScreenOrthoProjection;
-    dlist<batch_rect_buffer> RectBuffersPool;
+    b32 IsDeferredRenderer;
     
     u32 ActiveFrameUniqueFonts[14];
     int ActiveFrameUniqueFontsCount;
     
-    batch_rect_buffer* Rects2D_Window;
-    batch_rect_buffer* Rects2D_Unit;
-    batch_rect_buffer* Rects3D;
+    batch_rect_buffer* DEBUG_Rects2D_Window;
+    batch_rect_buffer* DEBUG_Rects2D_Unit;
     
     void* StateOfGraphicsAPI;
     
@@ -360,18 +345,10 @@ struct render_commands
     render_command_header CommandHeaders[MAX_RENDER_COMMANDS_COUNT];
     int CommandCount;
     
-    sorted_by_material_commands SortedMaterialsOpaque;
-    sorted_by_material_commands SortedMaterialsTransparent;
-    material_command_entry* FirstFreeCommandEntry;
-    
     render_pass RenderPasses[128];
     int RenderPassCount;
     
-    render_command_image ImageUse;
-    render_command_image ImageFree;
-    
     window_dimensions WindowDimensions;
-    image* FontAtlas;
     image* VoxelAtlas;
     
     render_water Water;
@@ -403,7 +380,7 @@ struct render_commands
     render_mesh_instance* InstanceTable[RENDER_INSTANCE_TABLE_SIZE];
     
     lighting Lighting;
-    postprocessing PostProcessing;
+    post_processing PostProcessing;
     
     // NOTE(Dima): Deallocate entries
     ticket_mutex DeallocEntriesMutex;
