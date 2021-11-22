@@ -423,11 +423,11 @@ struct rubiks_cube
     
     // NOTE(Dima): 26 = 6 faces + 12 edges + 8 angles
 #define RUBIKS_MESHES_COUNT 26
-    mesh UniqueMeshes[RUBIKS_MESHES_COUNT];
+    mesh* UniqueMeshes[RUBIKS_MESHES_COUNT];
     // NOTE(Dima): This should be equal to 26
     int UniqueMeshesCount;
     // NOTE(Dima): x, y, z (one for each)
-    mesh InnerMeshes[RubiksAxis_Count];
+    mesh* InnerMeshes[RubiksAxis_Count];
     b32 InnerMeshIsGenerated[RubiksAxis_Count];
     
     rubiks_beginned_rotation BeginnedRotation;

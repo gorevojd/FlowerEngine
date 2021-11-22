@@ -94,8 +94,8 @@ struct mesh
     char Name[64];
     
     // NOTE(Dima): This pointer holds data for all the mesh (this includes vertices and index data)
-    void* Free;
-    u32 FreeSize;
+    void* MeshDataStart;
+    mi MeshDataSize;
     
     v3* P;
     v2* UV;
@@ -399,8 +399,14 @@ struct model_node
 
 struct model
 {
-    mesh** Meshes;
-    material** Materials;
+    //mesh** Meshes;
+    //material** Materials;
+    
+    std::vector<mesh*> Meshes;
+    std::vector<material*> Materials;
+    
+    std::vector<asset_id> MeshIDs;
+    std::vector<asset_id> MaterialIDs;
     
     // NOTE(Dima): Nodes
     model_node* Nodes;
@@ -413,8 +419,6 @@ struct model
     int* NodesMeshIndices;
     int* NodesChildIndices;
     
-    int NumMeshes;
-    int NumMaterials;
     int NumNodes;
     int NumBones;
     int NumNodesMeshIndices;

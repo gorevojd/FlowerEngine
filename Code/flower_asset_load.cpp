@@ -650,63 +650,71 @@ INTERNAL_FUNCTION font* LoadFontFile(char* FilePath,
     return(Ctx.Result);
 }
 
-INTERNAL_FUNCTION mesh MakeMesh(const helper_mesh& HelperMesh)
+INTERNAL_FUNCTION mesh* MakeMesh(const helper_mesh& HelperMesh)
 {
-    mesh Result = {};
-    
-    // NOTE(Dima): Copy name
-    const char* SrcName = HelperMesh.Name.c_str();
-    CopyStringsSafe(Result.Name, ArrLen(Result.Name), (char*)SrcName);
-    
-    render_mesh_offsets* Offsets = &Result.Offsets;
     helper_byte_buffer Help = {};
     
-    Offsets->OffsetP = Help.AddPlace("P", HelperMesh.Vertices.size(), sizeof(v3));
-    Offsets->OffsetUV = Help.AddPlace("UV", HelperMesh.TexCoords.size(), sizeof(v2));
-    Offsets->OffsetN = Help.AddPlace("N", HelperMesh.Normals.size(), sizeof(v3));
-    Offsets->OffsetC = Help.AddPlace("C", HelperMesh.Colors.size(), sizeof(u32));
-    Offsets->OffsetBoneWeights = Help.AddPlace("BoneWeights", HelperMesh.BoneWeights.size(), sizeof(v4));
-    Offsets->OffsetBoneIndices = Help.AddPlace("BoneIndices", HelperMesh.BoneIndices.size(), sizeof(u32));
+    render_mesh_offsets Offsets = {};
+    Offsets.OffsetP = Help.AddPlace("P", HelperMesh.Vertices.size(), sizeof(v3));
+    Offsets.OffsetUV = Help.AddPlace("UV", HelperMesh.TexCoords.size(), sizeof(v2));
+    Offsets.OffsetN = Help.AddPlace("N", HelperMesh.Normals.size(), sizeof(v3));
+    Offsets.OffsetC = Help.AddPlace("C", HelperMesh.Colors.size(), sizeof(u32));
+    Offsets.OffsetBoneWeights = Help.AddPlace("BoneWeights", HelperMesh.BoneWeights.size(), sizeof(v4));
+    Offsets.OffsetBoneIndices = Help.AddPlace("BoneIndices", HelperMesh.BoneIndices.size(), sizeof(u32));
+    
+    // NOTE(Dima): Determining data size
+    mi MeshDataSize = Help.DataSize;
+    
     Help.AddPlace("Indices", HelperMesh.Indices.size(), sizeof(u32));
+    Help.AddPlace("ResultPtr", 1, sizeof(mesh));
     
     Help.Generate();
     
-    Result.P = (v3*)Help.GetPlace("P");
-    Result.UV = (v2*)Help.GetPlace("UV");
-    Result.N = (v3*)Help.GetPlace("N");
-    Result.C = (u32*)Help.GetPlace("C");
-    Result.BoneWeights = (v4*)Help.GetPlace("BoneWeights");
-    Result.BoneIndices = (u32*)Help.GetPlace("BoneIndices");
+    mesh* Result = (mesh*)Help.GetPlace("ResultPtr");
+    
+    Result->P = (v3*)Help.GetPlace("P");
+    Result->UV = (v2*)Help.GetPlace("UV");
+    Result->N = (v3*)Help.GetPlace("N");
+    Result->C = (u32*)Help.GetPlace("C");
+    Result->BoneWeights = (v4*)Help.GetPlace("BoneWeights");
+    Result->BoneIndices = (u32*)Help.GetPlace("BoneIndices");
+    
+    Result->Offsets = Offsets;
+    Result->Handle = {};
+    
+    // NOTE(Dima): Copy name
+    const char* SrcName = HelperMesh.Name.c_str();
+    CopyStringsSafe(Result->Name, ArrLen(Result->Name), (char*)SrcName);
     
     // NOTE(Dima): Saving vertices data buffer
-    Result.Free = Help.Data;
-    Result.FreeSize = Help.DataSize;
-    Result.VertexCount = HelperMesh.Vertices.size();
-    Result.IsSkinned = HelperMesh.IsSkinned;
+    Result->MeshDataStart = Result->P;
+    Result->MeshDataSize = MeshDataSize;
+    Result->VertexCount = HelperMesh.Vertices.size();
+    Result->IsSkinned = HelperMesh.IsSkinned;
     
     // NOTE(Dima): Allocating indices
-    Result.Indices = (u32*)Help.GetPlace("Indices");;
-    Result.IndexCount = HelperMesh.Indices.size();
+    Result->Indices = (u32*)Help.GetPlace("Indices");;
+    Result->IndexCount = HelperMesh.Indices.size();
     
     // NOTE(Dima): Storing vertex data
     for(int VertexIndex = 0;
         VertexIndex < HelperMesh.Vertices.size();
         VertexIndex++)
     {
-        Result.P[VertexIndex] = HelperMesh.Vertices[VertexIndex];
-        Result.UV[VertexIndex] = HelperMesh.TexCoords[VertexIndex];
-        Result.N[VertexIndex] = HelperMesh.Normals[VertexIndex];
-        Result.C[VertexIndex] = PackRGB(HelperMesh.Colors[VertexIndex]);
+        Result->P[VertexIndex] = HelperMesh.Vertices[VertexIndex];
+        Result->UV[VertexIndex] = HelperMesh.TexCoords[VertexIndex];
+        Result->N[VertexIndex] = HelperMesh.Normals[VertexIndex];
+        Result->C[VertexIndex] = PackRGB(HelperMesh.Colors[VertexIndex]);
         if(HelperMesh.IsSkinned)
         {
-            Result.BoneWeights[VertexIndex] = HelperMesh.BoneWeights[VertexIndex];
-            Result.BoneIndices[VertexIndex] = HelperMesh.BoneIndices[VertexIndex];
+            Result->BoneWeights[VertexIndex] = HelperMesh.BoneWeights[VertexIndex];
+            Result->BoneIndices[VertexIndex] = HelperMesh.BoneIndices[VertexIndex];
         }
     }
     
     for (int Index = 0; Index < HelperMesh.Indices.size(); Index += 1)
     {
-        Result.Indices[Index] = HelperMesh.Indices[Index];
+        Result->Indices[Index] = HelperMesh.Indices[Index];
     }
     
     return(Result);
@@ -817,7 +825,7 @@ INTERNAL_FUNCTION inline void PushUnitCubeSide(helper_mesh& HelperMesh,
                     Normal, Color);
 }
 
-INTERNAL_FUNCTION mesh MakeUnitCube(f32 SideLen = 1.0f)
+INTERNAL_FUNCTION mesh* MakeUnitCube(f32 SideLen = 1.0f)
 {
     helper_mesh HelperMesh = {};
     
@@ -865,12 +873,12 @@ INTERNAL_FUNCTION mesh MakeUnitCube(f32 SideLen = 1.0f)
                      CubeColor,
                      SideLen);
     
-    mesh Result = MakeMesh(HelperMesh);
+    mesh* Result = MakeMesh(HelperMesh);
     
     return(Result);
 }
 
-mesh MakePlane()
+mesh* MakePlane()
 {
     helper_mesh HelperMesh = {};
     
@@ -887,7 +895,7 @@ mesh MakePlane()
                     Points[2], Points[3],
                     V3_Up(), V3_One());
     
-    mesh Result = MakeMesh(HelperMesh);
+    mesh* Result = MakeMesh(HelperMesh);
     
     return(Result);
 }

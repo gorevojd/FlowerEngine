@@ -75,11 +75,9 @@ struct loaded_animation
 
 struct loaded_model
 {
-    int NumMeshes;
-    mesh* Meshes;
-    
     std::vector<loaded_model_node> Nodes;
     std::vector<material*> Materials;
+    std::vector<mesh*> Meshes;
     
     m44 Bone_InvBindPose[256];
     int Bone_NodeIndex[256];
@@ -93,15 +91,11 @@ struct loaded_model
     
     std::vector<int> NodesChildIndices;
     std::vector<int> NodesMeshIndices;
-    
-    void* ModelFree;
-    void* MeshesFree;
-    void* MaterialsFree;
 };
 
-mesh ConvertAssimpMesh(const aiScene* AssimpScene, 
-                       aiMesh* AssimpMesh, 
-                       loaded_model* Model)
+mesh* ConvertAssimpMesh(const aiScene* AssimpScene, 
+                        aiMesh* AssimpMesh, 
+                        loaded_model* Model)
 {
     helper_mesh HelperMesh = {};
     
@@ -282,12 +276,12 @@ mesh ConvertAssimpMesh(const aiScene* AssimpScene,
     }
     
     // NOTE(Dima): Actual converting
-    mesh Result = MakeMesh(HelperMesh);
+    mesh* Result = MakeMesh(HelperMesh);
     
     std::string MeshName = std::string(AssimpMesh->mName.C_Str());
     
-    CopyStringsSafe(Result.Name, ArrLen(Result.Name), (char*)MeshName.c_str());
-    Result.MaterialIndexInModel = AssimpMesh->mMaterialIndex;
+    CopyStringsSafe(Result->Name, ArrLen(Result->Name), (char*)MeshName.c_str());
+    Result->MaterialIndexInModel = AssimpMesh->mMaterialIndex;
     
     return(Result);
 }
@@ -381,17 +375,18 @@ INTERNAL_FUNCTION void LoadModelBones(const aiScene* AssimpScene,
 INTERNAL_FUNCTION void LoadModelMeshes(const aiScene* AssimpScene,
                                        loaded_model* Model)
 {
-    Model->NumMeshes = AssimpScene->mNumMeshes;
-    Model->Meshes = (mesh*)malloc(sizeof(mesh) * Model->NumMeshes);
+    Model->Meshes.reserve(AssimpScene->mNumMeshes);
     
     // NOTE(Dima): Loading meshes
     for(int MeshIndex = 0;
-        MeshIndex < Model->NumMeshes;
+        MeshIndex < AssimpScene->mNumMeshes;
         MeshIndex++)
     {
         aiMesh* AssimpMesh = AssimpScene->mMeshes[MeshIndex];
         
-        Model->Meshes[MeshIndex] = ConvertAssimpMesh(AssimpScene, AssimpMesh, Model);
+        mesh* Mesh = ConvertAssimpMesh(AssimpScene, AssimpMesh, Model);
+        
+        Model->Meshes.push_back(Mesh);
     }
     
     // NOTE(Dima): Loading mesh indices
@@ -411,8 +406,6 @@ INTERNAL_FUNCTION void LoadModelMeshes(const aiScene* AssimpScene,
             OurNode->MeshIndices.push_back(MeshIndexInScene);
         }
     }
-    
-    Model->MeshesFree = Model->Meshes;
 }
 
 INTERNAL_FUNCTION animation* ConvertToActualAnimation(loaded_animation* Load)
@@ -602,7 +595,14 @@ INTERNAL_FUNCTION void LoadModelAnimations(const aiScene* AssimpScene,
 INTERNAL_FUNCTION void LoadModelMaterials(const aiScene* AssimpScene,
                                           loaded_model* Model)
 {
-    
+    for (int MaterialIndex = 0;
+         MaterialIndex < AssimpScene->mNumMaterials;
+         MaterialIndex++)
+    {
+        material* Mat = 0;
+        
+        Model->Materials.push_back(Mat);
+    }
 }
 
 INTERNAL_FUNCTION void LoadModel_ProcessInternals(const aiScene* AssimpScene,
@@ -631,12 +631,8 @@ INTERNAL_FUNCTION void LoadModel_ProcessInternals(const aiScene* AssimpScene,
 
 INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
 {
-    int AllocMaterialsCount = FlowerMax(50, (int)Load->Materials.size());
-    
     helper_byte_buffer Help = {};
     Help.AddPlace("ResultPtr", 1, sizeof(model));
-    Help.AddPlace("Meshes", Load->NumMeshes, sizeof(mesh*));
-    Help.AddPlace("Materials", AllocMaterialsCount, sizeof(material*));
     Help.AddPlace("Nodes", Load->Nodes.size(), sizeof(model_node));
     Help.AddPlace("Node_ToParent", Load->Nodes.size(), sizeof(m44));
     Help.AddPlace("Node_ParentIndex", Load->Nodes.size(), sizeof(int));
@@ -649,8 +645,13 @@ INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
     
     model* Model = (model*)Help.GetPlace("ResultPtr");
     
-    Model->Meshes = (mesh**)Help.GetPlace("Meshes");
-    Model->Materials = (material**)Help.GetPlace("Materials");
+    new (Model) model;
+    
+    Model->Meshes = std::vector<mesh*>(Load->Meshes);
+    Model->Materials = std::vector<material*>(Load->Materials);
+    Model->MeshIDs = std::vector<asset_id>();
+    Model->MaterialIDs = std::vector<asset_id>();
+    
     Model->Nodes = (model_node*)Help.GetPlace("Nodes");
     Model->Node_ToParent = (m44*)Help.GetPlace("Node_ToParent");
     Model->Bone_InvBindPose = (m44*)Help.GetPlace("Bone_InvBindPose");
@@ -660,26 +661,30 @@ INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
     
     Model->NumNodes = Load->Nodes.size();
     Model->NumBones = Load->NumBones;
-    Model->NumMeshes = Load->NumMeshes;
-    Model->NumMaterials = Load->Materials.size();
     Model->NumNodesMeshIndices = Load->NodesMeshIndices.size();
     Model->NumNodesChildIndices = Load->NodesChildIndices.size();
     
+#if 0    
     // NOTE(Dima): Setting meshes
     for(int MeshIndex = 0;
-        MeshIndex < Model->NumMeshes;
+        MeshIndex < Load->Meshes.size();
         MeshIndex++)
     {
-        Model->Meshes[MeshIndex] = &Load->Meshes[MeshIndex];
+        mesh* MeshToAdd = Load->Meshes[MeshIndex];
+        
+        Model->Meshes.push_back(MeshToAdd);
     }
     
     // NOTE(Dima): Setting materials
     for(int MaterialIndex = 0;
-        MaterialIndex < Model->NumMaterials;
+        MaterialIndex < Load->Materials.size();
         MaterialIndex++)
     {
-        Model->Materials[MaterialIndex] = Load->Materials[MaterialIndex];
+        material* MaterialToAdd = Load->Materials[MaterialIndex];
+        
+        Model->Materials[MaterialIndex] = MaterialToAdd;
     }
+#endif
     
     // NOTE(Dima): Setting bones
     for(int BoneIndex = 0;

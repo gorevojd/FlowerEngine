@@ -24,7 +24,7 @@ enum asset_type
 #include "flower_asset_load.h"
 
 
-#include "flower_asset_types.h"
+#include "flower_asset_types_headers.h"
 #include "flower_asset_sources.h"
 
 
@@ -90,7 +90,7 @@ struct asset_pack
 
 struct asset_loading_context
 {
-#define MAX_ASSET_PACKS 32
+#define MAX_ASSET_PACKS 64
     asset_pack Packs[MAX_ASSET_PACKS];
 };
 
@@ -104,8 +104,8 @@ struct asset_system
     image* VoxelAtlas;
     
     // NOTE(Dima): Assets
-    mesh Cube;
-    mesh Plane;
+    mesh* Cube;
+    mesh* Plane;
     
     cubemap* Sky;
     

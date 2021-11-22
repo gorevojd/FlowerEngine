@@ -93,12 +93,12 @@ SCENE_UPDATE(TestGame)
         {
             
 #if 0            
-            PushMesh(&Global_Assets->Plane,
+            PushMesh(Global_Assets->Plane,
                      &Global_Assets->GroundMaterial,
                      ScalingMatrix(10.0f),
                      V3(1.0f));
 #else
-            PushMesh(&Global_Assets->Plane,
+            PushMesh(Global_Assets->Plane,
                      0, ScalingMatrix(V3(40.0f, 20.0f, 20.0f)) * TranslationMatrix(V3(12.0f, 0.0f, 0.0f)), 
                      V3(0.6f));
 #endif
@@ -107,7 +107,7 @@ SCENE_UPDATE(TestGame)
         
         case TestGame_CubeField:
         {
-            PushMesh(&Global_Assets->Plane,
+            PushMesh(Global_Assets->Plane,
                      0,
                      ScalingMatrix(20.0f),
                      V3(0.7f));
@@ -139,7 +139,7 @@ SCENE_UPDATE(TestGame)
                               0.5f, 
                               (f32)y * CubeSpacing) + CubeAddOffset;
                     
-                    PushMesh(&Global_Assets->Cube, 
+                    PushMesh(Global_Assets->Cube, 
                              0,
                              TranslationMatrix(P), 
                              VertColor);
@@ -162,7 +162,7 @@ SCENE_UPDATE(TestGame)
     
     
     
-    PushMesh(&Global_Assets->Cube, 
+    PushMesh(Global_Assets->Cube, 
              0,
              QuaternionToMatrix4(Rot) * TranslationMatrix(V3(-2.5f, 0.45f, 0.0f)), 
              V3(1.0f, 0.5f, 0.0f));
@@ -171,13 +171,13 @@ SCENE_UPDATE(TestGame)
                    Cos(Global_Time->Time) * 0.9f,
                    0.0f);
     
-    PushMesh(&Global_Assets->Cube, 
+    PushMesh(Global_Assets->Cube, 
              0,
              QuaternionToMatrix4(Rot) * TranslationMatrix(Cube2P), 
              V3(1.0f, 1.0f, 0.0f));
     
     v3 Cube3P = V3(-5.5f, 0.45f, 0.0f);
-    PushMesh(&Global_Assets->Cube, 
+    PushMesh(Global_Assets->Cube, 
              0,
              LookRotationMatrix(Cube2P - Cube3P) * TranslationMatrix(Cube3P), 
              V3(1.0f, 0.5f, 0.0f));

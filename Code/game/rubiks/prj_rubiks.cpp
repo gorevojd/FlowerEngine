@@ -337,8 +337,8 @@ INTERNAL_FUNCTION void RubiksGenerateInnerMeshes(rubiks_cube* Cube)
     }
 }
 
-INTERNAL_FUNCTION mesh GenerateCubieMesh(rubiks_cube* Cube,
-                                         int x, int y, int z)
+INTERNAL_FUNCTION mesh* GenerateCubieMesh(rubiks_cube* Cube,
+                                          int x, int y, int z)
 {
     helper_mesh HelperMesh = {};
     HelperMesh.Name = std::string("CubieMesh");
@@ -405,7 +405,7 @@ INTERNAL_FUNCTION mesh GenerateCubieMesh(rubiks_cube* Cube,
     }
     
     // NOTE(Dima): Initializing mesh
-    mesh Result = MakeMesh(HelperMesh);
+    mesh* Result = MakeMesh(HelperMesh);
     
     return(Result);
 }
@@ -1480,7 +1480,7 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             
             m44 InnerTransform = ScalingMatrix(ScaleValue) * TranslationMatrix(RotationOrigin) * Rot->AppliedRotation * OffsetMatrix;
             
-            mesh* InnerMesh = &Cube->InnerMeshes[Rot->AxisIndex];
+            mesh* InnerMesh = Cube->InnerMeshes[Rot->AxisIndex];
             
             PushMesh(InnerMesh,
                      0,
@@ -1553,7 +1553,7 @@ INTERNAL_FUNCTION void ShowCube(rubiks_cube* Cube, v3 P, b32 DebugMode = false)
             VisibleIndex++)
         {
             int MeshIndex = Vis->MeshIndex[VisibleIndex];
-            mesh* Mesh = &Cube->UniqueMeshes[MeshIndex];
+            mesh* Mesh = Cube->UniqueMeshes[MeshIndex];
             
             v3 Color = V3(1.0f);
             

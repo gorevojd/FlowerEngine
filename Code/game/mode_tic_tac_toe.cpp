@@ -298,7 +298,7 @@ b32 CheckIfAllLoose(tic_tac_state* State)
     return AllAreFilled;
 }
 
-b32 TicTac_ButtonWithText(tic_tac_state* State, char* ButtonText)
+b32 TicTac_ButtonWithText(tic_tac_state* State, char* ButtonText, f32 TextHeight = 200.0f)
 {
     rc2 ButtonRect = RectCenterDim(UVToScreenPoint(0.5f, 0.5f),
                                    UVToScreenPoint(0.65f, 0.25f));
@@ -322,7 +322,7 @@ b32 TicTac_ButtonWithText(tic_tac_state* State, char* ButtonText)
     PrintTextWithFontAligned(Global_Assets->Dimbo, 
                              ButtonText,
                              UVToScreenPoint(0.5f, 0.5f),
-                             200.0f,
+                             TextHeight,
                              TextAlign_Center,
                              TextAlign_Center,
                              TextColor);
@@ -348,7 +348,8 @@ void TicTac2D(tic_tac_state* State)
 {
     ResetRectBuffer(&State->RectBuffer);
     
-    PushClear(V3(0.86, 0.4f, 0.01f));
+    //PushClear(V3(0.23, 0.44f, 0.01f));
+    PushClear(V3(0.7f, 0.75f, 0.95f));
     
     if(GetKeyDown(Key_R))
     {
@@ -491,7 +492,15 @@ void TicTac2D(tic_tac_state* State)
     }
     else if(State->State == TicTacState_WaitForNewPlay)
     {
-        if(TicTac_ButtonWithText(State, "LET'S TRY AGAIN !!!"))
+        char* ButtonText = "LET'S TRY AGAIN !!!";
+        f32 TextSize = 200.0f;
+        if (State->BothLose)
+        {
+            ButtonText = "DRAW.. TO BATTLE AGAIN !!!";
+            TextSize = 150.0f;
+        }
+        
+        if(TicTac_ButtonWithText(State, ButtonText, TextSize))
         {
             ResetAllCellValues(State);
         }

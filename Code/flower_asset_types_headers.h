@@ -1,6 +1,5 @@
-#ifndef FLOWER_ASSET_TYPES_H
-#define FLOWER_ASSET_TYPES_H
-
+#ifndef FLOWER_ASSET_TYPES_HEADERS_H
+#define FLOWER_ASSET_TYPES_HEADERS_H
 
 struct asset_header_image
 {
@@ -28,6 +27,8 @@ struct asset_header_mesh
 {
     int VertexCount;
     int IndexCount;
+    b32 IsSkinned;
+    int MaterialIndexInModel;
     
     u32 BlobOffsetP;
     u32 BlobOffsetUV;
@@ -35,9 +36,6 @@ struct asset_header_mesh
     u32 BlobOffsetC;
     u32 BlobOffsetBoneWeights;
     u32 BlobOffsetBoneIDs;
-    
-    b32 IsSkinned;
-    int MaterialIndexInModel;
 };
 
 struct asset_header_material
@@ -110,9 +108,6 @@ struct asset_header_font
 
 struct asset_header_model
 {
-    asset_id* MeshIds;
-    asset_id* MaterialIds;
-    
     u32 BlobOffset_MeshIds;
     u32 BlobOffset_MaterialIds;
     u32 BlobOffset_Nodes;
@@ -130,19 +125,18 @@ struct asset_header_model
     int NumNodesChildIndices;
 };
 
-
+// NOTE(Dima): Asset header
 union asset_header
 {
-    asset_header_image* Image;
-    asset_header_cubemap* Cubemap;
-    asset_header_mesh* Mesh;
-    asset_header_material* Material;
-    asset_header_animation* Animation;
-    asset_header_node_animation* NodeAnimation;
-    asset_header_font* Font;
-    asset_header_font_size* FontSize;
-    asset_header_model* Model;
+    asset_header_image Image;
+    asset_header_cubemap Cubemap;
+    asset_header_mesh Mesh;
+    asset_header_material Material;
+    asset_header_animation Animation;
+    asset_header_node_animation NodeAnimation;
+    asset_header_font Font;
+    asset_header_font_size FontSize;
+    asset_header_model Model;
 };
-
 
 #endif //FLOWER_ASSET_TYPES_H

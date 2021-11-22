@@ -1501,7 +1501,7 @@ OpenGL_AllocateMesh(opengl_state* OpenGL,
     
     if(!Result->Initialized || MeshWasDeleted)
     {
-        if(Mesh->FreeSize > 0)
+        if(Mesh->MeshDataSize > 0)
         {
             
             GLuint VAO = 0;
@@ -1517,8 +1517,8 @@ OpenGL_AllocateMesh(opengl_state* OpenGL,
             
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
             glBufferData(GL_ARRAY_BUFFER, 
-                         Mesh->FreeSize, 
-                         Mesh->Free, 
+                         Mesh->MeshDataSize, 
+                         Mesh->MeshDataStart, 
                          GL_STATIC_DRAW);
             
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -1595,24 +1595,24 @@ INTERNAL_FUNCTION void OpenGL_RenderMesh(render_commands* Commands,
         // NOTE(Dima): Generating buffer for holding instance model transforms and mesh
         glBindBuffer(GL_ARRAY_BUFFER, InstanceModelBO);
         glBufferData(GL_ARRAY_BUFFER, 
-                     sizeof(m44) * MeshInstanceCount + Mesh->FreeSize, 
+                     sizeof(m44) * MeshInstanceCount + Mesh->MeshDataSize, 
                      0,
                      GL_STREAM_DRAW);
         
         // NOTE(Dima): Adding mesh to buffer
-        if(Mesh->FreeSize > 0)
+        if(Mesh->MeshDataSize > 0)
         {
             glBufferSubData(GL_ARRAY_BUFFER,
                             0,
-                            Mesh->FreeSize,
-                            Mesh->Free);
+                            Mesh->MeshDataSize,
+                            Mesh->MeshDataStart);
         }
         
         // NOTE(Dima): Adding instance model transforms to buffer
         if(MeshInstanceCount)
         {
             glBufferSubData(GL_ARRAY_BUFFER,
-                            Mesh->FreeSize,
+                            Mesh->MeshDataSize,
                             sizeof(m44) * MeshInstanceCount,
                             InstanceModelTransforms);
         }
@@ -1623,19 +1623,19 @@ INTERNAL_FUNCTION void OpenGL_RenderMesh(render_commands* Commands,
         // NOTE(Dima): Setting instance model transform attribs
         InitAttribFloat(ModelTranLoc1,
                         4, sizeof(m44),
-                        Mesh->FreeSize);
+                        Mesh->MeshDataSize);
         
         InitAttribFloat(ModelTranLoc2,
                         4, sizeof(m44),
-                        Mesh->FreeSize + 1 * sizeof(v4));
+                        Mesh->MeshDataSize + 1 * sizeof(v4));
         
         InitAttribFloat(ModelTranLoc3,
                         4, sizeof(m44),
-                        Mesh->FreeSize + 2 * sizeof(v4));
+                        Mesh->MeshDataSize + 2 * sizeof(v4));
         
         InitAttribFloat(ModelTranLoc4,
                         4, sizeof(m44),
-                        Mesh->FreeSize + 3 * sizeof(v4));
+                        Mesh->MeshDataSize + 3 * sizeof(v4));
         
         glVertexAttribDivisor(ModelTranLoc1, 1);
         glVertexAttribDivisor(ModelTranLoc2, 1);

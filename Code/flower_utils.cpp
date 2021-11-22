@@ -75,6 +75,15 @@ INTERNAL_FUNCTION image* AllocateImage(u32 Width, u32 Height,
     return(Result);
 }
 
+INTERNAL_FUNCTION material* AllocateMaterial(u32 MaterialType = Material_SpecularDiffuse)
+{
+    material* Material = (material*)malloc(sizeof(material));
+    
+    Material->Type = MaterialType;
+    
+    return Material;
+}
+
 INTERNAL_FUNCTION 
 void FillImageWithColor(image* Image, v4 ClearColor, b32 PremultiplyColorAlpha = true)
 {
