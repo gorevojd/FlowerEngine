@@ -1,6 +1,13 @@
 #ifndef FLOWER_ASSET_TYPES_HEADERS_H
 #define FLOWER_ASSET_TYPES_HEADERS_H
 
+#define ASSET_HEADER_MAX_SIZE 512
+
+#define ASSET_ASSERT_HEADER(header_type) \
+static_assert(sizeof(header_type) <= ASSET_HEADER_MAX_SIZE, \
+"Size of header should be smaller than MAX size")
+
+
 struct asset_header_image
 {
     int Width;
@@ -12,6 +19,8 @@ struct asset_header_image
     
     u32 BlobDataOffset;
 };
+ASSET_ASSERT_HEADER(asset_header_image);
+
 
 struct asset_header_cubemap
 {
@@ -22,6 +31,8 @@ struct asset_header_cubemap
     asset_id Up;
     asset_id Down;
 };
+ASSET_ASSERT_HEADER(asset_header_cubemap);
+
 
 struct asset_header_mesh
 {
@@ -37,6 +48,8 @@ struct asset_header_mesh
     u32 BlobOffsetBoneWeights;
     u32 BlobOffsetBoneIDs;
 };
+ASSET_ASSERT_HEADER(asset_header_mesh);
+
 
 struct asset_header_material
 {
@@ -46,6 +59,8 @@ struct asset_header_material
     
     asset_id TextureIDs[MAX_MATERIAL_TEXTURES];
 };
+ASSET_ASSERT_HEADER(asset_header_material);
+
 
 struct asset_header_node_animation
 {
@@ -63,6 +78,8 @@ struct asset_header_node_animation
     
     int NodeIndex;
 };
+ASSET_ASSERT_HEADER(asset_header_node_animation);
+
 
 struct asset_header_animation
 {
@@ -76,6 +93,8 @@ struct asset_header_animation
     
     u32 OutsideBehaviour;
 };
+ASSET_ASSERT_HEADER(asset_header_animation);
+
 
 struct asset_header_font_size
 {
@@ -84,27 +103,43 @@ struct asset_header_font_size
     asset_id FirstGlyphId;
     
     f32 PixelsPerMeter;
-    f32 Scale;
+    f32 ScaleForPixelHeight;
+};
+ASSET_ASSERT_HEADER(asset_header_font_size);
+
+struct asset_header_glyph
+{
+    u32 Codepoint;
+    
+    f32 Advance;
+    f32 LeftBearing;
+    
+    f32 XOffset;
+    f32 YOffset;
 };
 
 struct asset_header_font
 {
-    asset_id* SizesIds;
-    
-    int NumSizes;
-    int NumGlyphs;
-    
     u32 BlobOffset_SizesIds;
     u32 BlobOffset_Mapping;
     u32 BlobOffset_SlotsGlyphsIds;
     u32 BlobOffset_KerningPairs;
+    
+    int NumSizes;
+    int NumGlyphs;
     
     f32 Ascent;
     f32 Descent;
     f32 LineGap;
     f32 LineAdvance;
     u32 UniqueNameHash;
+    char UniqueName[64];
+    
+    asset_id AtlasImageID;
+    asset_id FirstFontSizeID;
 };
+ASSET_ASSERT_HEADER(asset_header_font);
+
 
 struct asset_header_model
 {
@@ -123,20 +158,32 @@ struct asset_header_model
     int NumBones;
     int NumNodesMeshIndices;
     int NumNodesChildIndices;
+    
+    std::vector<asset_id> MeshIDs;
+    std::vector<asset_id> MaterialIDs;
 };
+ASSET_ASSERT_HEADER(asset_header_model);
+
 
 // NOTE(Dima): Asset header
-union asset_header
+struct asset_header
 {
-    asset_header_image Image;
-    asset_header_cubemap Cubemap;
-    asset_header_mesh Mesh;
-    asset_header_material Material;
-    asset_header_animation Animation;
-    asset_header_node_animation NodeAnimation;
-    asset_header_font Font;
-    asset_header_font_size FontSize;
-    asset_header_model Model;
+    u8 HeaderBytes[ASSET_HEADER_MAX_SIZE];
+    
+    union
+    {
+        void* Ptr;
+        
+        asset_header_image* Image;
+        asset_header_cubemap* Cubemap;
+        asset_header_mesh* Mesh;
+        asset_header_material* Material;
+        asset_header_animation* Animation;
+        asset_header_node_animation* NodeAnimation;
+        asset_header_font* Font;
+        asset_header_font_size* FontSize;
+        asset_header_model* Model;
+    };
 };
 
 #endif //FLOWER_ASSET_TYPES_H

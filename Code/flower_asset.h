@@ -1,6 +1,10 @@
 #ifndef FLOWER_ASSET_H
 #define FLOWER_ASSET_H
 
+// TODO(Dima): We need special data deallocation (no deallocation actually) for 
+// *** NodeAnimation assets
+// *** FontSize assets
+
 enum asset_type
 {
     Asset_None,
@@ -13,6 +17,7 @@ enum asset_type
     Asset_NodeAnimation,
     Asset_Font,
     Asset_FontSize,
+    Asset_Glyph,
     Asset_Model,
     
     Asset_Count,
@@ -27,7 +32,6 @@ enum asset_type
 #include "flower_asset_types_headers.h"
 #include "flower_asset_sources.h"
 
-
 union asset_data_pointer
 {
     void* Ptr;
@@ -40,6 +44,7 @@ union asset_data_pointer
     node_animation* NodeAnimation;
     font* Font;
     font_size* FontSize;
+    glyph* Glyph;
     model* Model;
 };
 
@@ -55,6 +60,18 @@ struct asset
     asset_header Header;
     asset_source Source;
     asset_data_pointer DataPtr;
+    
+    /*
+     NOTE(Dima): If asset is supplemental it means that it is the part of other asset. 
+    For example NodeAnimation or FontSize, they are parts of Animation and Font assets and used only
+there.
+    In such cases memory is not allocated for this asset directly, it's memory allocated when on
+parent element creation (Actually it's memory IS the part of parent asset memory)
+It means that the memory should not be freed for these assets.
+
+Also it actually means that we'll never access these assets by GUID (It makes no sence).
+    */
+    b32 IsSupplemental;
 };
 
 struct asset_hashmap_entry
@@ -69,10 +86,8 @@ struct asset_storage
     asset Assets[10000];
     int NumAssets;
     
-    memory_arena Arena;
-    
-#define ASSET_STORAGE_HASHMAP_SIZE 512
-    hashmap<asset_hashmap_entry, ASSET_STORAGE_HASHMAP_SIZE> GuidToID;
+#define ASSET_DEFAULT_COUNT_IN_TABLE 512
+    std::unordered_map<char*, asset_id, string_fnv_key_hasher, string_comparator> GuidToID;
     
     b32 Initialized;
 };
@@ -122,36 +137,6 @@ struct asset_system
     font* BerlinSans;
     font* LiberationMono;
     font* Dimbo;
-    
-    image* BearDiffuse;
-    image* BearNormal;
-    image* BearEyesDiffuse;
-    image* BearEyesShine;
-    
-    image* FoxDiffuse;
-    image* FoxNormal;
-    image* FoxEyesDiffuse;
-    image* FoxEyesShine;
-    
-    model* Bear;
-    model* Fox;
-    model* Supra;
-    model* Mustang;
-    model* NissanGTR;
-    model* Golf2;
-    model* Aventador;
-    
-    animation* BearSuccess;
-    animation* BearIdle;
-    animation* FoxTalk;
-    
-    material BearMaterial;
-    material BearEyesMaterial;
-    material BearEyesShineMaterial;
-    
-    material FoxMaterial;
-    material FoxEyesMaterial;
-    material FoxEyesShineMaterial;
     
     material PaletteMaterial;
     material GroundMaterial;

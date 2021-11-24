@@ -186,7 +186,7 @@ struct animation
 {
     char Name[64];
     
-    node_animation** NodeAnims;
+    node_animation* NodeAnims;
     int NumNodeAnims;
     
     u32 Behaviour;
@@ -243,10 +243,12 @@ inline glyph_style CreateGlyphStyle(image* Image, int Width, int Height)
     return(Result);
 }
 
+#if 0
 struct glyph_size
 {
     glyph_style Styles[FontStyle_Count];
 };
+#endif
 
 struct glyph
 {
@@ -280,18 +282,20 @@ struct font_size
     glyph** Glyphs;
     
     f32 PixelsPerMeter;
-    f32 Scale;
+    f32 ScaleForPixelHeight;
 };
 
 struct font
 {
+    char UniqueName[64];
+    u32 UniqueNameHash;
+    
     image* Atlas;
     
     f32 Ascent;
     f32 Descent;
     f32 LineGap;
     f32 LineAdvance;
-    u32 UniqueNameHash;
     
     float* KerningPairs;
     
@@ -404,9 +408,6 @@ struct model
     
     std::vector<mesh*> Meshes;
     std::vector<material*> Materials;
-    
-    std::vector<asset_id> MeshIDs;
-    std::vector<asset_id> MaterialIDs;
     
     // NOTE(Dima): Nodes
     model_node* Nodes;

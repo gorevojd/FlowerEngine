@@ -162,7 +162,7 @@ void UpdateAnimation(animation* Animation, f32 Time, m44* NodeMatrices)
         NodeAnimIndex < Animation->NumNodeAnims;
         NodeAnimIndex++)
     {
-        node_animation* NodeAnim = Animation->NodeAnims[NodeAnimIndex];
+        node_animation* NodeAnim = &Animation->NodeAnims[NodeAnimIndex];
         
         // NOTE(Dima): Finding frames that we will interpolate between
         nearest_frames NearestP = FindNearestFrames(NodeAnim->PositionTimes,

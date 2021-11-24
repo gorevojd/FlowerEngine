@@ -281,7 +281,10 @@ EndFontLoading(load_font_context* Ctx)
     font* Result = Ctx->Result;
     
     // NOTE(Dima): SEtting some result fields
-    Result->UniqueNameHash = Ctx->UniqueNameHash;
+    CopyStringsSafe(Result->UniqueName,
+                    ArrLen(Result->UniqueName),
+                    Ctx->UniqueName);
+    Result->UniqueNameHash = StringHashFNV(Ctx->UniqueName);
     Result->NumGlyphs = NumGlyphs;
     Result->NumSizes = NumSizes;
     Result->Sizes = (font_size*)HelpBytes.GetPlace("FontSizes");
@@ -308,7 +311,7 @@ EndFontLoading(load_font_context* Ctx)
         load_font_size_context* SizeCtx = &Ctx->FontSizes[SizeIndex];
         font_size* FontSize = &Result->Sizes[SizeIndex];
         
-        FontSize->Scale = SizeCtx->Scale;
+        FontSize->ScaleForPixelHeight = SizeCtx->Scale;
         FontSize->FontSizeEnumType = SizeCtx->SizeTypeEnum;
         FontSize->PixelsPerMeter = SizeCtx->PixelsPerMeter;
         

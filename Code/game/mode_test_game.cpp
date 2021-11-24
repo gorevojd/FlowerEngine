@@ -33,30 +33,54 @@ SCENE_INIT(TestGame)
     
     InitCamera(&State->Camera, Camera_FlyAround, 0.5f, 500.0f);
     
-    State->Bear1 = CreateModelGameObject(Scene->Game, Global_Assets->Bear);
-    State->Bear2 = CreateModelGameObject(Scene->Game, Global_Assets->Bear);
-    State->Fox = CreateModelGameObject(Scene->Game, Global_Assets->Fox);
+    // NOTE(Dima): Cars
+    asset_id SupraID = GetAssetID("Model_Car_Supra");
+    asset_id MustangID = GetAssetID("Model_Car_Mustang");
+    asset_id NissanGTRID = GetAssetID("Model_Car_NissanGTR");
+    asset_id Golf2ID = GetAssetID("Model_Car_Golf2");
+    asset_id AventadorID = GetAssetID("Model_Car_LamborginiAventador");
     
-    State->Supra = CreateModelGameObject(Scene->Game, Global_Assets->Supra);
-    State->Mustang = CreateModelGameObject(Scene->Game, Global_Assets->Mustang);
-    State->NissanGTR = CreateModelGameObject(Scene->Game, Global_Assets->NissanGTR);
-    State->Golf2 = CreateModelGameObject(Scene->Game, Global_Assets->Golf2);
-    State->Aventador = CreateModelGameObject(Scene->Game, Global_Assets->Aventador);
-    
-    State->Bear1->P = V3(0.0f, 0.0f, 0.0f);
-    State->Bear1->CompAnimator.PlayingAnimation = Global_Assets->BearSuccess;
-    
-    State->Bear2->P = V3(2.0f, 0.0f, 0.0f);
-    State->Bear2->CompAnimator.PlayingAnimation = Global_Assets->BearIdle;
-    
-    State->Fox->P = V3(4.0f, 0.0f, 0.0f);
-    State->Fox->CompAnimator.PlayingAnimation = Global_Assets->FoxTalk;
+    State->Supra = CreateModelGameObject(Scene->Game, G_GetAssetDataByID(SupraID, model));
+    State->Mustang = CreateModelGameObject(Scene->Game, G_GetAssetDataByID(MustangID, model));
+    State->NissanGTR = CreateModelGameObject(Scene->Game, G_GetAssetDataByID(NissanGTRID, model));
+    State->Golf2 = CreateModelGameObject(Scene->Game, G_GetAssetDataByID(Golf2ID, model));
+    State->Aventador = CreateModelGameObject(Scene->Game, G_GetAssetDataByID(AventadorID, model));
     
     State->Supra->P = V3(6.0f, 0.0f, 0.0f);
     State->Mustang->P = V3(10.0f, 0.0f, 0.0f);
     State->NissanGTR->P = V3_Left() * 14.0f;
     State->Golf2->P = V3_Left() * 18.0f;
     State->Aventador->P = V3_Left() * 22.0f;
+    
+    
+    // NOTE(Dima): Animals
+    asset_id ModelBearID = GetAssetID("Model_Bear");
+    asset_id ModelFoxID = GetAssetID("Model_Fox");
+    
+    State->Bear1 = CreateModelGameObject(Scene->Game, G_GetAssetDataByID(ModelBearID, model));
+    State->Bear2 = CreateModelGameObject(Scene->Game, G_GetAssetDataByID(ModelBearID, model));
+    State->Fox = CreateModelGameObject(Scene->Game, G_GetAssetDataByID(ModelFoxID, model));
+    
+    
+    State->Bear1->P = V3(0.0f, 0.0f, 0.0f);
+    State->Bear2->P = V3(2.0f, 0.0f, 0.0f);
+    State->Fox->P = V3(4.0f, 0.0f, 0.0f);
+    
+#if 1    
+    asset_id BearSuccessID = GetAssetID("Anim_Bear_Success");
+    asset_id BearIdleID = GetAssetID("Anim_Bear_Idle");
+    asset_id FoxTalkID = GetAssetID("Anim_Fox_Talk");
+    
+    State->Bear1->CompAnimator.PlayingAnimation = G_GetAssetDataByID(BearSuccessID, 
+                                                                     animation);
+    
+    State->Bear2->CompAnimator.PlayingAnimation = G_GetAssetDataByID(BearIdleID, 
+                                                                     animation);
+    
+    State->Fox->CompAnimator.PlayingAnimation = G_GetAssetDataByID(FoxTalkID, 
+                                                                   animation);
+#endif
+    
 }
 
 SCENE_UPDATE(TestGame)
@@ -161,6 +185,9 @@ SCENE_UPDATE(TestGame)
     quat Rot = AxisAngle(RotAxis, 0.0f);
     
     
+    // NOTE(Dima): Test code
+    asset_id ID = GetAssetID("Model_Car_Supra");
+    asset* Asset = &Global_Assets->AssetStorage.Assets[ID];
     
     PushMesh(Global_Assets->Cube, 
              0,
@@ -233,7 +260,6 @@ SCENE_UPDATE(TestGame)
         RectAtX += 0.2f;
     }
 #endif
-    
     
     //PushImage(Global_Assets->BerlinSans->Atlas, V2(100), 1024);
     PrintTextWithFont(Global_Assets->BerlinSans,

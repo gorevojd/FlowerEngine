@@ -17,6 +17,27 @@ INTERNAL_FUNCTION char* GenerateSpecialGUID(char* Buf,
     return (Buf);
 }
 
+INTERNAL_FUNCTION inline 
+asset_id GetAssetID(asset_storage* Storage, char* GUID)
+{
+    asset_id Result = 0;
+    
+    auto& Found = Storage->GuidToID.find(GUID);
+    if (Found != Storage->GuidToID.end())
+    {
+        Result = Found->second;
+    }
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION inline 
+asset_id GetAssetID(char* GUID)
+{
+    asset_id Result = GetAssetID(&Global_Assets->AssetStorage, GUID);
+    
+    return Result;
+}
 
 INTERNAL_FUNCTION inline 
 asset* GetAssetByID(asset_storage* Storage, asset_id ID)
@@ -35,6 +56,40 @@ void* GetAssetDataByID_(asset_storage* Storage, asset_id ID)
 }
 
 #define GetAssetDataByID(storage, id, type) (type*)GetAssetDataByID_(storage, id)
+#define G_GetAssetDataByID(id, type) (type*)GetAssetDataByID_(&Global_Assets->AssetStorage, id)
+
+
+INTERNAL_FUNCTION
+void ProcessAssetHeader(asset* Asset, bool IsInit)
+{
+    asset_header* Header = &Asset->Header;
+    
+    Header->Ptr = Header->HeaderBytes;
+    
+    switch(Asset->Type)
+    {
+        case Asset_Model:
+        {
+            if (IsInit)
+            {
+                new (Asset->Header.Model) asset_header_model;
+            }
+            else
+            {
+                Asset->Header.Model->~asset_header_model();
+            }
+        }break;
+    }
+    
+    if (!IsInit)
+    {
+        Header->Ptr = 0;
+    }
+    else if (IsInit && (Asset->Type != Asset_None))
+    {
+        StrictAssert(Asset->Header.Ptr);
+    }
+}
 
 INTERNAL_FUNCTION 
 asset_id AddAssetToStorage(asset_storage* Storage, 
@@ -44,34 +99,48 @@ asset_id AddAssetToStorage(asset_storage* Storage,
     asset_id NewAssetID = Storage->NumAssets++;
     asset* NewAsset = GetAssetByID(Storage, NewAssetID);
     
+    NewAsset->IsSupplemental = false;
     NewAsset->Type = Type;
     CopyStringsSafe(NewAsset->GUID, ArrLen(NewAsset->GUID), GUID);
     
     
     // NOTE(Dima): Adding asset to (Guid to AssetID) mapping
-    u32 GuidHash = StringHashFNV(GUID);
-    asset_hashmap_entry* FoundEntry = Storage->GuidToID.find(GuidHash);
+    b32 FoundWithTheSameName = false;
+    if (Storage->GuidToID.size() > 0)
+    {
+        auto Found = Storage->GuidToID.find(NewAsset->GUID);
+        
+        FoundWithTheSameName = Found != Storage->GuidToID.end();
+    }
     
     /*
     // NOTE(Dima): When inserting asset to hashmap we have to make sure 
 that asset with the same GUID has not been inserted into asset storage before.
 */
-    Assert(!FoundEntry);
+    Assert(!FoundWithTheSameName);
     
-    asset_hashmap_entry NewEntry = {};
-    NewEntry.AssetGuidHash = GuidHash;
-    NewEntry.AssetID = NewAssetID;
+    Storage->GuidToID[NewAsset->GUID] = NewAssetID;
     
-    Storage->GuidToID.insert(GuidHash, NewEntry);
-    
-    // TODO(Dima): Maybe allocate header here
+    // NOTE(Dima): Initializing header
+    ProcessAssetHeader(NewAsset, true);
     
     return NewAssetID;
 }
 
-INTERNAL_FUNCTION asset_source* AddSourceToAsset(asset* Asset, mi SizeofSourceStruct)
+INTERNAL_FUNCTION
+void FreeAsset(asset_storage* Storage, int AssetIndex)
 {
+    asset* Asset = &Storage->Assets[AssetIndex];
     
+    // NOTE(Dima): Freeing DataPtr if it is set
+    if (!Asset->IsSupplemental && Asset->DataPtr.Ptr)
+    {
+        free(Asset->DataPtr.Ptr);
+    }
+    Asset->DataPtr.Ptr = 0;
+    
+    // NOTE(Dima): Freeing asset header
+    ProcessAssetHeader(Asset, false);
 }
 
 INTERNAL_FUNCTION void InitAssetStorage(asset_storage* Storage)
@@ -79,12 +148,27 @@ INTERNAL_FUNCTION void InitAssetStorage(asset_storage* Storage)
     Assert(Storage->NumAssets == 0);
     Assert(Storage->Initialized == false);
     
+    new (Storage) asset_storage;
+    
     Storage->Initialized = true;
     Storage->NumAssets = 0;
-    Storage->Arena = {};
-    Storage->GuidToID = hashmap<asset_hashmap_entry, ASSET_STORAGE_HASHMAP_SIZE>(&Storage->Arena);
+    Storage->GuidToID.reserve(ASSET_DEFAULT_COUNT_IN_TABLE);
     
     AddAssetToStorage(Storage, "NullAsset", Asset_None);
+}
+
+INTERNAL_FUNCTION void FreeAssetStorage(asset_storage* Storage)
+{
+    // NOTE(Dima): Freeing all assets sources & data pointers & headers in asset pack
+    for (int AssetIndex = 1;
+         AssetIndex < Storage->NumAssets;
+         AssetIndex++)
+    {
+        // NOTE(Dima): Freeing asset header
+        FreeAsset(Storage, AssetIndex);
+    }
+    
+    Storage->~asset_storage();
 }
 
 INTERNAL_FUNCTION void InitAssetLoadingContext(asset_loading_context* Ctx)
@@ -138,20 +222,7 @@ INTERNAL_FUNCTION void FreeAssetPack(asset_pack* Pack)
     
     asset_storage* Storage = &Pack->AssetStorage;
     
-    // NOTE(Dima): Freeing all assets sources & data pointers & headers in asset pack
-    for (int AssetIndex = 1;
-         AssetIndex < Storage->NumAssets;
-         AssetIndex++)
-    {
-        asset* Asset = &Storage->Assets[AssetIndex];
-        
-        // NOTE(Dima): Freeing DataPtr if it is set
-        if (Asset->DataPtr.Ptr)
-        {
-            free(Asset->DataPtr.Ptr);
-        }
-        Asset->DataPtr.Ptr = 0;
-    }
+    FreeAssetStorage(Storage);
 }
 
 INTERNAL_FUNCTION void 
@@ -163,16 +234,18 @@ WriteAssetPackToFile(asset_pack* Pack)
 INTERNAL_FUNCTION
 asset_id AddAssetImage(asset_storage* Storage,
                        char* GUID,
-                       image* Image)
+                       image* Image,
+                       b32 IsSupplemental = false)
 {
     asset_id Result = AddAssetToStorage(Storage, GUID, Asset_Image);
     asset* Asset = GetAssetByID(Storage, Result);
+    Asset->IsSupplemental = IsSupplemental;
     
     // NOTE(Dima): Filling Data
     Asset->DataPtr.Image = Image;
     
     // NOTE(Dima): Filling header
-    asset_header_image* Header = &Asset->Header.Image;
+    asset_header_image* Header = Asset->Header.Image;
     
     Header->Width = Image->Width;
     Header->Height = Image->Height;
@@ -240,7 +313,7 @@ asset_id AddAssetCubemap(asset_storage* Storage,
     Asset->DataPtr.Cubemap = Cubemap;
     
     // NOTE(Dima): Setting up asset header
-    asset_header_cubemap* Header = &Asset->Header.Cubemap;
+    asset_header_cubemap* Header = Asset->Header.Cubemap;
     
     Header->Left = LeftID;
     Header->Right = RightID;
@@ -306,7 +379,7 @@ asset_id AddAssetMesh(asset_storage* Storage,
     Asset->DataPtr.Mesh = Mesh;
     
     // NOTE(Dima): Filling asset header
-    asset_header_mesh* Header = &Asset->Header.Mesh;
+    asset_header_mesh* Header = Asset->Header.Mesh;
     
     Header->VertexCount = Mesh->VertexCount;
     Header->IndexCount = Mesh->IndexCount;
@@ -330,40 +403,20 @@ asset_id AddAssetMaterial(asset_storage* Storage,
     if (Material == 0)
     {
         Material = (material*)malloc(sizeof(material));
+        
+        CopyStrings(Material->Name, MaterialName);
+        Material->Type = MaterialType;
     }
     
     Asset->DataPtr.Material = Material;
     
     // NOTE(Dima): Filling header
-    asset_header_material* Header = &Asset->Header.Material;
+    asset_header_material* Header = Asset->Header.Material;
     
     CopyStrings(Header->Name, MaterialName);
     Header->Type = MaterialType;
     
     return Result;
-}
-
-INTERNAL_FUNCTION
-void SetMaterialTexture(asset_storage* Storage,
-                        asset_id MaterialID,
-                        u32 TextureType,
-                        asset_id TextureID)
-{
-    // NOTE(Dima): Checking if asset types are correct
-    asset* MaterialAsset = GetAssetByID(Storage, MaterialID);
-    Assert(Asset_Material == MaterialAsset->Type);
-    
-    asset* ImageAsset = GetAssetByID(Storage, TextureID);
-    Assert(Asset_Image == ImageAsset->Type);
-    
-    // NOTE(Dima): Setting up image in header
-    asset_header_material* Header = &MaterialAsset->Header.Material;
-    Header->TextureIDs[TextureType] = TextureID;
-    
-    // NOTE(Dima): Setting up image in actual 'material' pointer
-    material* Material = GetAssetDataByID(Storage, MaterialID, material);
-    image* Image = GetAssetDataByID(Storage, TextureID, image);
-    Material->Textures[TextureType] = Image;
 }
 
 INTERNAL_FUNCTION 
@@ -383,7 +436,7 @@ asset_id AddAssetMaterial(asset_storage* Storage,
     
     // NOTE(Dima): Filling asset header. 
     // NOTE(Dima): (Material Name & Type are already set by AddAssetMaterialInternal)
-    asset_header_material* Header = &Asset->Header.Material;
+    asset_header_material* Header = Asset->Header.Material;
     
     for (int TextureIndex = 0;
          TextureIndex < MAX_MATERIAL_TEXTURES;
@@ -416,6 +469,29 @@ asset_id AddAssetMaterial(asset_storage* Storage,
     return Result;
 }
 
+INTERNAL_FUNCTION
+void SetMaterialTexture(asset_storage* Storage,
+                        asset_id MaterialID,
+                        u32 TextureType,
+                        asset_id TextureID)
+{
+    // NOTE(Dima): Checking if asset types are correct
+    asset* MaterialAsset = GetAssetByID(Storage, MaterialID);
+    Assert(Asset_Material == MaterialAsset->Type);
+    
+    asset* ImageAsset = GetAssetByID(Storage, TextureID);
+    Assert(Asset_Image == ImageAsset->Type);
+    
+    // NOTE(Dima): Setting up image in header
+    asset_header_material* Header = MaterialAsset->Header.Material;
+    Header->TextureIDs[TextureType] = TextureID;
+    
+    // NOTE(Dima): Setting up image in actual 'material' pointer
+    material* Material = GetAssetDataByID(Storage, MaterialID, material);
+    image* Image = GetAssetDataByID(Storage, TextureID, image);
+    Material->Textures[TextureType] = Image;
+}
+
 INTERNAL_FUNCTION 
 void SetModelMaterial(asset_storage* Storage, 
                       asset_id ModelID,
@@ -434,7 +510,7 @@ void SetModelMaterial(asset_storage* Storage,
     material* Material = GetAssetDataByID(Storage, MaterialID, material);
     
     Model->Materials[MaterialIndex] = Material;
-    Model->MaterialIDs[MaterialIndex] = MaterialID;
+    ModelAsset->Header.Model->MaterialIDs[MaterialIndex] = MaterialID;
 }
 
 INTERNAL_FUNCTION 
@@ -446,8 +522,10 @@ asset_id AddAssetModel(asset_storage* Storage,
     asset_id Result = AddAssetToStorage(Storage, GUID, Asset_Model);
     asset* Asset = GetAssetByID(Storage, Result);
     
+    // NOTE(Dima): Loading model
     model* Model = LoadModel(FilePath, Params);
     
+    // NOTE(Dima): Setting data ptr
     Asset->DataPtr.Model = Model;
     
     // NOTE(Dima): Filling asset source
@@ -458,7 +536,9 @@ asset_id AddAssetModel(asset_storage* Storage,
                     FilePath);
     
     // NOTE(Dima): Filling asset header
-    asset_header_model* Header = &Asset->Header.Model;
+    asset_header_model* Header = Asset->Header.Model;
+    new (Header) asset_header_model;
+    
     Header->NumMeshes = Model->Meshes.size();
     Header->NumMaterials = Model->Materials.size();
     Header->NumNodes = Model->NumNodes;
@@ -466,8 +546,8 @@ asset_id AddAssetModel(asset_storage* Storage,
     Header->NumNodesMeshIndices = Model->NumNodesMeshIndices;
     Header->NumNodesChildIndices = Model->NumNodesChildIndices;
     
-    Model->MeshIDs.resize(Model->Meshes.size(), 0);
-    Model->MaterialIDs.resize(Model->Materials.size(), 0);
+    Header->MeshIDs.resize(Model->Meshes.size(), 0);
+    Header->MaterialIDs.resize(Model->Materials.size(), 0);
     
     // NOTE(Dima): Fillling material IDs
     for (int MaterialIndex = 0;
@@ -488,10 +568,10 @@ asset_id AddAssetModel(asset_storage* Storage,
                                 GUID,
                                 TempBuf);
             
-            MaterialAssetID = AddAssetMaterial(Storage, GUID, Material);
+            MaterialAssetID = AddAssetMaterial(Storage, MaterialGUID, Material);
         }
         
-        Model->MaterialIDs[MaterialIndex] = MaterialAssetID;
+        Header->MaterialIDs[MaterialIndex] = MaterialAssetID;
     }
     
     // NOTE(Dima): Filling mesh IDs
@@ -514,19 +594,266 @@ asset_id AddAssetModel(asset_storage* Storage,
                                 GUID,
                                 TempBuf);
             
-            MeshAssetID = AddAssetMesh(Storage, GUID, Mesh);
+            MeshAssetID = AddAssetMesh(Storage, MeshGUID, Mesh);
             
         }
         
-        Model->MeshIDs[MeshIndex] = MeshAssetID;
+        Header->MeshIDs[MeshIndex] = MeshAssetID;
     }
     
     return Result;
 }
 
+INTERNAL_FUNCTION
+asset_id AddAssetNodeAnim(asset_storage* Storage,
+                          char* AnimationGUID,
+                          int NodeAnimIndex,
+                          animation* Animation)
+{
+    // NOTE(Dima): Generating asset GUID
+    char NodeAnimGUID[ASSET_GUID_SIZE];
+    char TempBuf[ASSET_GUID_SIZE];
+    
+    stbsp_sprintf(TempBuf, "_NodeAnim:%d", NodeAnimIndex);
+    
+    GenerateSpecialGUID(NodeAnimGUID,
+                        ASSET_GUID_SIZE,
+                        AnimationGUID,
+                        TempBuf);
+    
+    // NOTE(Dima): Adding asset
+    asset_id Result = AddAssetToStorage(Storage, NodeAnimGUID, Asset_NodeAnimation);
+    asset* Asset = GetAssetByID(Storage, Result);
+    Asset->IsSupplemental = true;
+    
+    // NOTE(Dima): Setting data
+    node_animation* NodeAnim = &Animation->NodeAnims[NodeAnimIndex];
+    Asset->DataPtr.Ptr = NodeAnim;
+    
+    // NOTE(Dima): Filling header
+    asset_header_node_animation* Header = Asset->Header.NodeAnimation;
+    
+    Header->NodeIndex = NodeAnim->NodeIndex;
+    Header->NumPos = NodeAnim->NumPos;
+    Header->NumRot = NodeAnim->NumRot;
+    Header->NumSca = NodeAnim->NumScl;
+    
+    return Result;
+}
 
+INTERNAL_FUNCTION 
+asset_id AddAssetAnimationFirst(asset_storage* Storage, 
+                                char* GUID,
+                                char* Path)
+{
+    asset_id Result = AddAssetToStorage(Storage, GUID, Asset_Animation);
+    asset* Asset = GetAssetByID(Storage, Result);
+    
+    animation* Anim = LoadFirstSkeletalAnimation(Path);
+    Assert(Anim);
+    
+    // NOTE(Dima): Setting data
+    Asset->DataPtr.Ptr = Anim;
+    
+    // NOTE(Dima): Setting asset source
+    CopyStringsSafe(Asset->Source.FilePath, 
+                    ArrLen(Asset->Source.FilePath),
+                    Path);
+    
+    // NOTE(Dima): Setting asset header
+    asset_header_animation* Header = Asset->Header.Animation;
+    
+    CopyStringsSafe(Header->Name, 
+                    ArrLen(Header->Name),
+                    Anim->Name);
+    
+    Header->NumNodeAnims = Anim->NumNodeAnims;
+    Header->DurationTicks = Anim->DurationTicks;
+    Header->TicksPerSecond = Anim->TicksPerSecond;
+    Header->OutsideBehaviour = Anim->Behaviour;
+    
+    // NOTE(Dima): 
+    b32 IsFirstNodeAnim = true;
+    for (int NodeAnimIndex = 0;
+         NodeAnimIndex < Anim->NumNodeAnims;
+         NodeAnimIndex++)
+    {
+        asset_id NodeAnimAssetID = AddAssetNodeAnim(Storage, 
+                                                    GUID, 
+                                                    NodeAnimIndex,
+                                                    Anim);
+        
+        if (IsFirstNodeAnim)
+        {
+            Header->FirstNodeAnimID = NodeAnimAssetID;
+            
+            IsFirstNodeAnim = false;
+        }
+    }
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION
+asset_id AddAssetFontSize(asset_storage* Storage,
+                          char* FontGUID,
+                          int FontSizeIndex,
+                          font_size* FontSize)
+{
+    // NOTE(Dima): Generating GUID for font size
+    char FontSizeGUID[ASSET_GUID_SIZE];
+    char TempBuf[ASSET_GUID_SIZE];
+    stbsp_sprintf(TempBuf, 
+                  "FontSize:%d",
+                  FontSizeIndex);
+    
+    GenerateSpecialGUID(FontSizeGUID, 
+                        ASSET_GUID_SIZE,
+                        FontGUID,
+                        TempBuf);
+    
+    // NOTE(Dima): Adding asset
+    asset_id Result = AddAssetToStorage(Storage, FontSizeGUID, Asset_FontSize);
+    asset* Asset = GetAssetByID(Storage, Result);
+    Asset->IsSupplemental = true;
+    
+    // NOTE(Dima): Setting data ptr 
+    Asset->DataPtr.Ptr = FontSize;
+    
+    // NOTE(Dima): Filling header
+    asset_header_font_size* Header = Asset->Header.FontSize;
+    
+    Header->FontSizeEnumType = FontSize->FontSizeEnumType;
+    Header->PixelsPerMeter = FontSize->PixelsPerMeter;
+    Header->ScaleForPixelHeight = FontSize->ScaleForPixelHeight;
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION
+asset_id AddAssetGlyph(asset_storage* Storage,
+                       char* FontSizeGUID,
+                       int GlyphIndex,
+                       glyph* Glyph)
+{
+    // NOTE(Dima): Generating GUID for glyph
+    char GlyphGUID[ASSET_GUID_SIZE];
+    char TempBuf[ASSET_GUID_SIZE];
+    stbsp_sprintf(TempBuf, 
+                  "Glyph:%d",
+                  GlyphIndex);
+    
+    GenerateSpecialGUID(GlyphGUID, 
+                        ASSET_GUID_SIZE,
+                        FontSizeGUID,
+                        TempBuf);
+    
+    // NOTE(Dima): Adding asset
+    asset_id Result = AddAssetToStorage(Storage, FontSizeGUID, Asset_Glyph);
+    asset* Asset = GetAssetByID(Storage, Result);
+    Asset->IsSupplemental = true;
+    
+}
 
 #if 0
+INTERNAL_FUNCTION
+asset_id AddAssetFont(asset_storage* Storage,
+                      char* GUID,
+                      char* Path,
+                      const loading_params& Params = LoadingParams_Font())
+{
+    asset_id Result = AddAssetToStorage(Storage, GUID, Asset_Font);
+    asset* Asset = GetAssetByID(Storage, Result);
+    
+    // NOTE(Dima): Setting asset source 
+    CopyStringsSafe(Asset->Source.FilePath,
+                    ArrLen(Asset->Source.FilePath),
+                    Path);
+    Asset->Source.Params = Params;
+    
+    // NOTE(Dima): Loading asset
+    font* Font = LoadFontFile(Path, Params);
+    
+    // NOTE(Dima): Setting data ptr
+    Asset->DataPtr.Ptr = Font;
+    
+    // NOTE(Dima): Filling header
+    asset_header_font* Header = Asset->Header.Font;
+    
+    Header->Ascent = Font->Ascent;
+    Header->Descent = Font->Descent;
+    Header->LineGap = Font->LineGap;
+    Header->LineAdvance = Font->LineAdvance;
+    Header->UniqueNameHash = Font->UniqueNameHash;
+    CopyStringsSafe(Header->UniqueName, 
+                    ArrLen(Header->UniqueName),
+                    Font->UniqueName);
+    
+    Header->NumSizes = Font->NumSizes;
+    Header->NumGlyphs = Font->NumGlyphs;
+    
+    // NOTE(Dima): Adding atlas
+    char AtlasGUID[ASSET_GUID_SIZE];
+    GenerateSpecialGUID(AtlasGUID, 
+                        ASSET_GUID_SIZE,
+                        GUID,
+                        "FontAtlas");
+    
+    Header->AtlasImageID = AddAssetImage(Storage,
+                                         AtlasGUID,
+                                         Font->Atlas,
+                                         true);
+    
+    // NOTE(Dima): Adding font sizes
+    for (int FontSizeIndex = 0;
+         FontSizeIndex < Font->NumSizes;
+         FontSizeIndex++)
+    {
+        font_size* Size = &Font->Sizes[FontSizeIndex];
+        
+        asset_id FontSizeAssetID = AddAssetFontSize(Storage,
+                                                    GUID, 
+                                                    FontSizeIndex,
+                                                    Size);
+        
+        if (FontSizeIndex == 0)
+        {
+            Header->FirstFontSizeID = FontSizeAssetID;
+        }
+    }
+    
+    
+    // NOTE(Dima): Adding font size's glyphs
+    for (int FontSizeIndex = 0;
+         FontSizeIndex < Font->NumSizes;
+         FontSizeIndex++)
+    {
+        asset_id FontSizeID = Header->FirstFontSizeID + FontSizeIndex;
+        
+        asset* FontSizeAsset = GetAssetByID(Storage, FontSizeID);
+        font_size* FontSize = &Font->Sizes[FontSizeIndex];
+        
+        asset_header_font_size* FontSizeHeader = FontSizeAsset->Header.FontSize;
+        
+        // NOTE(Dima): Adding font size's glyphs
+        for (int GlyphIndex = 0;
+             GlyphIndex < Font->NumGlyphs;
+             GlyphIndex++)
+        {
+            asset_id GlyphID = AddAssetGlyph(???);
+            
+            if (GlyphIndex == 0)
+            {
+                FontSizeHeader->FirstGlyphId = GlyphID;
+            }
+        }
+    }
+    
+    
+    return Result;
+}
+#endif
+
 INTERNAL_FUNCTION 
 void AddBear(asset_storage* Storage)
 {
@@ -534,26 +861,86 @@ void AddBear(asset_storage* Storage)
     Params.Model.DefaultScale = 0.01f;
     Params.Model.FixInvalidRotation = true;
     
-    A->Bear = LoadModel("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/bear.FBX", Params);
+    asset_id ModelID = AddAssetModel(Storage, 
+                                     "Model_Bear", 
+                                     "../Data/ForGame/Common/ForestAnimals/Bear/bear.FBX", 
+                                     Params);
     
     // NOTE(Dima): Loading animations
-    A->BearSuccess = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
-    A->BearIdle = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
+    AddAssetAnimationFirst(Storage,
+                           "Anim_Bear_Idle",
+                           "../Data/ForGame/Common/ForestAnimals/Bear/animations/Idle.FBX");
+    
+    AddAssetAnimationFirst(Storage,
+                           "Anim_Bear_Success",
+                           "../Data/ForGame/Common/ForestAnimals/Bear/animations/Success.FBX");
     
     
-    // NOTE(Dima): Setting materials
-    A->BearMaterial = {};
-    A->BearMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearDiffuse;
+    // NOTE(Dima): Loading textures
+    asset_id ImgDiffuseID = AddAssetImage(Storage, 
+                                          "Image_Bear_Diffuse",
+                                          "../Data/ForGame/Common/ForestAnimals/Bear/Textures/Bear.tga");
+    asset_id ImgNormalsID = AddAssetImage(Storage,
+                                          "Image_Bear_Normal",
+                                          "../Data/ForGame/Common/ForestAnimals/Bear/Textures/Bear Normals.tga");
+    asset_id ImgEyesID = AddAssetImage(Storage,
+                                       "Image_Bear_EyesDiffuse",
+                                       "../Data/ForGame/Common/ForestAnimals/Bear/Textures/Eye Bear.tga");
+    asset_id ImgEyesShineID = AddAssetImage(Storage,
+                                            "Image_Bear_EyesShine",
+                                            "../Data/ForGame/Common/ForestAnimals/Bear/Textures/Eye Shine Bear.tga");
     
-    A->BearEyesMaterial = {};
-    A->BearEyesMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearEyesDiffuse;
+    // NOTE(Dima): Setting main material
+    asset_id MatBearID = AddAssetMaterial(Storage,
+                                          "Material_Bear",
+                                          "BearMain",
+                                          Material_SpecularDiffuse);
+    SetMaterialTexture(Storage,
+                       MatBearID,
+                       MatTex_SpecularDiffuse_Diffuse,
+                       ImgDiffuseID);
+    SetMaterialTexture(Storage,
+                       MatBearID,
+                       MatTex_SpecularDiffuse_Normal,
+                       ImgNormalsID);
     
-    A->BearEyesShineMaterial = {};
-    A->BearEyesShineMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearEyesShine;
+    // NOTE(Dima): Setting eyes material
+    asset_id MatBearEyesID = AddAssetMaterial(Storage,
+                                              "Material_BearEyes",
+                                              "BearEyes",
+                                              Material_SpecularDiffuse);
+    SetMaterialTexture(Storage,
+                       MatBearEyesID,
+                       MatTex_SpecularDiffuse_Diffuse,
+                       ImgEyesID);
     
-    A->Bear->Materials[0] = &A->BearMaterial;
-    A->Bear->Materials[1] = &A->BearEyesMaterial;
-    A->Bear->Materials[2] = &A->BearEyesShineMaterial;
+    
+    // NOTE(Dima): Setting eyes shine material
+    asset_id MatBearEyesShineID = AddAssetMaterial(Storage,
+                                                   "Material_BearEyesShine",
+                                                   "BearEyesShine",
+                                                   Material_SpecularDiffuse);
+    SetMaterialTexture(Storage,
+                       MatBearEyesShineID,
+                       MatTex_SpecularDiffuse_Diffuse,
+                       ImgEyesShineID);
+    
+    
+    // NOTE(Dima): Setting model's materials
+    SetModelMaterial(Storage, 
+                     ModelID,
+                     0,
+                     MatBearID);
+    
+    SetModelMaterial(Storage,
+                     ModelID,
+                     1,
+                     MatBearEyesID);
+    
+    SetModelMaterial(Storage,
+                     ModelID,
+                     2,
+                     MatBearEyesShineID);
 }
 
 INTERNAL_FUNCTION 
@@ -563,27 +950,91 @@ void AddFox(asset_storage* Storage)
     Params.Model.DefaultScale = 0.01f;
     Params.Model.FixInvalidRotation = true;
     
-    A->Fox = LoadModel("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/Fox.FBX", Params);
+    asset_id ModelID = AddAssetModel(Storage, 
+                                     "Model_Fox", 
+                                     "../Data/ForGame/Common/ForestAnimals/Fox/Fox.FBX", 
+                                     Params);
     
-    A->FoxTalk = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
+    // NOTE(Dima): Loading animations
+    AddAssetAnimationFirst(Storage,
+                           "Anim_Fox_Talk",
+                           "../Data/ForGame/Common/ForestAnimals/Fox/animations/Talk.FBX");
     
     
-    // NOTE(Dima): Fox materials
-    A->FoxMaterial = {};
-    A->FoxMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxDiffuse;
     
-    A->FoxEyesMaterial = {};
-    A->FoxEyesMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxEyesDiffuse;
+    // NOTE(Dima): Loading textures
+    asset_id ImgDiffuseID = AddAssetImage(Storage, 
+                                          "Image_Fox_Diffuse",
+                                          "../Data/ForGame/Common/ForestAnimals/Fox/Textures/Fox.tga");
+    asset_id ImgNormalsID = AddAssetImage(Storage,
+                                          "Image_Fox_Normal",
+                                          "../Data/ForGame/Common/ForestAnimals/Fox/Textures/Fox Normals.tga");
+    asset_id ImgEyesID = AddAssetImage(Storage,
+                                       "Image_Fox_EyesDiffuse",
+                                       "../Data/ForGame/Common/ForestAnimals/Fox/Textures/Eye Green.tga");
+    asset_id ImgEyesShineID = AddAssetImage(Storage,
+                                            "Image_Fox_EyesShine",
+                                            "../Data/ForGame/Common/ForestAnimals/Fox/Textures/Eye Shine.tga");
     
-    A->FoxEyesShineMaterial = {};
-    A->FoxEyesShineMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxEyesShine;
+    // NOTE(Dima): Setting main material
+    asset_id MatID = AddAssetMaterial(Storage,
+                                      "Material_Fox",
+                                      "FoxMain",
+                                      Material_SpecularDiffuse);
+    SetMaterialTexture(Storage,
+                       MatID,
+                       MatTex_SpecularDiffuse_Diffuse,
+                       ImgDiffuseID);
+    SetMaterialTexture(Storage,
+                       MatID,
+                       MatTex_SpecularDiffuse_Normal,
+                       ImgNormalsID);
     
-    A->Fox->Materials[0] = &A->FoxMaterial;
-    A->Fox->Materials[1] = &A->FoxEyesMaterial;
-    A->Fox->Materials[2] = &A->FoxEyesShineMaterial;
+    // NOTE(Dima): Setting eyes material
+    asset_id MatEyesID = AddAssetMaterial(Storage,
+                                          "Material_FoxEyes",
+                                          "FoxEyes",
+                                          Material_SpecularDiffuse);
+    SetMaterialTexture(Storage,
+                       MatEyesID,
+                       MatTex_SpecularDiffuse_Diffuse,
+                       ImgEyesID);
     
+    
+    // NOTE(Dima): Setting eyes shine material
+    asset_id MatEyesShineID = AddAssetMaterial(Storage,
+                                               "Material_FoxEyesShine",
+                                               "FoxEyesShine",
+                                               Material_SpecularDiffuse);
+    SetMaterialTexture(Storage,
+                       MatEyesShineID,
+                       MatTex_SpecularDiffuse_Diffuse,
+                       ImgEyesShineID);
+    
+    
+    // NOTE(Dima): Setting model's materials
+    SetModelMaterial(Storage, 
+                     ModelID,
+                     0,
+                     MatID);
+    
+    SetModelMaterial(Storage,
+                     ModelID,
+                     1,
+                     MatEyesID);
+    
+    SetModelMaterial(Storage,
+                     ModelID,
+                     2,
+                     MatEyesShineID);
 }
-#endif
+
+INTERNAL_FUNCTION
+void AddAnimals(asset_storage* Storage)
+{
+    AddBear(Storage);
+    AddFox(Storage);
+}
 
 INTERNAL_FUNCTION void AddCars(asset_storage* Storage)
 {
@@ -657,12 +1108,61 @@ INTERNAL_FUNCTION void AddCars(asset_storage* Storage)
     }
 }
 
+INTERNAL_FUNCTION 
+void AddFonts(asset_storage* Storage)
+{
+#if 0    
+    AddAssetFont(Pack, 
+                 "Font_BerlinSans", 
+                 "../Data/Fonts/BerlinSans.ttf");
+    
+    AddAssetFont(Pack, 
+                 "Font_LiberationMono", 
+                 "../Data/Fonts/liberation-mono.ttf");
+    AddAssetFont(Pack,
+                 "Font_Dimbo",
+                 "../Data/Fonts/Dimbo Regular.ttf");
+#endif
+}
+
+
+INTERNAL_FUNCTION 
+void AddCommonAssets(asset_storage* Storage)
+{
+    AddCars(Storage);
+    AddFonts(Storage);
+    AddAnimals(Storage);
+    
+    
+#if 0    
+    AddAssetImage(Pack, "Image_BoxDiffuse", 
+                  "../Data/Textures/container_diffuse.png");
+    
+    AddAssetImage(Pack, "Image_PlaneTexture", 
+                  "../Data/Textures/PixarTextures/png/fabric/Flower_pattern_pxr128.png");
+    
+    AddAssetInternal(Pack, "Mesh_Cube", Asset_Mesh, &A->Cube);
+    AddAssetInternal(Pack, "Mesh_Plane", Asset_Mesh, &A->Plane);
+    
+    AddAssetSkybox(Pack, "Skybox_Default", 
+                   "../Data/Textures/Cubemaps/Pink/left.png",
+                   "../Data/Textures/Cubemaps/Pink/right.png",
+                   "../Data/Textures/Cubemaps/Pink/front.png",
+                   "../Data/Textures/Cubemaps/Pink/back.png",
+                   "../Data/Textures/Cubemaps/Pink/up.png",
+                   "../Data/Textures/Cubemaps/Pink/down.png");
+#endif
+    
+}
+
 INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
 {
     Global_Assets = PushStruct(Arena, asset_system);
     Global_Assets->Arena = Arena;
     
     asset_system* A = Global_Assets;
+    
+    InitAssetStorage(&A->AssetStorage);
     
 #if 1
     loading_params VoxelAtlasParams = LoadingParams_Image();
@@ -699,85 +1199,24 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     
     A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");
     A->PlaneTexture = LoadImageFile("E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png");
-    loading_params PaletteParams = LoadingParams_Image();
-    PaletteParams.Image.FilteringIsClosest = true;
-    A->Palette = LoadImageFile("E:/Development/Modeling/Pallette/MyPallette.png", PaletteParams);
-    A->PaletteMaterial.Textures[0] = A->Palette;
-    
-    A->BearDiffuse = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear.tga");
-    A->BearNormal = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Bear Normals.tga");
-    A->BearEyesDiffuse = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Eye Bear.tga");
-    A->BearEyesShine = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Bear/Eye Shine Bear.tga");
-    
-    A->FoxDiffuse = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Fox.tga");
-    A->FoxNormal = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Fox Normals.tga");
-    A->FoxEyesDiffuse = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Eye Green.tga");
-    A->FoxEyesShine = LoadImageFile("E:/Development/Modeling/3rdParty/ForestAnimals/Textures/Fox/Eye Shine.tga");
-    
-    loading_params BearParams = LoadingParams_Model();
-    BearParams.Model.DefaultScale = 0.01f;
-    BearParams.Model.FixInvalidRotation = true;
-    
-    loading_params FoxParams = BearParams;
-    
-    A->Bear = LoadModel("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/bear.FBX", BearParams);
-    A->Fox = LoadModel("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/Fox.FBX", FoxParams);
-    
-    A->Supra = LoadModel("E:/Development/Modeling/Modeling challenge/ToyotaSupra/Supra.FBX");
-    A->Mustang = LoadModel("E:/Development/Modeling/Modeling challenge/MustangGTGen6/mustanggt6gen.fbx");
-    A->NissanGTR = LoadModel("E:/Development/Modeling/Modeling challenge/NissanGTR/NissanGTR.fbx");
-    A->Golf2 = LoadModel("E:/Development/Modeling/Modeling challenge/Golf2/golf2.fbx");
-    A->Aventador = LoadModel("E:/Development/Modeling/Modeling challenge/LambAventador/aventador.fbx");
-    
-    A->BearSuccess = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Success.FBX");
-    A->BearIdle = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Bear/animations/Idle.FBX");
-    A->FoxTalk = LoadFirstSkeletalAnimation("E:/Development/Modeling/3rdParty/ForestAnimals/FBX/Fox/animations/Talk.FBX");
-    
-    // NOTE(Dima): Bear materials
-    A->BearMaterial = {};
-    A->BearMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearDiffuse;
-    
-    A->BearEyesMaterial = {};
-    A->BearEyesMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearEyesDiffuse;
-    
-    A->BearEyesShineMaterial = {};
-    A->BearEyesShineMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->BearEyesShine;
-    
-    A->Bear->Materials[0] = &A->BearMaterial;
-    A->Bear->Materials[1] = &A->BearEyesMaterial;
-    A->Bear->Materials[2] = &A->BearEyesShineMaterial;
-    
-    // NOTE(Dima): Fox materials
-    A->FoxMaterial = {};
-    A->FoxMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxDiffuse;
-    
-    A->FoxEyesMaterial = {};
-    A->FoxEyesMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxEyesDiffuse;
-    
-    A->FoxEyesShineMaterial = {};
-    A->FoxEyesShineMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->FoxEyesShine;
-    
-    A->Fox->Materials[0] = &A->FoxMaterial;
-    A->Fox->Materials[1] = &A->FoxEyesMaterial;
-    A->Fox->Materials[2] = &A->FoxEyesShineMaterial;
     
     // NOTE(Dima): Other materials
     A->GroundMaterial = {};
     A->GroundMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->PlaneTexture;
-    
-    // NOTE(Dima): Supra material
-    A->Supra->Materials[0] = &A->PaletteMaterial;
-    A->Mustang->Materials[0] = &A->PaletteMaterial;
-    A->NissanGTR->Materials[0] = &A->PaletteMaterial;
-    A->Golf2->Materials[0] = &A->PaletteMaterial;
-    A->Aventador->Materials[0] = &A->PaletteMaterial;
-    
 #endif
     
-#if 0
     {
-        asset_pack* Pack = CreateAssetPack("common");
+        //asset_pack* Pack = UseAssetPack(&Global_Assets->LoadingCtx, "common");
+        //asset_storage* Storage = &Pack->AssetStorage;
         
+        AddCommonAssets(&Global_Assets->AssetStorage);
+        
+#if 0
+        
+        WriteAssetPackToFile(Pack);
+#endif
+        
+#if 0
         loading_params VoxelAtlasParams = DefaultLoadingParams();
         VoxelAtlasParams.Image_FilteringIsClosest = true;
         AddAssetImage(Pack, "Image_VoxelAtlas1", 
@@ -788,33 +1227,7 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
                       "../Data/Textures/minc_atlas2.png",
                       VoxelAtlasParams);
         
-        AddAssetImage(Pack, "Image_BoxDiffuse", 
-                      "../Data/Textures/container_diffuse.png");
-        
-        AddAssetImage(Pack, "Image_PlaneTexture", 
-                      "../Data/Textures/PixarTextures/png/fabric/Flower_pattern_pxr128.png");
-        
-        loading_params PaletteParams = DefaultLoadingParams();
-        PaletteParams.Image_FilteringIsClosest = true;
-        AddAssetImage(Pack, "Image_Palette", 
-                      "../Data/Textures/MyPallette.png");
-        
-        AddAssetFont(Pack, "Font_BerlinSans", "../Data/Fonts/BerlinSans.ttf");
-        AddAssetFont(Pack, "Font_LiberationMono", "../Data/Fonts/liberation-mono.ttf");
-        
-        AddAssetInternal(Pack, "Mesh_Cube", Asset_Mesh, &A->Cube);
-        AddAssetInternal(Pack, "Mesh_Plane", Asset_Mesh, &A->Plane);
-        
-        AddAssetSkybox(Pack, "Skybox_Default", 
-                       "../Data/Textures/Cubemaps/Pink/left.png",
-                       "../Data/Textures/Cubemaps/Pink/right.png",
-                       "../Data/Textures/Cubemaps/Pink/front.png",
-                       "../Data/Textures/Cubemaps/Pink/back.png",
-                       "../Data/Textures/Cubemaps/Pink/up.png",
-                       "../Data/Textures/Cubemaps/Pink/down.png");
-        
-        WriteAssetPackToFile(Pack);
-    }
 #endif
+    }
 }
 

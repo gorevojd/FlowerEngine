@@ -7,14 +7,14 @@ INTERNAL_FUNCTION inline ui_params* UIGetParams()
 
 inline f32 GetLineBase(font* Font, font_size* FontSize, f32 Scale = 1.0f)
 {
-    f32 Result = Font->Ascent * FontSize->Scale * Scale;
+    f32 Result = Font->Ascent * FontSize->ScaleForPixelHeight * Scale;
     
     return Result;
 }
 
 inline f32 GetLineAdvance(font* Font, font_size* FontSize, f32 Scale = 1.0f)
 {
-    f32 Result = Font->LineAdvance * FontSize->Scale * Scale;
+    f32 Result = Font->LineAdvance * FontSize->ScaleForPixelHeight * Scale;
     
     return Result;
 }
@@ -94,8 +94,8 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     
     rc2 Bounds;
     Bounds.Min.x = AtP.x;
-    Bounds.Min.y = AtP.y - Font->Ascent * FontSize->Scale * Scale;
-    Bounds.Max.y = AtP.y - Font->Descent * FontSize->Scale * Scale;
+    Bounds.Min.y = AtP.y - Font->Ascent * FontSize->ScaleForPixelHeight * Scale;
+    Bounds.Max.y = AtP.y - Font->Descent * FontSize->ScaleForPixelHeight * Scale;
     
     while(*At)
     {
@@ -130,7 +130,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
         f32 Kerning = GetKerning(Font, *At, *(At + 1)); 
         
         //AtP.x += Glyph->Advance * Scale;
-        AtP.x += (Glyph->Advance + Kerning * FontSize->Scale) * Scale;
+        AtP.x += (Glyph->Advance + Kerning * FontSize->ScaleForPixelHeight) * Scale;
         
         At++;
     }
@@ -241,21 +241,21 @@ INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(font* Font, font_size* Fon
     {
         case TextAlign_Top:
         {
-            Result = Min + Font->Ascent * FontSize->Scale * TextScale;
+            Result = Min + Font->Ascent * FontSize->ScaleForPixelHeight * TextScale;
         }break;
         
         case TextAlign_Bottom:
         {
-            Result = Max + Font->Descent * FontSize->Scale * TextScale;
+            Result = Max + Font->Descent * FontSize->ScaleForPixelHeight * TextScale;
         }break;
         
         case TextAlign_Center:
         {
-            f32 DimY = (Font->Ascent - Font->Descent) * FontSize->Scale * TextScale;
+            f32 DimY = (Font->Ascent - Font->Descent) * FontSize->ScaleForPixelHeight * TextScale;
             
             f32 CenterY = Min + (Max - Min) * 0.5f;
             
-            Result = CenterY - DimY * 0.5f + Font->Ascent * FontSize->Scale * TextScale;
+            Result = CenterY - DimY * 0.5f + Font->Ascent * FontSize->ScaleForPixelHeight * TextScale;
         }break;
         
         default:

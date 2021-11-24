@@ -95,6 +95,26 @@ inline u32 StringHashFNV(char* Name)
     return(Result);
 }
 
+struct string_fnv_key_hasher
+{
+    u32 operator()(char* KeyString) const
+    {
+        u32 HashResult = StringHashFNV(KeyString);
+        
+        return HashResult;
+    }
+};
+
+struct string_comparator
+{
+    bool operator()(char* lhs, char* rhs) const 
+    {
+        bool Result = StringsAreEqual(lhs, rhs);
+        
+        return Result;
+    }
+};
+
 inline b32 StringIsDecimalInteger(char* String) {
     b32 Result = 1;
     
@@ -112,7 +132,8 @@ inline b32 StringIsDecimalInteger(char* String) {
             
         }
         else {
-            return(0);
+            Result = 0;
+            break;
         }
         
         *At++;

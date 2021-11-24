@@ -12,6 +12,8 @@
 #define Assert(cond)
 #endif
 
+#define StrictAssert(cond) assert(cond)
+
 #define InvalidCodePath Assert(!"Invalid code path")
 
 #define ArrLen(arr) (sizeof(arr) / sizeof((arr)[0]))

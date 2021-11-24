@@ -415,8 +415,7 @@ INTERNAL_FUNCTION animation* ConvertToActualAnimation(loaded_animation* Load)
     helper_byte_buffer Help = {};
     
     Help.AddPlace("ResultPtr", 1, sizeof(animation));
-    Help.AddPlace("NodeAnims", NumNodeAnims, sizeof(node_animation*));
-    Help.AddPlace("NodeAnimsArr", NumNodeAnims, sizeof(node_animation));
+    Help.AddPlace("NodeAnims", NumNodeAnims, sizeof(node_animation));
     
     std::string PKeysStr = std::string("PKeys");
     std::string RKeysStr = std::string("RKeys");
@@ -449,11 +448,9 @@ INTERNAL_FUNCTION animation* ConvertToActualAnimation(loaded_animation* Load)
     Result->TicksPerSecond = Load->TicksPerSecond;
     Result->Behaviour = Load->Behaviour;
     Result->NumNodeAnims = NumNodeAnims;
+    Result->NodeAnims = (node_animation*)Help.GetPlace("NodeAnims");
     
     CopyStringsSafe(Result->Name, ArrLen(Result->Name), (char*)Load->Name.c_str());
-    
-    Result->NodeAnims = (node_animation**)Help.GetPlace("NodeAnims");
-    node_animation* NodeAnimsArr = (node_animation*)Help.GetPlace("NodeAnimsArr");
     
     for(int NodeAnimIndex = 0;
         NodeAnimIndex < NumNodeAnims;
@@ -461,9 +458,7 @@ INTERNAL_FUNCTION animation* ConvertToActualAnimation(loaded_animation* Load)
     {
         loaded_node_animation* Src = &Load->NodeAnims[NodeAnimIndex];
         
-        Result->NodeAnims[NodeAnimIndex] = &NodeAnimsArr[NodeAnimIndex];
-        
-        node_animation* NodeAnim = Result->NodeAnims[NodeAnimIndex];
+        node_animation* NodeAnim = &Result->NodeAnims[NodeAnimIndex];
         
         NodeAnim->NumPos = Src->PositionKeys.size();
         NodeAnim->NumRot = Src->RotationKeys.size();
@@ -649,8 +644,6 @@ INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
     
     Model->Meshes = std::vector<mesh*>(Load->Meshes);
     Model->Materials = std::vector<material*>(Load->Materials);
-    Model->MeshIDs = std::vector<asset_id>();
-    Model->MaterialIDs = std::vector<asset_id>();
     
     Model->Nodes = (model_node*)Help.GetPlace("Nodes");
     Model->Node_ToParent = (m44*)Help.GetPlace("Node_ToParent");
