@@ -123,19 +123,20 @@ struct ui_params
     window_dimensions WindowDimensions;
 };
 
-inline u32 UIGetPrintFlagsFromFontStyle(u32 FontStyle)
+inline u32 GetPrintFlagsFromGlyphStyle(u32 GlyphStyle)
 {
-    u32 FontStyleFlag = 0;
-    if(FontStyle == FontStyle_Shadow)
+    u32 GlyphStyleFlag = 0;
+    
+    if(GlyphStyle == GlyphStyle_Shadow)
     {
-        FontStyleFlag = PrintText_StyleShadow;
+        GlyphStyleFlag = PrintText_StyleShadow;
     }
-    else if(FontStyle == FontStyle_Outline)
+    else if(GlyphStyle == GlyphStyle_Outline)
     {
-        FontStyleFlag = PrintText_StyleOutline;
+        GlyphStyleFlag = PrintText_StyleOutline;
     }
     
-    return(FontStyleFlag);
+    return(GlyphStyleFlag);
 }
 
 struct ui_graph

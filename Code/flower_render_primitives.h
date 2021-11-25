@@ -195,15 +195,6 @@ struct animation
     f32 TicksPerSecond;
 };
 
-enum font_style
-{
-    FontStyle_Regular, 
-    FontStyle_Shadow,
-    FontStyle_Outline,
-    
-    FontStyle_Count,
-};
-
 enum font_size_type
 {
     FontSize_Small,
@@ -212,6 +203,13 @@ enum font_size_type
     FontSize_ExtraLarge,
     
     FontSize_Count,
+};
+
+enum font_glyph_style
+{
+    GlyphStyle_Original = BIT_FLAG(0),
+    GlyphStyle_Shadow = BIT_FLAG(1),
+    GlyphStyle_Outline = BIT_FLAG(2),
 };
 
 // TODO(Dima): Use Stb rect pack to pack glyphs into atlas
@@ -226,33 +224,19 @@ static int Global_FontSizes[FontSize_Count] =
 
 struct glyph_style
 {
-    image* Image;
+    u32 GlyphStyleType;
+    
     f32 WidthOverHeight;
+    int ImageHeight;
     
     v2 MinUV;
     v2 MaxUV;
 };
 
-inline glyph_style CreateGlyphStyle(image* Image, int Width, int Height)
-{
-    glyph_style Result = {};
-    
-    Result.Image = Image;
-    Result.WidthOverHeight = (f32)Width / (f32)Height;
-    
-    return(Result);
-}
-
-#if 0
-struct glyph_size
-{
-    glyph_style Styles[FontStyle_Count];
-};
-#endif
-
 struct glyph
 {
-    glyph_style Styles[FontStyle_Count];
+    glyph_style* Styles;
+    int NumStyles;
     
     u32 Codepoint;
     
@@ -262,6 +246,28 @@ struct glyph
     f32 XOffset;
     f32 YOffset;
 };
+
+inline int RequestGlyphStyle(glyph* Glyph, u32 DesiredGlyphStyle)
+{
+    Assert(Glyph->NumStyles > 0);
+    
+    int Result = 0;
+    
+    for (int GlyphStyleIndex = 0;
+         GlyphStyleIndex < Glyph->NumStyles;
+         GlyphStyleIndex++)
+    {
+        glyph_style* Style = &Glyph->Styles[GlyphStyleIndex];
+        
+        if(Style->GlyphStyleType == DesiredGlyphStyle)
+        {
+            Result = GlyphStyleIndex;
+            break;
+        }
+    }
+    
+    return Result;
+}
 
 struct font_codepoint_slot_range
 {
@@ -279,7 +285,7 @@ struct font_size
 {
     u32 FontSizeEnumType;
     
-    glyph** Glyphs;
+    glyph* Glyphs;
     
     f32 PixelsPerMeter;
     f32 ScaleForPixelHeight;

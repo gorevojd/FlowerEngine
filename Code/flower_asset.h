@@ -17,6 +17,7 @@ enum asset_type
     Asset_NodeAnimation,
     Asset_Font,
     Asset_FontSize,
+    Asset_GlyphStyle,
     Asset_Glyph,
     Asset_Model,
     
@@ -44,6 +45,7 @@ union asset_data_pointer
     node_animation* NodeAnimation;
     font* Font;
     font_size* FontSize;
+    glyph_style* GlyphStyle;
     glyph* Glyph;
     model* Model;
 };
@@ -86,8 +88,8 @@ struct asset_storage
     asset Assets[10000];
     int NumAssets;
     
-#define ASSET_DEFAULT_COUNT_IN_TABLE 512
-    std::unordered_map<char*, asset_id, string_fnv_key_hasher, string_comparator> GuidToID;
+#define ASSET_DEFAULT_COUNT_IN_TABLE 2048
+    std::unordered_map<const char*, asset_id, string_fnv_key_hasher, string_comparator> GuidToID;
     
     b32 Initialized;
 };

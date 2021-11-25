@@ -82,14 +82,14 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     int TextureIndex = GetFontTextureIndexInRectBuffer(Font, 
                                                        Global_RenderCommands->DEBUG_Rects2D_Window);
     
-    u32 FontStyle = FontStyle_Regular;
+    u32 GlyphStyleType = GlyphStyle_Original;
     if(BoolFlag(Flags, PrintText_StyleShadow))
     {
-        FontStyle = FontStyle_Shadow;
+        GlyphStyleType = GlyphStyle_Shadow;
     }
     else if(BoolFlag(Flags, PrintText_StyleOutline))
     {
-        FontStyle = FontStyle_Outline;
+        GlyphStyleType = GlyphStyle_Outline;
     }
     
     rc2 Bounds;
@@ -105,32 +105,29 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
             GlyphIndex = GetGlyphIndexByCodepoint(Font, '?');
         }
         
-        glyph* Glyph = FontSize->Glyphs[GlyphIndex];
+        glyph* Glyph = &FontSize->Glyphs[GlyphIndex];
         
         b32 IsGetSizePass = BoolFlag(Flags, PrintText_IsGetSizePass);
         
         if(!IsGetSizePass)
         {
-            glyph_style* GlyphStyle = &Glyph->Styles[FontStyle];
+            int GlyphStyleIndex = RequestGlyphStyle(Glyph, GlyphStyleType);
+            glyph_style* GlyphStyle = &Glyph->Styles[GlyphStyleIndex];
             
-            image* Image = GlyphStyle->Image;
-            if (Image)
-            {
-                f32 TargetHeight = (f32)Image->Height * Scale;
-                
-                v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;
-                PushGlyph(Buffer, Glyph, ImageP, 
-                          TargetHeight, 
-                          FontStyle, 
-                          TextureIndex,
-                          C);
-            }
+            f32 TargetHeight = (f32)GlyphStyle->ImageHeight * Scale;
+            
+            v2 ImageP = AtP + V2(Glyph->XOffset, Glyph->YOffset) * Scale + Offset;
+            PushGlyph(Buffer, Glyph, ImageP, 
+                      TargetHeight, 
+                      GlyphStyleIndex, 
+                      TextureIndex,
+                      C);
         }
         
         f32 Kerning = GetKerning(Font, *At, *(At + 1)); 
         
-        //AtP.x += Glyph->Advance * Scale;
-        AtP.x += (Glyph->Advance + Kerning * FontSize->ScaleForPixelHeight) * Scale;
+        // TODO(Dima): Check calculations are correct here
+        AtP.x += (Glyph->Advance + Kerning) * FontSize->ScaleForPixelHeight * Scale;
         
         At++;
     }
@@ -145,7 +142,7 @@ INTERNAL_FUNCTION inline rc2 GetTextRect(char* Text, v2 P)
     ui_params* Params = UIGetParams();
     font* Font = Params->Font;
     
-    u32 FontStyleFlag = UIGetPrintFlagsFromFontStyle(Params->FontStyle);
+    u32 FontStyleFlag = GetPrintFlagsFromGlyphStyle(Params->FontStyle);
     
     rc2 Result = PrintText_(Font, 
                             Text, 
@@ -177,11 +174,14 @@ INTERNAL_FUNCTION inline rc2 GetTextRectWithFont(font* Font,
     font_size* FontSize = FindBestFontSizeForPixelHeight(Font, PixelHeight);
     f32 Scale = GetScaleForPixelHeight(FontSize, PixelHeight);
     
+    // TODO(Dima): Pass this to this function
+    u32 FontStyleFlag = 0;
+    
     rc2 Result = PrintText_(Font, 
                             Text, 
                             V3_Left(), V3_Up(), V3_Forward(), 
                             V3(P.x, P.y, 0.0f), V2(0.0f, 0.0f), 
-                            0, 
+                            PrintText_IsGetSizePass | FontStyleFlag,
                             FontSize,
                             Scale);
     
@@ -354,7 +354,7 @@ INTERNAL_FUNCTION rc2 PrintText(char* Text,
     ui_params* Params = UIGetParams();
     font* Font = Params->Font;
     
-    u32 FontStyleFlag = UIGetPrintFlagsFromFontStyle(Params->FontStyle);
+    u32 FontStyleFlag = GetPrintFlagsFromGlyphStyle(Params->FontStyle);
     
     rc2 Result = PrintText_(Font, Text, 
                             V3_Left(), V3_Up(), V3_Forward(), 

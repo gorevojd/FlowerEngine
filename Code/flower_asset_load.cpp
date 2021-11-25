@@ -3,7 +3,7 @@
 
 #include <array>
 
-INTERNAL_FUNCTION image* LoadImageFile(char* FilePath, 
+INTERNAL_FUNCTION image* LoadImageFile(const char* FilePath, 
                                        const loading_params& Params = LoadingParams_Image())
 {
     int Width;
@@ -81,6 +81,13 @@ INTERNAL_FUNCTION cubemap* LoadCubemap(const char* Left,
     return(Result);
 }
 
+struct load_glyph_styles_ctx
+{
+    // NOTE(Dima): Number of styles is limited by the size of 32 (32 bits max mask)
+    glyph_style Styles[32];
+    image* Images[32];
+};
+
 struct load_font_size_context
 {
     u32 SizeTypeEnum;
@@ -90,6 +97,7 @@ struct load_font_size_context
     f32 PixelsPerMeter;
     
     std::vector<glyph> Glyphs;
+    std::vector<load_glyph_styles_ctx> GlyphIndexToGlyphStyles;
 };
 
 struct load_font_context
@@ -114,6 +122,7 @@ struct load_font_context
     u32 UniqueNameHash;
     
     std::vector<load_font_size_context> FontSizes;
+    std::vector<u32> GlyphStyleTypes;
     
     loading_params Params;
 };
@@ -125,6 +134,47 @@ INTERNAL_FUNCTION std::vector<u32> ExtractFontSizesToLoad(u32 SizesFlags)
     for (int i = 0; i < FontSize_Count; i++)
     {
         Result.push_back(i);
+    }
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION std::vector<u32> ExtractGlyphStylesToLoad(u32 StyleFlags)
+{
+    std::vector<u32> Result;
+    
+    for(int BitIndex = 0;
+        BitIndex < 32;
+        BitIndex++)
+    {
+        u32 MaskValue = 1 << BitIndex;
+        
+        if (StyleFlags & MaskValue)
+        {
+            Result.push_back(MaskValue);
+        }
+    }
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION inline 
+bool GlyphStylePresentInLoadCtx(load_font_context* Ctx, 
+                                u32 GlyphStyle,
+                                int* IndexInStyles)
+{
+    bool Result = false;
+    
+    for(int StyleIndex = 0;
+        StyleIndex < Ctx->GlyphStyleTypes.size();
+        StyleIndex++)
+    {
+        if (Ctx->GlyphStyleTypes[StyleIndex] == GlyphStyle)
+        {
+            Result = true;
+            *IndexInStyles = StyleIndex;
+            break;
+        }
     }
     
     return Result;
@@ -182,13 +232,17 @@ BeginFontLoading(load_font_context* Ctx, char* FilePath,
             
             Ctx->FontSizes.push_back(FontSize);
         }
+        
+        Ctx->GlyphStyleTypes = ExtractGlyphStylesToLoad(Params.Font.StyleFlags);
     }
     
     return Result;
 }
 
 
-INTERNAL_FUNCTION void AddGlyphToAtlas(load_font_context* Ctx, glyph* Glyph)
+INTERNAL_FUNCTION void AddGlyphToAtlas(load_font_context* Ctx, 
+                                       glyph* Glyph,
+                                       image** StylesImages)
 {
     font* Font = Ctx->Result;
     image* Dst = Font->Atlas;
@@ -197,13 +251,13 @@ INTERNAL_FUNCTION void AddGlyphToAtlas(load_font_context* Ctx, glyph* Glyph)
     f32 OneOverSize = 1.0f / (f32)DstSize;
     
     for(int StyleIndex = 0; 
-        StyleIndex < FontStyle_Count;
+        StyleIndex < Glyph->NumStyles;
         StyleIndex++)
     {
         glyph_style* Style = &Glyph->Styles[StyleIndex];
         
         // NOTE(Dima): Getting image 
-        image* Src = Style->Image;
+        image* Src = StylesImages[StyleIndex];
         if(Src)
         {
             int SrcW = Src->Width;
@@ -240,6 +294,9 @@ INTERNAL_FUNCTION void AddGlyphToAtlas(load_font_context* Ctx, glyph* Glyph)
             
             Ctx->FontAtlasAtP = V2(DstPx + SrcW, DstPy);
             Ctx->FontAtlasMaxRowY = FlowerMax(Ctx->FontAtlasMaxRowY, DstPy + SrcH);
+            
+            free(Src);
+            StylesImages[StyleIndex] = 0;
         }
     }
 }
@@ -250,6 +307,7 @@ EndFontLoading(load_font_context* Ctx)
     int NumGlyphs = Ctx->NumGlyphs;
     int NumSizes = Ctx->FontSizes.size();
     int AtlasWidth = Ctx->Params.Font.AtlasWidth;
+    int NumGlyphStyles = Ctx->GlyphStyleTypes.size();
     
     // NOTE(Dima): Copying glyphs
     helper_byte_buffer HelpBytes;
@@ -261,11 +319,23 @@ EndFontLoading(load_font_context* Ctx)
     {
         char TempBuf[256];
         
-        stbsp_sprintf(TempBuf, "Ptrs[%d]", SizeIndex);
-        HelpBytes.AddPlace(TempBuf, NumGlyphs, sizeof(glyph*));
-        
-        stbsp_sprintf(TempBuf, "Glyphs[%d]", SizeIndex);
+        stbsp_sprintf(TempBuf, "GlyphsArr_%d", SizeIndex);
         HelpBytes.AddPlace(TempBuf, NumGlyphs, sizeof(glyph));
+        
+        for (int GlyphIndex = 0;
+             GlyphIndex < NumGlyphs;
+             GlyphIndex++)
+        {
+            // TODO(Dima): Allocate memory for glyph styles
+            
+            char GlyphTempBuf[256];
+            stbsp_sprintf(GlyphTempBuf, 
+                          "GlyphSize#%d_GlyphIndex#%d", 
+                          SizeIndex, 
+                          GlyphIndex);
+            
+            HelpBytes.AddPlace(GlyphTempBuf, NumGlyphStyles, sizeof(glyph_style));
+        }
     }
     
     HelpBytes.AddPlace("Kerning", NumGlyphs * NumGlyphs, sizeof(f32));
@@ -318,20 +388,33 @@ EndFontLoading(load_font_context* Ctx)
         // NOTE(Dima): Getting glyphs
         char TempBuf[256];
         
-        stbsp_sprintf(TempBuf, "Glyphs[%d]", SizeIndex);
-        glyph* GlyphsArr = (glyph*)HelpBytes.GetPlace(TempBuf);
-        
-        stbsp_sprintf(TempBuf, "Ptrs[%d]", SizeIndex);
-        FontSize->Glyphs = (glyph**)HelpBytes.GetPlace(TempBuf);
+        stbsp_sprintf(TempBuf, "GlyphsArr_%d", SizeIndex);
+        FontSize->Glyphs = (glyph*)HelpBytes.GetPlace(TempBuf);
         
         // NOTE(Dima): Copying glyphs ptrs
-        memcpy(GlyphsArr, &SizeCtx->Glyphs[0], NumGlyphs * sizeof(glyph));
+        memcpy(&FontSize->Glyphs[0], 
+               &SizeCtx->Glyphs[0], 
+               NumGlyphs * sizeof(glyph));
         
         for (int GlyphIndex = 0;
              GlyphIndex < NumGlyphs;
              GlyphIndex++)
         {
-            FontSize->Glyphs[GlyphIndex] = &GlyphsArr[GlyphIndex];
+            glyph* Glyph = &FontSize->Glyphs[GlyphIndex];
+            glyph* SrcGlyph = &SizeCtx->Glyphs[GlyphIndex];
+            
+            char GlyphTempBuf[256];
+            stbsp_sprintf(GlyphTempBuf, 
+                          "GlyphSize#%d_GlyphIndex#%d", 
+                          SizeIndex, 
+                          GlyphIndex);
+            
+            Glyph->NumStyles = NumGlyphStyles;
+            Glyph->Styles = (glyph_style*)HelpBytes.GetPlace(GlyphTempBuf);
+            
+            memcpy(&Glyph->Styles[0],
+                   &SizeCtx->GlyphIndexToGlyphStyles[GlyphIndex].Styles[0],
+                   sizeof(glyph_style) * NumGlyphStyles);
         }
     }
     
@@ -396,14 +479,18 @@ EndFontLoading(load_font_context* Ctx)
          SizeIndex++)
     {
         font_size* FontSize = &Result->Sizes[SizeIndex];
+        load_font_size_context* SizeCtx = &Ctx->FontSizes[SizeIndex];
         
         for(int GlyphIndex = 0;
             GlyphIndex < NumGlyphs;
             GlyphIndex++)
         {
-            glyph* Glyph = FontSize->Glyphs[GlyphIndex];
+            glyph* Glyph = &FontSize->Glyphs[GlyphIndex];
+            load_glyph_styles_ctx* GlyphStylesCtx = &SizeCtx->GlyphIndexToGlyphStyles[GlyphIndex];
             
-            AddGlyphToAtlas(Ctx, Glyph);
+            AddGlyphToAtlas(Ctx, 
+                            Glyph, 
+                            GlyphStylesCtx->Images);
         }
     }
     
@@ -415,15 +502,35 @@ EndFontLoading(load_font_context* Ctx)
     Ctx->FileBufferToFree = 0;
 }
 
+inline void InitGlyphStyle(load_glyph_styles_ctx* StylesCtx,
+                           int StyleIndex,
+                           image* Image, 
+                           int Width, 
+                           int Height,
+                           u32 StyleType)
+{
+    glyph_style* Style = &StylesCtx->Styles[StyleIndex];
+    
+    Style->WidthOverHeight = (f32)Width / (f32)Height;
+    Style->ImageHeight = Image->Height;
+    Style->MinUV = V2(0.0f);
+    Style->MaxUV = V2(0.0f);
+    Style->GlyphStyleType = StyleType;
+    
+    StylesCtx->Images[StyleIndex] = Image;
+}
+
 INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
 {
     glyph Glyph = {};
+    load_glyph_styles_ctx StylesCtx = {};
     
     int SlotIndex = Codepoint % FONT_MAPPING_SIZE;
     
     font_slot_glyph_id SlotGlyphId = {};
     SlotGlyphId.Codepoint = Codepoint;
-    SlotGlyphId.IndexInGlyphs = Ctx->NumGlyphs++;
+    int IndexInGlyphs = Ctx->NumGlyphs++;
+    SlotGlyphId.IndexInGlyphs = IndexInGlyphs;
     Ctx->Mapping[SlotIndex].push_back(SlotGlyphId);
     
     int StbAdvance;
@@ -466,7 +573,6 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
             ImageExist = false;
         }
         
-        glyph_style* Styles = Glyph.Styles;
         if(ImageExist)
         {
             image* StbImage = AllocateImage(StbW, StbH);
@@ -479,149 +585,158 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
             int Border = 3;
             int ShadowOffset = Ctx->Params.Font.ShadowOffset;
             
-            // NOTE(Dima): Creating image for regular font
             int RegularWidth = StbW + 2 * Border;
             int RegularHeight = StbH + 2 * Border;
-            image* RegularImage = AllocateImage(RegularWidth, RegularHeight);
             
-            Styles[FontStyle_Regular] = CreateGlyphStyle(RegularImage, 
-                                                         RegularWidth, 
-                                                         RegularHeight);
-            
-            RenderOneBitmapIntoAnother(RegularImage,
-                                       StbImage,
-                                       Border, Border,
-                                       ColorWhite());
+            // NOTE(Dima): Creating image for regular font
+            int StyleIndex = 0;
+            if(GlyphStylePresentInLoadCtx(Ctx, GlyphStyle_Original, &StyleIndex))
+            {
+                image* RegularImage = AllocateImage(RegularWidth, RegularHeight);
+                
+                InitGlyphStyle(&StylesCtx,
+                               StyleIndex,
+                               RegularImage, 
+                               RegularWidth, 
+                               RegularHeight,
+                               GlyphStyle_Original);
+                
+                RenderOneBitmapIntoAnother(RegularImage,
+                                           StbImage,
+                                           Border, Border,
+                                           ColorWhite());
+            }
             
             // NOTE(Dima): Creating image for shadowed font
-            int ImageShadowWidth = RegularWidth + ShadowOffset;
-            int ImageShadowHeight = RegularHeight + ShadowOffset;
-            image* ShadowImage = AllocateImage(ImageShadowWidth, ImageShadowHeight);
-            
-            Styles[FontStyle_Shadow] = CreateGlyphStyle(ShadowImage,
-                                                        ImageShadowWidth,
-                                                        ImageShadowHeight);
-            
-            RenderOneBitmapIntoAnother(ShadowImage,
-                                       StbImage,
-                                       Border + ShadowOffset,
-                                       Border + ShadowOffset,
-                                       Ctx->Params.Font.ShadowColor);
-            
-            RenderOneBitmapIntoAnother(ShadowImage,
-                                       StbImage,
-                                       Border, Border,
-                                       ColorWhite());
+            if(GlyphStylePresentInLoadCtx(Ctx, GlyphStyle_Shadow, &StyleIndex))
+            {
+                int ImageShadowWidth = RegularWidth + ShadowOffset;
+                int ImageShadowHeight = RegularHeight + ShadowOffset;
+                image* ShadowImage = AllocateImage(ImageShadowWidth, ImageShadowHeight);
+                
+                InitGlyphStyle(&StylesCtx,
+                               StyleIndex,
+                               ShadowImage,
+                               ImageShadowWidth,
+                               ImageShadowHeight,
+                               GlyphStyle_Shadow);
+                
+                RenderOneBitmapIntoAnother(ShadowImage,
+                                           StbImage,
+                                           Border + ShadowOffset,
+                                           Border + ShadowOffset,
+                                           Ctx->Params.Font.ShadowColor);
+                
+                RenderOneBitmapIntoAnother(ShadowImage,
+                                           StbImage,
+                                           Border, Border,
+                                           ColorWhite());
+            }
             
             // NOTE(Dima): Creating image for outlined font
-            int ImageOutlineW = RegularWidth;
-            int ImageOutlineH = RegularHeight;
-            image* OutlineSrc = AllocateImage(ImageOutlineW, ImageOutlineH);
-            image* OutlineImage = AllocateImage(ImageOutlineW, ImageOutlineH);
-            
-            Styles[FontStyle_Outline] = CreateGlyphStyle(OutlineImage,
-                                                         ImageOutlineW,
-                                                         ImageOutlineH);
-            
+            if (GlyphStylePresentInLoadCtx(Ctx, GlyphStyle_Outline, &StyleIndex))
+            {
+                
+                int ImageOutlineW = RegularWidth;
+                int ImageOutlineH = RegularHeight;
+                image* OutlineSrc = AllocateImage(ImageOutlineW, ImageOutlineH);
+                image* OutlineImage = AllocateImage(ImageOutlineW, ImageOutlineH);
+                
+                InitGlyphStyle(&StylesCtx,
+                               StyleIndex,
+                               OutlineImage,
+                               ImageOutlineW,
+                               ImageOutlineH,
+                               GlyphStyle_Outline);
+                
 #if 0       
-            RenderOneBitmapIntoAnother(&OutlineSrc,
-                                       &StbImage,
-                                       Border,
-                                       Border,
-                                       Params.Font_OutlineColor);
-            
-            image* OutlineTemp = AllocateImage(ImageOutlineW, ImageOutlineH);
-            BlurBitmapApproximateGaussian(OutlineImage,
-                                          OutlineSrc,
-                                          OutlineTemp,
-                                          3);
-            
-            for(int y = 0; y < OutlineImage.Height; y++)
-            {
-                for(int x = 0; x < OutlineImage.Width; x++)
+                RenderOneBitmapIntoAnother(&OutlineSrc,
+                                           &StbImage,
+                                           Border,
+                                           Border,
+                                           Params.Font_OutlineColor);
+                
+                image* OutlineTemp = AllocateImage(ImageOutlineW, ImageOutlineH);
+                BlurBitmapApproximateGaussian(OutlineImage,
+                                              OutlineSrc,
+                                              OutlineTemp,
+                                              3);
+                
+                for(int y = 0; y < OutlineImage.Height; y++)
                 {
-                    u32* At = (u32*)OutlineImage.Pixels + OutlineImage.Width * y + x;
-                    
-                    v4 Color = UnpackRGBA(*At);
-                    
-                    if(Color.a > 0.1f)
+                    for(int x = 0; x < OutlineImage.Width; x++)
                     {
-                        Color = Params.Font_OutlineColor;
-                    }
-                    
-                    *At = PackRGBA(Color);
-                }
-            }
-#else
-            // NOTE(Dima): Simple cellural automata for outline generation
-            int CellDist = 1;
-            RenderOneBitmapIntoAnother(OutlineImage,
-                                       StbImage,
-                                       Border,
-                                       Border,
-                                       Ctx->Params.Font.OutlineColor);
-            
-            for(int y = CellDist; y < OutlineImage->Height - CellDist; y++)
-            {
-                for(int x = CellDist; x < OutlineImage->Width - CellDist; x++)
-                {
-                    u32* At = (u32*)OutlineSrc->Pixels + OutlineImage->Width * y + x;
-                    
-                    f32 NearAlphaSum = 0.0f;
-                    for(int CheckY = y - CellDist; CheckY <= y + CellDist; CheckY++)
-                    {
-                        for(int CheckX = x - CellDist; CheckX <= x + CellDist; CheckX++)
+                        u32* At = (u32*)OutlineImage.Pixels + OutlineImage.Width * y + x;
+                        
+                        v4 Color = UnpackRGBA(*At);
+                        
+                        if(Color.a > 0.1f)
                         {
-                            u32* CheckAt = (u32*)OutlineImage->Pixels + OutlineImage->Width * CheckY + CheckX;
-                            
-                            v4 CheckColor = UnpackRGBA(*CheckAt);
-                            
-                            NearAlphaSum += CheckColor.a;
+                            Color = Params.Font_OutlineColor;
                         }
+                        
+                        *At = PackRGBA(Color);
                     }
-                    
-                    v4 Color = ColorClear();
-                    if(NearAlphaSum >= 1.0f)
-                    {
-                        Color = Ctx->Params.Font.OutlineColor;
-                    }
-                    
-                    *At = PackRGBA(Color);
                 }
-            }
-            
-            image* OutlineTemp = AllocateImage(ImageOutlineW, ImageOutlineH);
-            BlurBitmapApproximateGaussian(OutlineImage,
-                                          OutlineSrc,
-                                          OutlineTemp,
-                                          2);
+#else
+                // NOTE(Dima): Simple cellural automata for outline generation
+                int CellDist = 1;
+                RenderOneBitmapIntoAnother(OutlineImage,
+                                           StbImage,
+                                           Border,
+                                           Border,
+                                           Ctx->Params.Font.OutlineColor);
+                
+                for(int y = CellDist; y < OutlineImage->Height - CellDist; y++)
+                {
+                    for(int x = CellDist; x < OutlineImage->Width - CellDist; x++)
+                    {
+                        u32* At = (u32*)OutlineSrc->Pixels + OutlineImage->Width * y + x;
+                        
+                        f32 NearAlphaSum = 0.0f;
+                        for(int CheckY = y - CellDist; CheckY <= y + CellDist; CheckY++)
+                        {
+                            for(int CheckX = x - CellDist; CheckX <= x + CellDist; CheckX++)
+                            {
+                                u32* CheckAt = (u32*)OutlineImage->Pixels + OutlineImage->Width * CheckY + CheckX;
+                                
+                                v4 CheckColor = UnpackRGBA(*CheckAt);
+                                
+                                NearAlphaSum += CheckColor.a;
+                            }
+                        }
+                        
+                        v4 Color = ColorClear();
+                        if(NearAlphaSum >= 1.0f)
+                        {
+                            Color = Ctx->Params.Font.OutlineColor;
+                        }
+                        
+                        *At = PackRGBA(Color);
+                    }
+                }
+                
+                image* OutlineTemp = AllocateImage(ImageOutlineW, ImageOutlineH);
+                BlurBitmapApproximateGaussian(OutlineImage,
+                                              OutlineSrc,
+                                              OutlineTemp,
+                                              2);
 #endif
-            
-            RenderOneBitmapIntoAnother(OutlineImage,
-                                       StbImage,
-                                       Border,
-                                       Border,
-                                       ColorWhite());
+                
+                RenderOneBitmapIntoAnother(OutlineImage,
+                                           StbImage,
+                                           Border,
+                                           Border,
+                                           ColorWhite());
+            }
             
             // NOTE(Dima): Setting other glyph information
             Glyph.Codepoint = Codepoint;
-            Glyph.Advance = (f32)StbAdvance * SizeCtx->Scale;
-            Glyph.LeftBearing = (f32)StbLeftBearing * SizeCtx->Scale;
+            Glyph.Advance = (f32)StbAdvance;
+            Glyph.LeftBearing = (f32)StbLeftBearing;
             
             Glyph.XOffset = StbXOffset - Border;
             Glyph.YOffset = StbYOffset - Border;
-        }
-        else
-        {
-            // TODO(Dima): Set image indices to invalid
-            for(int StyleIndex = 0;
-                StyleIndex < FontStyle_Count;
-                StyleIndex++)
-            {
-                glyph_style* Style = Styles + StyleIndex;
-                
-                *Style = CreateGlyphStyle(nullptr, 1, 1);
-            }
         }
         
         if(StbBitmap)
@@ -630,6 +745,7 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
         }
         
         SizeCtx->Glyphs.push_back(Glyph);
+        SizeCtx->GlyphIndexToGlyphStyles.push_back(StylesCtx);
     }
 }
 

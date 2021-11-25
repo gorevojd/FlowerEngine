@@ -40,6 +40,8 @@
 
 #define Align(value, align) ((value + (align - 1)) & (~(align - 1)))
 
+#define BIT_FLAG(bit_index) (1 << (bit_index))
+
 typedef uint64_t u64;
 typedef uint32_t u32;
 typedef uint16_t u16;

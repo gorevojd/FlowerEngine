@@ -3,7 +3,7 @@ INTERNAL_FUNCTION char* GenerateSpecialGUID(char* Buf,
                                             const char* BaseGUID,
                                             const char* SpecialStr)
 {
-    char* StringsToConcat[] = 
+    const char* StringsToConcat[] = 
     {
         (char*)BaseGUID,
         "_",
@@ -18,7 +18,8 @@ INTERNAL_FUNCTION char* GenerateSpecialGUID(char* Buf,
 }
 
 INTERNAL_FUNCTION inline 
-asset_id GetAssetID(asset_storage* Storage, char* GUID)
+asset_id GetAssetID(asset_storage* Storage, 
+                    const char* GUID)
 {
     asset_id Result = 0;
     
@@ -32,7 +33,7 @@ asset_id GetAssetID(asset_storage* Storage, char* GUID)
 }
 
 INTERNAL_FUNCTION inline 
-asset_id GetAssetID(char* GUID)
+asset_id GetAssetID(const char* GUID)
 {
     asset_id Result = GetAssetID(&Global_Assets->AssetStorage, GUID);
     
@@ -93,7 +94,7 @@ void ProcessAssetHeader(asset* Asset, bool IsInit)
 
 INTERNAL_FUNCTION 
 asset_id AddAssetToStorage(asset_storage* Storage, 
-                           char* GUID,
+                           const char* GUID,
                            u32 Type)
 {
     asset_id NewAssetID = Storage->NumAssets++;
@@ -101,7 +102,9 @@ asset_id AddAssetToStorage(asset_storage* Storage,
     
     NewAsset->IsSupplemental = false;
     NewAsset->Type = Type;
-    CopyStringsSafe(NewAsset->GUID, ArrLen(NewAsset->GUID), GUID);
+    CopyStringsSafe(NewAsset->GUID, 
+                    ArrLen(NewAsset->GUID), 
+                    GUID);
     
     
     // NOTE(Dima): Adding asset to (Guid to AssetID) mapping
@@ -184,7 +187,8 @@ INTERNAL_FUNCTION void InitAssetLoadingContext(asset_loading_context* Ctx)
     }
 }
 
-INTERNAL_FUNCTION asset_pack* UseAssetPack(asset_loading_context* Ctx, char* PackName)
+INTERNAL_FUNCTION asset_pack* UseAssetPack(asset_loading_context* Ctx, 
+                                           char* PackName)
 {
     asset_pack* Pack = 0;
     
@@ -233,7 +237,7 @@ WriteAssetPackToFile(asset_pack* Pack)
 
 INTERNAL_FUNCTION
 asset_id AddAssetImage(asset_storage* Storage,
-                       char* GUID,
+                       const char* GUID,
                        image* Image,
                        b32 IsSupplemental = false)
 {
@@ -259,8 +263,8 @@ asset_id AddAssetImage(asset_storage* Storage,
 
 INTERNAL_FUNCTION 
 asset_id AddAssetImage(asset_storage* Storage, 
-                       char* GUID, 
-                       char* Path,
+                       const char* GUID, 
+                       const char* Path,
                        loading_params& Params = LoadingParams_Image())
 {
     // NOTE(Dima): Loading image
@@ -281,7 +285,7 @@ asset_id AddAssetImage(asset_storage* Storage,
 
 INTERNAL_FUNCTION 
 asset_id AddAssetCubemap(asset_storage* Storage,
-                         char* GUID,
+                         const char* GUID,
                          asset_id LeftID,
                          asset_id RightID,
                          asset_id FrontID,
@@ -327,13 +331,13 @@ asset_id AddAssetCubemap(asset_storage* Storage,
 
 INTERNAL_FUNCTION 
 asset_id AddAssetCubemap(asset_storage* Storage,
-                         char* GUID,
-                         char* LeftPath,
-                         char* RightPath,
-                         char* FrontPath,
-                         char* BackPath,
-                         char* UpPath,
-                         char* DownPath,
+                         const char* GUID,
+                         const char* LeftPath,
+                         const char* RightPath,
+                         const char* FrontPath,
+                         const char* BackPath,
+                         const char* UpPath,
+                         const char* DownPath,
                          loading_params& ImagesParams = LoadingParams_Image())
 {
     char GuidBuf[128];
@@ -370,7 +374,7 @@ asset_id AddAssetCubemap(asset_storage* Storage,
 
 INTERNAL_FUNCTION 
 asset_id AddAssetMesh(asset_storage* Storage,
-                      char* GUID,
+                      const char* GUID,
                       mesh* Mesh)
 {
     asset_id Result = AddAssetToStorage(Storage, GUID, Asset_Mesh);
@@ -391,8 +395,8 @@ asset_id AddAssetMesh(asset_storage* Storage,
 
 INTERNAL_FUNCTION
 asset_id AddAssetMaterial(asset_storage* Storage,
-                          char* GUID,
-                          char* MaterialName,
+                          const char* GUID,
+                          const char* MaterialName,
                           u32 MaterialType,
                           material* Material = 0)
 {
@@ -421,7 +425,7 @@ asset_id AddAssetMaterial(asset_storage* Storage,
 
 INTERNAL_FUNCTION 
 asset_id AddAssetMaterial(asset_storage* Storage,
-                          char* GUID,
+                          const char* GUID,
                           material* Material)
 {
     asset_id Result = AddAssetMaterial(Storage, 
@@ -515,8 +519,8 @@ void SetModelMaterial(asset_storage* Storage,
 
 INTERNAL_FUNCTION 
 asset_id AddAssetModel(asset_storage* Storage,
-                       char* GUID,
-                       char* FilePath,
+                       const char* GUID,
+                       const char* FilePath,
                        const loading_params& Params = LoadingParams_Model())
 {
     asset_id Result = AddAssetToStorage(Storage, GUID, Asset_Model);
@@ -606,7 +610,7 @@ asset_id AddAssetModel(asset_storage* Storage,
 
 INTERNAL_FUNCTION
 asset_id AddAssetNodeAnim(asset_storage* Storage,
-                          char* AnimationGUID,
+                          const char* AnimationGUID,
                           int NodeAnimIndex,
                           animation* Animation)
 {
@@ -643,7 +647,7 @@ asset_id AddAssetNodeAnim(asset_storage* Storage,
 
 INTERNAL_FUNCTION 
 asset_id AddAssetAnimationFirst(asset_storage* Storage, 
-                                char* GUID,
+                                const char* GUID,
                                 char* Path)
 {
     asset_id Result = AddAssetToStorage(Storage, GUID, Asset_Animation);
@@ -672,8 +676,7 @@ asset_id AddAssetAnimationFirst(asset_storage* Storage,
     Header->TicksPerSecond = Anim->TicksPerSecond;
     Header->OutsideBehaviour = Anim->Behaviour;
     
-    // NOTE(Dima): 
-    b32 IsFirstNodeAnim = true;
+    // NOTE(Dima): Adding node animations assets
     for (int NodeAnimIndex = 0;
          NodeAnimIndex < Anim->NumNodeAnims;
          NodeAnimIndex++)
@@ -683,11 +686,9 @@ asset_id AddAssetAnimationFirst(asset_storage* Storage,
                                                     NodeAnimIndex,
                                                     Anim);
         
-        if (IsFirstNodeAnim)
+        if (NodeAnimIndex == 0)
         {
             Header->FirstNodeAnimID = NodeAnimAssetID;
-            
-            IsFirstNodeAnim = false;
         }
     }
     
@@ -696,7 +697,7 @@ asset_id AddAssetAnimationFirst(asset_storage* Storage,
 
 INTERNAL_FUNCTION
 asset_id AddAssetFontSize(asset_storage* Storage,
-                          char* FontGUID,
+                          const char* FontGUID,
                           int FontSizeIndex,
                           font_size* FontSize)
 {
@@ -732,7 +733,7 @@ asset_id AddAssetFontSize(asset_storage* Storage,
 
 INTERNAL_FUNCTION
 asset_id AddAssetGlyph(asset_storage* Storage,
-                       char* FontSizeGUID,
+                       const char* FontSizeGUID,
                        int GlyphIndex,
                        glyph* Glyph)
 {
@@ -753,9 +754,60 @@ asset_id AddAssetGlyph(asset_storage* Storage,
     asset* Asset = GetAssetByID(Storage, Result);
     Asset->IsSupplemental = true;
     
+    // NOTE(Dima): Filling asset header
+    asset_header_glyph* Header = Asset->Header.Glyph;
+    
+    Header->NumStyles = Glyph->NumStyles;
+    Header->Codepoint = Glyph->Codepoint;
+    Header->Advance = Glyph->Advance;
+    Header->LeftBearing = Glyph->LeftBearing;
+    Header->XOffset = Glyph->XOffset;
+    Header->YOffset = Glyph->YOffset;
+    
+    // NOTE(Dima): This will be setup in AddAssetFont function
+    Header->FirstStyleID = 0;
+    
+    return Result;
 }
 
 #if 0
+INTERNAL_FUNCTION
+asset_id AddAssetGlyphStyle(asset_storage* Storage,
+                            const char* GlyphGUID,
+                            int StyleIndex,
+                            glyph_style* Style)
+{
+    char GlyphStyleGUID[ASSET_GUID_SIZE];
+    char TempBuf[ASSET_GUID_SIZE];
+    stbsp_sprintf(TempBuf, "GlyphStyle:%d", StyleIndex);
+    
+    GenerateSpecialGUID(GlyphStyleGUID,
+                        ASSET_GUID_SIZE,
+                        GlyphGUID,
+                        TempBuf);
+    
+    // NOTE(Dima): Adding asset
+    asset_id Result = AddAssetToStorage(Storage, GlyphStyleGUID, Asset_GlyphStyle);
+    asset* Asset = GetAssetByID(Storage, Result);
+    Asset->IsSupplemental = true;
+    
+    // NOTE(Dima): Filling asset header
+    asset_header_glyph_style* Header = Asset->Header.GlyphStyle;
+    
+    Header->GlyphStyleType = Style->GlyphStyleType;
+    Header->ImageWidth = Style->ImageWidth;
+    Header->ImageHeight = Style->ImageHeight;
+    Header->MinUV_x = Style->MinUV.x;
+    Header->MinUV_y = Style->MinUV.y;
+    Header->MaxUV_x = Style->MaxUV.x;
+    Header->MaxUV_y = Style->MaxUV.y;
+    
+    // NOTE(Dima): 
+    Header->ImageID = ???;
+    
+    return Result;
+}
+
 INTERNAL_FUNCTION
 asset_id AddAssetFont(asset_storage* Storage,
                       char* GUID,
@@ -840,7 +892,12 @@ asset_id AddAssetFont(asset_storage* Storage,
              GlyphIndex < Font->NumGlyphs;
              GlyphIndex++)
         {
-            asset_id GlyphID = AddAssetGlyph(???);
+            glyph* Glyph = &FontSize->Glyphs[GlyphIndex];
+            
+            asset_id GlyphID = AddAssetGlyph(Storage, 
+                                             FontSizeAsset->GUID,
+                                             GlyphIndex,
+                                             Glyph);
             
             if (GlyphIndex == 0)
             {
@@ -849,6 +906,43 @@ asset_id AddAssetFont(asset_storage* Storage,
         }
     }
     
+    // NOTE(Dima): Adding font size's glyphs's styles
+    for (int FontSizeIndex = 0;
+         FontSizeIndex < Font->NumSizes;
+         FontSizeIndex++)
+    {
+        asset_id FontSizeID = Header->FirstFontSizeID + FontSizeIndex;
+        
+        asset* FontSizeAsset = GetAssetByID(Storage, FontSizeID);
+        font_size* FontSize = &Font->Sizes[FontSizeIndex];
+        
+        asset_header_font_size* FontSizeHeader = FontSizeAsset->Header.FontSize;
+        
+        for (int GlyphIndex = 0;
+             GlyphIndex < Font->NumGlyphs;
+             GlyphIndex++)
+        {
+            asset_id GlyphID = FontSizeHeader->FirstGlyphId + GlyphIndex;
+            
+            glyph* Glyph = &FontSize->Glyphs[GlyphIndex];
+            asset* GlyphAsset = GetAssetByID(Storage, GlyphID);
+            asset_header_glyph* GlyphHeader = GlyphAsset->Header.Glyph;
+            
+            for (int StyleIndex = 0;
+                 StyleIndex < Glyph->NumStyles;
+                 StyleIndex++)
+            {
+                glyph_style* Style = &Glyph->Styles[StyleIndex];
+                
+                asset_id StyleID = AddAssetGlyphStyle();
+                
+                if (StyleIndex == 0)
+                {
+                    GlyphHeader->FirstStyleID = StyleID;
+                }
+            }
+        }
+    }
     
     return Result;
 }

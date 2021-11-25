@@ -261,7 +261,7 @@ SCENE_UPDATE(TestGame)
     }
 #endif
     
-    //PushImage(Global_Assets->BerlinSans->Atlas, V2(100), 1024);
+    PushImage(Global_Assets->BerlinSans->Atlas, V2(100), 1024);
     PrintTextWithFont(Global_Assets->BerlinSans,
                       "Hello world. My Name is Dima",
                       V2(1000, 100),
@@ -271,6 +271,12 @@ SCENE_UPDATE(TestGame)
                       "And I love programming",
                       V2(1000, 300),
                       40.0f,
+                      ColorGreen());
+    
+    PrintTextWithFont(Global_Assets->LiberationMono,
+                      "And Making 123 Videos for YouTube",
+                      V2(100, 600),
+                      100.0f + Sin(Global_Time->Time) * 60.0f,
                       ColorGreen());
     
 }

@@ -16,12 +16,12 @@ struct loading_params
         
         struct 
         {
-            
             v4 ShadowColor;
             v4 OutlineColor;
             int ShadowOffset;
             int AtlasWidth;
             u32 SizesFlags;
+            u32 StyleFlags;
         }Font;
         
         struct 
@@ -70,6 +70,8 @@ inline loading_params LoadingParams_Font()
     Result.Font.OutlineColor = ColorBlack();
     Result.Font.AtlasWidth = 2048;
     Result.Font.SizesFlags = 0;
+    //Result.Font.StyleFlags = GlyphStyle_Original | GlyphStyle_Shadow | GlyphStyle_Outline;
+    Result.Font.StyleFlags = GlyphStyle_Original;
     
     return Result;
 }

@@ -719,7 +719,7 @@ INTERNAL_FUNCTION model* ConvertToActualModel(loaded_model* Load)
     return(Model);
 }
 
-INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
+INTERNAL_FUNCTION loaded_model LoadModelFileInternal(const char* FilePath,
                                                      loading_params Params = LoadingParams_Model(),
                                                      b32 LoadAnimations = true,
                                                      b32 LoadOnlyAnimations = false)
@@ -796,7 +796,7 @@ INTERNAL_FUNCTION loaded_model LoadModelFileInternal(char* FilePath,
 }
 
 // NOTE(Dima): Pass LoadAnimations = true to get all animations that were in this file
-model* LoadModel(char* FilePath,
+model* LoadModel(const char* FilePath,
                  loading_params Params = LoadingParams_Model())
 {
     b32 LoadOnlyAnimations = false;

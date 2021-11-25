@@ -25,10 +25,10 @@ GLOBAL_VARIABLE u64 PowersOf10[] =
     10000000000000000000,
 };
 
-inline int StringLength(char* Text) {
+inline int StringLength(const char* Text) {
 	int Res = 0;
     
-	char* At = Text;
+	const char* At = Text;
 	while (*At) {
 		Res++;
         
@@ -38,7 +38,9 @@ inline int StringLength(char* Text) {
 	return(Res);
 }
 
-inline b32 StringsAreEqual(char* A, char* B) {
+inline b32 StringsAreEqual(const char* A, 
+                           const char* B)
+{
 	b32 Result = false;
     
 	while (*A && *B) {
@@ -59,7 +61,9 @@ inline b32 StringsAreEqual(char* A, char* B) {
 	return(Result);
 }
 
-inline void CopyStrings(char* Dst, char* Src) {
+inline void CopyStrings(char* Dst, 
+                        const char* Src) 
+{
 	if (Src && Dst) {
 		while (*Src) {
 			*Dst++ = *Src++;
@@ -68,7 +72,10 @@ inline void CopyStrings(char* Dst, char* Src) {
     }
 }
 
-inline void CopyStringsSafe(char* Dst, int DstSize, char* Src){
+inline void CopyStringsSafe(char* Dst, 
+                            int DstSize, 
+                            const char* Src)
+{
     if(Src && Dst){
         int SpaceInDstAvailable = DstSize - 1;
         while(*Src && SpaceInDstAvailable){
@@ -79,11 +86,11 @@ inline void CopyStringsSafe(char* Dst, int DstSize, char* Src){
     }
 }
 
-inline u32 StringHashFNV(char* Name) 
+inline u32 StringHashFNV(const char* Name) 
 {
     u32 Result = 2166136261;
     
-    char* At = Name;
+    const char* At = Name;
     while (*At) {
         
         Result *= 16777619;
@@ -97,7 +104,7 @@ inline u32 StringHashFNV(char* Name)
 
 struct string_fnv_key_hasher
 {
-    u32 operator()(char* KeyString) const
+    u32 operator()(const char* KeyString) const
     {
         u32 HashResult = StringHashFNV(KeyString);
         
@@ -107,7 +114,7 @@ struct string_fnv_key_hasher
 
 struct string_comparator
 {
-    bool operator()(char* lhs, char* rhs) const 
+    bool operator()(const char* lhs, const char* rhs) const 
     {
         bool Result = StringsAreEqual(lhs, rhs);
         
@@ -142,10 +149,11 @@ inline b32 StringIsDecimalInteger(char* String) {
     return(Result);
 }
 
-inline int StringToInteger(char* String) {
+inline int StringToInteger(const char* String) 
+{
     int Result = 0;
     
-    char* At = String;
+    const char* At = String;
     
     int Len = StringLength(String);
     
@@ -170,7 +178,8 @@ inline int StringToInteger(char* String) {
     return(Result);
 }
 
-inline float StringToFloat(char* String) {
+inline float StringToFloat(const char* String)
+{
     float Result = 0.0f;
     
     //NOTE(dima): Detecting if negative and whole part start index
@@ -181,9 +190,9 @@ inline float StringToFloat(char* String) {
         WholeStart = 1;
     }
     
-    char* At = String + WholeStart;
+    const char* At = String + WholeStart;
     b32 DotExist = 0;
-    char* DotAt = 0;
+    const char* DotAt = 0;
     //NOTE(dima): Detecting whole part end
     int WholeEndIndex = WholeStart;
     while (*At) {
@@ -218,10 +227,10 @@ inline float StringToFloat(char* String) {
         }
         
         if (FractionalPartLen) {
-            char* FractionalBegin = DotAt + 1;
-            char* FractionalEnd = At;
+            const char* FractionalBegin = DotAt + 1;
+            const char* FractionalEnd = At;
             
-            char* FractionalAt = FractionalBegin;
+            const char* FractionalAt = FractionalBegin;
             CurrentMultiplier = 0.1f;
             while (FractionalAt != FractionalEnd) {
                 float CurrentDigit = (float)(*FractionalAt - '0');
@@ -238,7 +247,8 @@ inline float StringToFloat(char* String) {
     return(Result);
 }
 
-inline void IntegerToString(int Value, char* String) 
+inline void IntegerToString(int Value, 
+                            char* String) 
 {
     int DigitIndex = 0;
     
@@ -378,8 +388,10 @@ inline b32 IsWhitespace(char C){
     return(Result);
 }
 
-inline void StringToUpper(char* To, char* From){
-    char* AtFrom = From;
+inline void StringToUpper(char* To, 
+                          const char* From)
+{
+    const char* AtFrom = From;
     char* AtTo = To;
     
     if(AtFrom && AtTo){
@@ -407,7 +419,7 @@ inline void StringToUpper(char* To, char* From){
 
 // NOTE(Dima): This function returns one past last symbol of Src in Dst
 inline int CopyStringIntoDst(char* Dst, int DstSize,
-                             char* Src,
+                             const char* Src,
                              int StartInsertFrom = 0)
 {
     int SrcLen = StringLength(Src);
@@ -427,7 +439,7 @@ inline int CopyStringIntoDst(char* Dst, int DstSize,
 
 // NOTE(Dima): This function returns one past last symbol of Src in Dst
 inline int CopyStringIntoDstAndNullTerminate(char* Dst, int DstSize,
-                                             char* Src,
+                                             const char* Src,
                                              int StartInsertFrom = 0)
 {
     int EndIndex = CopyStringIntoDst(Dst, DstSize, Src, StartInsertFrom);
@@ -441,7 +453,7 @@ inline int CopyStringIntoDstAndNullTerminate(char* Dst, int DstSize,
 
 // NOTE(Dima): This function returns one past last symbol of Src in Dst
 inline int AppendToString(char* Dst, int DstSize, 
-                          char* Src)
+                          const char* Src)
 {
     int DstCurLen = StringLength(Dst);
     int SrcLen = StringLength(Src);
@@ -461,7 +473,7 @@ inline void ClearString(char* Dst, int DstSize)
 }
 
 inline int ConcatBunchOfStrings(char* Dst, int DstSize,
-                                char** StringsToConcat,
+                                const char** StringsToConcat,
                                 int NumStringsToConcat)
 {
     int InsertAt = 0;

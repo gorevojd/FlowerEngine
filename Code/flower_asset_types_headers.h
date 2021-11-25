@@ -107,8 +107,29 @@ struct asset_header_font_size
 };
 ASSET_ASSERT_HEADER(asset_header_font_size);
 
+
+struct asset_header_glyph_style
+{
+    asset_id ImageID;
+    
+    u32 GlyphStyleType;
+    int ImageWidth;
+    int ImageHeight;
+    
+    f32 MinUV_x;
+    f32 MinUV_y;
+    
+    f32 MaxUV_x;
+    f32 MaxUV_y;
+};
+ASSET_ASSERT_HEADER(asset_header_glyph_style);
+
+
 struct asset_header_glyph
 {
+    asset_id FirstStyleID;
+    int NumStyles;
+    
     u32 Codepoint;
     
     f32 Advance;
@@ -117,6 +138,8 @@ struct asset_header_glyph
     f32 XOffset;
     f32 YOffset;
 };
+ASSET_ASSERT_HEADER(asset_header_glyph);
+
 
 struct asset_header_font
 {
@@ -182,6 +205,8 @@ struct asset_header
         asset_header_node_animation* NodeAnimation;
         asset_header_font* Font;
         asset_header_font_size* FontSize;
+        asset_header_glyph* Glyph;
+        asset_header_glyph_style* GlyphStyle;
         asset_header_model* Model;
     };
 };
