@@ -119,29 +119,6 @@ struct asset_system
     asset_loading_context LoadingCtx;
     
     image* VoxelAtlas;
-    
-    // NOTE(Dima): Assets
-    mesh* Cube;
-    mesh* Plane;
-    
-    cubemap* Sky;
-    
-    image* BoxTexture;
-    image* PlaneTexture;
-    image* Palette; 
-    
-#if 0    
-    font TimesNewRoman;
-    font LifeIsGoofy;
-    font Arial;
-#endif
-    
-    font* BerlinSans;
-    font* LiberationMono;
-    font* Dimbo;
-    
-    material PaletteMaterial;
-    material GroundMaterial;
 };
 
 #endif //FLOWER_ASSET_H

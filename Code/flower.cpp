@@ -49,6 +49,7 @@ inline void OutputLog(const char* Format, ...)
 
 #include "flower_asset.cpp"
 #include "flower_render.cpp"
+#include "flower_render_asset.cpp"
 #include "flower_ui.cpp"
 #include "flower_animation.cpp"
 #include "flower_gameplay.cpp"

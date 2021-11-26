@@ -36,7 +36,9 @@ SCENE_UPDATE(Minecraft)
     
     render_pass* RenderPass = AddRenderPass();
     
-    PushSky(Global_Assets->Sky);
+    PushSky(GetGlobalAssetStorage(),
+            true,
+            GetAssetID("Cubemap_DefaultPink"));
     //PushImage(&Global_Assets->VoxelAtlas, V2(0.0f, 0.0f), 400);
     //PushFullscreenRect(ColorRed());
     

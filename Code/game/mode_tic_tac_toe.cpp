@@ -318,8 +318,11 @@ b32 TicTac_ButtonWithText(tic_tac_state* State, char* ButtonText, f32 TextHeight
         }
     }
     
+    asset_id DimboFontID = GetAssetID("Font_Dimbo");
+    font* Dimbo = G_GetAssetDataByID(DimboFontID, font);
+    
 #if 1        
-    PrintTextWithFontAligned(Global_Assets->Dimbo, 
+    PrintTextWithFontAligned(Dimbo, 
                              ButtonText,
                              UVToScreenPoint(0.5f, 0.5f),
                              TextHeight,
@@ -327,7 +330,7 @@ b32 TicTac_ButtonWithText(tic_tac_state* State, char* ButtonText, f32 TextHeight
                              TextAlign_Center,
                              TextColor);
 #else
-    PrintTextWithFont(Global_Assets->Dimbo,
+    PrintTextWithFont(Dimbo,
                       ButtonText,
                       UVToScreenPoint(0.2f, 0.5f),
                       200.0f,

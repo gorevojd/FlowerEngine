@@ -116,23 +116,65 @@ SCENE_UPDATE(TestGame)
         case TestGame_Animals:
         {
             
+            m44 PlaneMatrix = ScalingMatrix(V3(30.0f)) * 
+                TranslationMatrix(V3(12.0f, 0.0f, 0.0f));
+            
 #if 0            
-            PushMesh(Global_Assets->Plane,
-                     &Global_Assets->GroundMaterial,
-                     ScalingMatrix(10.0f),
+            PushMesh(GetGlobalAssetStorage(),
+                     true,
+                     GetAssetID("Mesh_Plane"),
+                     GetAssetID("Material_DefaultPlane"),
+                     PlaneMatrix,
                      V3(1.0f));
 #else
-            PushMesh(Global_Assets->Plane,
-                     0, ScalingMatrix(V3(40.0f, 20.0f, 20.0f)) * TranslationMatrix(V3(12.0f, 0.0f, 0.0f)), 
+            PushMesh(GetGlobalAssetStorage(),
+                     true, 
+                     GetAssetID("Mesh_Plane"),
+                     GetAssetID("Material_DefaultPlane"),
+                     PlaneMatrix, 
                      V3(0.6f));
 #endif
+            
+            
+            // NOTE(Dima): Updating cubes
+            v3 RotAxis = NOZ(V3(Cos(Global_Time->Time),
+                                Sin(Global_Time->Time * 1.1f),
+                                Cos(Global_Time->Time * 1.05f + 3123.0f)));
+            
+            quat Rot = AxisAngle(RotAxis, 0.0f);
+            
+            PushMesh(GetGlobalAssetStorage(),
+                     true,
+                     GetAssetID("Mesh_Cube"), 
+                     GetAssetID("Material_DefaultCube"),
+                     QuaternionToMatrix4(Rot) * TranslationMatrix(V3(-2.5f, 0.45f, 0.0f)));
+            
+            v3 Cube2P = V3(-4.0f, 
+                           Cos(Global_Time->Time) * 0.9f,
+                           0.0f);
+            
+            PushMesh(GetGlobalAssetStorage(),
+                     true,
+                     GetAssetID("Mesh_Cube"),
+                     GetAssetID("Material_DefaultCube"),
+                     QuaternionToMatrix4(Rot) * TranslationMatrix(Cube2P));
+            
+            v3 Cube3P = V3(-5.5f, 0.45f, 0.0f);
+            PushMesh(GetGlobalAssetStorage(),
+                     true,
+                     GetAssetID("Mesh_Cube"),
+                     0,
+                     LookRotationMatrix(Cube2P - Cube3P) * TranslationMatrix(Cube3P),
+                     V3(1.0f, 0.25f, 0.1f));
             
         }break;
         
         case TestGame_CubeField:
         {
-            PushMesh(Global_Assets->Plane,
-                     0,
+            PushMesh(GetGlobalAssetStorage(),
+                     GetAssetID("Mesh_Plane"),
+                     GetAssetID("Material_DefaultPlane"),
+                     true, 
                      ScalingMatrix(20.0f),
                      V3(0.7f));
             
@@ -147,6 +189,9 @@ SCENE_UPDATE(TestGame)
             f32 DimCubes = CubeSpacing * (f32)SideLen;
             
             v3 CubeAddOffset = V3(-DimCubes, 0.0f, -DimCubes) * 0.5f;
+            
+            asset_id MeshAssetID = GetAssetID("Mesh_Cube");
+            asset_id MaterialAssetID = GetAssetID("Material_DefaultCube");
             
             for(int y = 0; y < SideLen; y++)
             {
@@ -163,8 +208,10 @@ SCENE_UPDATE(TestGame)
                               0.5f, 
                               (f32)y * CubeSpacing) + CubeAddOffset;
                     
-                    PushMesh(Global_Assets->Cube, 
-                             0,
+                    PushMesh(GetGlobalAssetStorage(),
+                             true,
+                             MeshAssetID,
+                             MaterialAssetID,
                              TranslationMatrix(P), 
                              VertColor);
                 }
@@ -173,43 +220,11 @@ SCENE_UPDATE(TestGame)
     }
     
     PushClear(V3(1.0f, 0.0f, 1.0f));
-    PushSky(Global_Assets->Sky);
+    PushSky(GetGlobalAssetStorage(),
+            true,
+            GetAssetID("Cubemap_DefaultPink"));
     
     UpdateGameObjects(Scene->Game);
-    
-    // NOTE(Dima): Updating cubes
-    v3 RotAxis = NOZ(V3(Cos(Global_Time->Time),
-                        Sin(Global_Time->Time * 1.1f),
-                        Cos(Global_Time->Time * 1.05f + 3123.0f)));
-    
-    quat Rot = AxisAngle(RotAxis, 0.0f);
-    
-    
-    // NOTE(Dima): Test code
-    asset_id ID = GetAssetID("Model_Car_Supra");
-    asset* Asset = &Global_Assets->AssetStorage.Assets[ID];
-    
-    PushMesh(Global_Assets->Cube, 
-             0,
-             QuaternionToMatrix4(Rot) * TranslationMatrix(V3(-2.5f, 0.45f, 0.0f)), 
-             V3(1.0f, 0.5f, 0.0f));
-    
-    v3 Cube2P = V3(-4.0f, 
-                   Cos(Global_Time->Time) * 0.9f,
-                   0.0f);
-    
-    PushMesh(Global_Assets->Cube, 
-             0,
-             QuaternionToMatrix4(Rot) * TranslationMatrix(Cube2P), 
-             V3(1.0f, 1.0f, 0.0f));
-    
-    v3 Cube3P = V3(-5.5f, 0.45f, 0.0f);
-    PushMesh(Global_Assets->Cube, 
-             0,
-             LookRotationMatrix(Cube2P - Cube3P) * TranslationMatrix(Cube3P), 
-             V3(1.0f, 0.5f, 0.0f));
-    
-    
     
     directional_light* DirLit = &Global_RenderCommands->Lighting.DirLit;
     
@@ -261,19 +276,25 @@ SCENE_UPDATE(TestGame)
     }
 #endif
     
-    PushImage(Global_Assets->BerlinSans->Atlas, V2(100), 1024);
-    PrintTextWithFont(Global_Assets->BerlinSans,
+    asset_id BerlinSansID = GetAssetID("Font_BerlinSans");
+    asset_id LiberationMonoID = GetAssetID("Font_LiberationMono");
+    
+    font* BerlinSans = G_GetAssetDataByID(BerlinSansID, font);
+    font* LiberationMono = G_GetAssetDataByID(LiberationMonoID, font);
+    
+    PushImage(BerlinSans->Atlas, V2(100), 1024);
+    PrintTextWithFont(BerlinSans,
                       "Hello world. My Name is Dima",
                       V2(1000, 100),
                       25.0f,
                       ColorRed());
-    PrintTextWithFont(Global_Assets->LiberationMono,
+    PrintTextWithFont(LiberationMono,
                       "And I love programming",
                       V2(1000, 300),
                       40.0f,
                       ColorGreen());
     
-    PrintTextWithFont(Global_Assets->LiberationMono,
+    PrintTextWithFont(LiberationMono,
                       "And Making 123 Videos for YouTube",
                       V2(100, 600),
                       100.0f + Sin(Global_Time->Time) * 60.0f,

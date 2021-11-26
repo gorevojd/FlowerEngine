@@ -537,7 +537,10 @@ INTERNAL_FUNCTION void UIBeginFrame(window_dimensions WindowDimensions)
 {
     ui_params ParamsUI = {};
     ParamsUI.Commands = Global_RenderCommands;
-    ParamsUI.Font = Global_Assets->LiberationMono;
+    
+    asset_id FontAssetID = GetAssetID("Font_LiberationMono");
+    ParamsUI.Font = G_GetAssetDataByID(FontAssetID, font);
+    
     ParamsUI.WindowDimensions = WindowDimensions;
     ParamsUI.FontStyle = 2;
     

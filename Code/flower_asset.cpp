@@ -56,8 +56,16 @@ void* GetAssetDataByID_(asset_storage* Storage, asset_id ID)
     return Asset->DataPtr.Ptr;
 }
 
+INTERNAL_FUNCTION inline 
+asset_storage* GetGlobalAssetStorage()
+{
+    asset_storage* Result = &Global_Assets->AssetStorage;
+    
+    return Result;
+}
+
 #define GetAssetDataByID(storage, id, type) (type*)GetAssetDataByID_(storage, id)
-#define G_GetAssetDataByID(id, type) (type*)GetAssetDataByID_(&Global_Assets->AssetStorage, id)
+#define G_GetAssetDataByID(id, type) (type*)GetAssetDataByID_(GetGlobalAssetStorage(), id)
 
 
 INTERNAL_FUNCTION
@@ -750,9 +758,12 @@ asset_id AddAssetGlyph(asset_storage* Storage,
                         TempBuf);
     
     // NOTE(Dima): Adding asset
-    asset_id Result = AddAssetToStorage(Storage, FontSizeGUID, Asset_Glyph);
+    asset_id Result = AddAssetToStorage(Storage, GlyphGUID, Asset_Glyph);
     asset* Asset = GetAssetByID(Storage, Result);
     Asset->IsSupplemental = true;
+    
+    // NOTE(Dima): Setting data ptr
+    Asset->DataPtr.Glyph = Glyph;
     
     // NOTE(Dima): Filling asset header
     asset_header_glyph* Header = Asset->Header.Glyph;
@@ -770,7 +781,6 @@ asset_id AddAssetGlyph(asset_storage* Storage,
     return Result;
 }
 
-#if 0
 INTERNAL_FUNCTION
 asset_id AddAssetGlyphStyle(asset_storage* Storage,
                             const char* GlyphGUID,
@@ -791,19 +801,19 @@ asset_id AddAssetGlyphStyle(asset_storage* Storage,
     asset* Asset = GetAssetByID(Storage, Result);
     Asset->IsSupplemental = true;
     
+    // NOTE(Dima): Setting data ptr
+    Asset->DataPtr.GlyphStyle = Style;
+    
     // NOTE(Dima): Filling asset header
     asset_header_glyph_style* Header = Asset->Header.GlyphStyle;
     
     Header->GlyphStyleType = Style->GlyphStyleType;
-    Header->ImageWidth = Style->ImageWidth;
+    Header->WidthOverHeight = Style->WidthOverHeight;
     Header->ImageHeight = Style->ImageHeight;
     Header->MinUV_x = Style->MinUV.x;
     Header->MinUV_y = Style->MinUV.y;
     Header->MaxUV_x = Style->MaxUV.x;
     Header->MaxUV_y = Style->MaxUV.y;
-    
-    // NOTE(Dima): 
-    Header->ImageID = ???;
     
     return Result;
 }
@@ -934,7 +944,10 @@ asset_id AddAssetFont(asset_storage* Storage,
             {
                 glyph_style* Style = &Glyph->Styles[StyleIndex];
                 
-                asset_id StyleID = AddAssetGlyphStyle();
+                asset_id StyleID = AddAssetGlyphStyle(Storage, 
+                                                      GlyphAsset->GUID,
+                                                      StyleIndex,
+                                                      Style);
                 
                 if (StyleIndex == 0)
                 {
@@ -946,7 +959,7 @@ asset_id AddAssetFont(asset_storage* Storage,
     
     return Result;
 }
-#endif
+
 
 INTERNAL_FUNCTION 
 void AddBear(asset_storage* Storage)
@@ -1202,23 +1215,22 @@ INTERNAL_FUNCTION void AddCars(asset_storage* Storage)
     }
 }
 
+
 INTERNAL_FUNCTION 
 void AddFonts(asset_storage* Storage)
 {
-#if 0    
-    AddAssetFont(Pack, 
+    AddAssetFont(Storage, 
                  "Font_BerlinSans", 
                  "../Data/Fonts/BerlinSans.ttf");
     
-    AddAssetFont(Pack, 
+    AddAssetFont(Storage, 
                  "Font_LiberationMono", 
                  "../Data/Fonts/liberation-mono.ttf");
-    AddAssetFont(Pack,
+    
+    AddAssetFont(Storage,
                  "Font_Dimbo",
                  "../Data/Fonts/Dimbo Regular.ttf");
-#endif
 }
-
 
 INTERNAL_FUNCTION 
 void AddCommonAssets(asset_storage* Storage)
@@ -1227,27 +1239,86 @@ void AddCommonAssets(asset_storage* Storage)
     AddFonts(Storage);
     AddAnimals(Storage);
     
+    // NOTE(Dima): Loading default images
+    asset_id BoxDiffuseID = AddAssetImage(Storage, 
+                                          "Image_BoxDiffuse", 
+                                          "../Data/Textures/container_diffuse.png");
     
-#if 0    
-    AddAssetImage(Pack, "Image_BoxDiffuse", 
-                  "../Data/Textures/container_diffuse.png");
+    asset_id BoxSpecularID = AddAssetImage(Storage,
+                                           "Image_BoxSpecular",
+                                           "../Data/Textures/container_specular.png");
     
-    AddAssetImage(Pack, "Image_PlaneTexture", 
-                  "../Data/Textures/PixarTextures/png/fabric/Flower_pattern_pxr128.png");
+    asset_id FlowerPatternID = AddAssetImage(Storage, 
+                                             "Image_PlaneTexture", 
+                                             "../Data/Textures/PixarTextures/png/fabric/Flower_pattern_pxr128.png");
     
-    AddAssetInternal(Pack, "Mesh_Cube", Asset_Mesh, &A->Cube);
-    AddAssetInternal(Pack, "Mesh_Plane", Asset_Mesh, &A->Plane);
     
-    AddAssetSkybox(Pack, "Skybox_Default", 
-                   "../Data/Textures/Cubemaps/Pink/left.png",
-                   "../Data/Textures/Cubemaps/Pink/right.png",
-                   "../Data/Textures/Cubemaps/Pink/front.png",
-                   "../Data/Textures/Cubemaps/Pink/back.png",
-                   "../Data/Textures/Cubemaps/Pink/up.png",
-                   "../Data/Textures/Cubemaps/Pink/down.png");
-#endif
+    // NOTE(Dima): Loading default meshes
+    mesh* UnitCube = MakeUnitCube();
+    mesh* Plane = MakePlane();
+    
+    AddAssetMesh(Storage,
+                 "Mesh_Cube", 
+                 UnitCube);
+    
+    AddAssetMesh(Storage, 
+                 "Mesh_Plane", 
+                 Plane);
+    
+    // NOTE(Dima): Adding default plane material
+    asset_id PlaneMatID = AddAssetMaterial(Storage,
+                                           "Material_DefaultPlane",
+                                           "DefaultPlaneMaterial",
+                                           Material_SpecularDiffuse);
+    SetMaterialTexture(Storage,
+                       PlaneMatID,
+                       MatTex_SpecularDiffuse_Diffuse,
+                       FlowerPatternID);
+    
+    // NOTE(Dima): Adding default cube material
+    asset_id CubeMatID = AddAssetMaterial(Storage,
+                                          "Material_DefaultCube",
+                                          "DefaultCubeMaterial",
+                                          Material_SpecularDiffuse);
+    
+    SetMaterialTexture(Storage,
+                       CubeMatID,
+                       MatTex_SpecularDiffuse_Diffuse,
+                       BoxDiffuseID);
+    
+    SetMaterialTexture(Storage,
+                       CubeMatID,
+                       MatTex_SpecularDiffuse_Specular,
+                       BoxSpecularID);
+    
+    // NOTE(Dima): Loading default cubemaps
+    AddAssetCubemap(Storage,
+                    "Cubemap_Default",
+                    "../Data/Textures/Cubemaps/skybox/right.jpg",
+                    "../Data/Textures/Cubemaps/skybox/left.jpg",
+                    "../Data/Textures/Cubemaps/skybox/front.jpg",
+                    "../Data/Textures/Cubemaps/skybox/back.jpg",
+                    "../Data/Textures/Cubemaps/skybox/top.jpg",
+                    "../Data/Textures/Cubemaps/skybox/bottom.jpg");
+    
+    AddAssetCubemap(Storage, "Cubemap_DefaultPink", 
+                    "../Data/Textures/Cubemaps/Pink/left.png",
+                    "../Data/Textures/Cubemaps/Pink/right.png",
+                    "../Data/Textures/Cubemaps/Pink/front.png",
+                    "../Data/Textures/Cubemaps/Pink/back.png",
+                    "../Data/Textures/Cubemaps/Pink/up.png",
+                    "../Data/Textures/Cubemaps/Pink/down.png");
+}
+
+
+INTERNAL_FUNCTION 
+void StartAssetLoading(asset_storage* Storage, 
+                       asset_id AssetID,
+                       b32 Immediate)
+{
     
 }
+
 
 INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
 {
@@ -1263,40 +1334,6 @@ INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
     VoxelAtlasParams.Image.FilteringIsClosest = true;
     A->VoxelAtlas = LoadImageFile("../Data/Textures/minc_atlas2.png", VoxelAtlasParams);
     //A->VoxelAtlas = LoadImageFile("../Data/Textures/minc_atlas1.jpg", VoxelAtlasParams);
-    
-    A->BerlinSans = LoadFontFile("../Data/Fonts/BerlinSans.ttf");
-    A->LiberationMono = LoadFontFile("../Data/Fonts/liberation-mono.ttf");
-    A->Dimbo = LoadFontFile("../Data/Fonts/Dimbo Regular.ttf");
-    
-    // NOTE(Dima): Loading assets
-    A->Cube = MakeUnitCube();
-    A->Plane = MakePlane();
-    
-    
-#if 0    
-    A->Sky = LoadCubemap(
-                         "../Data/Textures/Cubemaps/skybox/right.jpg",
-                         "../Data/Textures/Cubemaps/skybox/left.jpg",
-                         "../Data/Textures/Cubemaps/skybox/front.jpg",
-                         "../Data/Textures/Cubemaps/skybox/back.jpg",
-                         "../Data/Textures/Cubemaps/skybox/top.jpg",
-                         "../Data/Textures/Cubemaps/skybox/bottom.jpg");
-#else
-    A->Sky = LoadCubemap(
-                         "../Data/Textures/Cubemaps/Pink/left.png",
-                         "../Data/Textures/Cubemaps/Pink/right.png",
-                         "../Data/Textures/Cubemaps/Pink/front.png",
-                         "../Data/Textures/Cubemaps/Pink/back.png",
-                         "../Data/Textures/Cubemaps/Pink/up.png",
-                         "../Data/Textures/Cubemaps/Pink/down.png");
-#endif
-    
-    A->BoxTexture = LoadImageFile("../Data/Textures/container_diffuse.png");
-    A->PlaneTexture = LoadImageFile("E:/Media/PixarTextures/png/ground/Red_gravel_pxr128.png");
-    
-    // NOTE(Dima): Other materials
-    A->GroundMaterial = {};
-    A->GroundMaterial.Textures[MatTex_SpecularDiffuse_Diffuse] = A->PlaneTexture;
 #endif
     
     {

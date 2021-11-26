@@ -295,6 +295,7 @@ INTERNAL_FUNCTION void AddGlyphToAtlas(load_font_context* Ctx,
             Ctx->FontAtlasAtP = V2(DstPx + SrcW, DstPy);
             Ctx->FontAtlasMaxRowY = FlowerMax(Ctx->FontAtlasMaxRowY, DstPy + SrcH);
             
+            // NOTE(Dima): Freing image data because it is not needed anymore
             free(Src);
             StylesImages[StyleIndex] = 0;
         }
@@ -474,9 +475,9 @@ EndFontLoading(load_font_context* Ctx)
                           HelpBytes.GetPlace("AtlasData"));
     ClearImage(Result->Atlas);
     
-    for (int SizeIndex = 0;
-         SizeIndex < Result->NumSizes;
-         SizeIndex++)
+    for (int SizeIndex = Result->NumSizes - 1;
+         SizeIndex >= 0;
+         SizeIndex--)
     {
         font_size* FontSize = &Result->Sizes[SizeIndex];
         load_font_size_context* SizeCtx = &Ctx->FontSizes[SizeIndex];

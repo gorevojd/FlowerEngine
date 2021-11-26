@@ -110,11 +110,9 @@ ASSET_ASSERT_HEADER(asset_header_font_size);
 
 struct asset_header_glyph_style
 {
-    asset_id ImageID;
-    
     u32 GlyphStyleType;
-    int ImageWidth;
     int ImageHeight;
+    f32 WidthOverHeight;
     
     f32 MinUV_x;
     f32 MinUV_y;
