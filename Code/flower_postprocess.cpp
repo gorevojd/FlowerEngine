@@ -60,4 +60,10 @@ INTERNAL_FUNCTION void InitPostprocessing(post_processing* PP)
     
     post_proc_effect* MainDOFBlur = PostProcEffect_Add(PP, "MainDOF_Blur", 
                                                        PostProcEffect_BoxBlur);
+    
+    post_proc_effect* CrtDisplay = PostProcEffect_Add(PP, "CrtDisplay",
+                                                      PostProcEffect_CrtDisplay);
+    
+    post_proc_effect* Posterize = PostProcEffect_Add(PP, "Posterize",
+                                                     PostProcEffect_Posterize);
 }

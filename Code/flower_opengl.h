@@ -93,6 +93,7 @@ struct opengl_state
     opengl_shader* RenderDepthShader;
     opengl_shader* VarianceShadowBlurShader;
     opengl_shader* RenderWaterShader;
+    opengl_shader* CrtDisplayShader;
     
     opengl_g_buffer GBuffer;
     opengl_ssao SSAO;

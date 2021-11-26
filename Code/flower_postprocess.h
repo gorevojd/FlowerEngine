@@ -24,6 +24,7 @@ enum post_proc_effect_type
     PostProcEffect_Dilation,
     PostProcEffect_DOF,
     PostProcEffect_SSAO,
+    PostProcEffect_CrtDisplay,
 };
 
 struct posterize_params
@@ -46,6 +47,15 @@ struct dilation_params
     
     f32 MinThreshold;
     f32 MaxThreshold;
+    
+    post_proc_resolution Resolution;
+};
+
+struct crt_display_params
+{
+    v2 Curvature;
+    v2 ScanLineOpacity;
+    f32 CellSize;
     
     post_proc_resolution Resolution;
 };
@@ -80,6 +90,7 @@ struct post_proc_params
         dilation_params Dilation;
         dof_params DOF;
         ssao_params SSAO;
+        crt_display_params CrtDisplay;
     } Union;
 };
 
@@ -145,6 +156,17 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             SSAO->RangeCheck = 0.25f;
             SSAO->BlurRadius = 2;
             SSAO->Resolution = PostProcResolution_Normal;
+        }break;
+        
+        case PostProcEffect_CrtDisplay:
+        {
+            crt_display_params* Params = &ParamsBase->Union.CrtDisplay;
+            
+            Params->Curvature = V2(3.0f, 3.0f);
+            Params->ScanLineOpacity = V2(0.1f, 0.16f);
+            Params->CellSize = 7.0f;
+            
+            Params->Resolution = PostProcResolution_Normal;
         }break;
     }
 }
