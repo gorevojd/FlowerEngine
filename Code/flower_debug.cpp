@@ -670,7 +670,8 @@ INTERNAL_FUNCTION void DEBUGUpdate()
     
     if(Global_Debug->Menus.Visible)
     {
-        DEBUGShowOverlays();
+        DEBUG_ShowOverlays(Global_Debug,
+                           Global_RenderCommands);
     }
 #endif
 }

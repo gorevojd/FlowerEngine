@@ -428,23 +428,55 @@ INTERNAL_FUNCTION inline v4 UIGetColor(u32 Color)
     return(Result);
 }
 
-INTERNAL_FUNCTION void InitUIColors()
+INTERNAL_FUNCTION inline
+ui_color_theme ColorThemeDefault()
 {
-    ui_colors* Colors_ =  &Global_UI->Colors;
-    
-    v4* Colors = Colors_->Colors;
+    ui_color_theme Result = {};
+    v4* Colors = Result.Colors;
     
     Colors[UIColor_Text] = ColorWhite();
+    Colors[UIColor_TextActive] = ColorWhite();
     Colors[UIColor_TextHot] = ColorYellow();
-    Colors[UIColor_ButtonBackground] = ColorRed();
+    Colors[UIColor_ButtonBackgroundActive] = ColorRed();
     Colors[UIColor_ButtonBackgroundInactive] = V4(0.5f, 0.1f, 0.1f, 1.0f);
     Colors[UIColor_Borders] = ColorBlack();
     Colors[UIColor_GraphBackground] = V4(0.0f, 0.0f, 0.0f, 0.65f);
+    Colors[UIColor_AnchorInactive] = ColorWhite();
+    Colors[UIColor_AnchorActive] = ColorYellow();
     
     Colors[UIColor_GraphFrameNew] = ColorRed();
     Colors[UIColor_GraphFrameOld] = V4(0.2f, 0.3f, 0.9f, 1.0f);
     Colors[UIColor_GraphFrameCollation] = ColorGreen();
     Colors[UIColor_GraphFrameView] = ColorYellow();
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION inline 
+ui_color_theme ColorThemeNice()
+{
+    ui_color_theme Result = {};
+    v4* Colors = Result.Colors;
+    
+    v4 ColorInactiveText = ColorFromHex("#64d3f8");
+    v4 ColorActiveText = ColorFromHex("#28ffc9");
+    
+    Colors[UIColor_Text] = ColorInactiveText;
+    Colors[UIColor_TextHot] = ColorYellow();
+    Colors[UIColor_TextActive] = ColorActiveText;
+    Colors[UIColor_ButtonBackgroundActive] = ColorFromHex("#7d4df5");
+    Colors[UIColor_ButtonBackgroundInactive] = ColorFromHex("#141245");
+    Colors[UIColor_Borders] = ColorBlack();
+    Colors[UIColor_GraphBackground] = V4(ColorFromHex("#201d20").rgb, 0.65f);
+    Colors[UIColor_AnchorInactive] = ColorInactiveText;
+    Colors[UIColor_AnchorActive] = ColorActiveText;
+    
+    Colors[UIColor_GraphFrameNew] = ColorRed();
+    Colors[UIColor_GraphFrameOld] = V4(0.2f, 0.3f, 0.9f, 1.0f);
+    Colors[UIColor_GraphFrameCollation] = ColorGreen();
+    Colors[UIColor_GraphFrameView] = ColorYellow();
+    
+    return Result;
 }
 
 INTERNAL_FUNCTION void InitUI(memory_arena* Arena)
@@ -453,7 +485,8 @@ INTERNAL_FUNCTION void InitUI(memory_arena* Arena)
     
     Global_UI->Arena = Arena;
     
-    InitUIColors();
+    //Global_UI->Colors = ColorThemeDefault();
+    Global_UI->Colors = ColorThemeNice();
     
     Global_UI->FirstLayout = 0;
     
@@ -477,32 +510,38 @@ INTERNAL_FUNCTION inline void UISetParams(ui_params Params)
     Global_UI->Params = Params;
 }
 
-inline void UIPushScale(f32 Scale)
+inline void UIPushPixelHeight(f32 PixelHeight)
 {
     ui_params* Params = UIGetParams();
     
-    Assert(Params->ScaleStackIndex < ArrLen(Params->ScaleStack));
+    Assert(Params->PixelHeightStackIndex < ArrLen(Params->PixelHeightStack));
     
-    Params->ScaleStack[Params->ScaleStackIndex++] = Scale;
-    Params->Scale = Scale;
+    Params->PixelHeightStack[Params->PixelHeightStackIndex++] = PixelHeight;
+    Params->TextPixelHeight = PixelHeight;
+    
+    Params->FontSize = FindBestFontSizeForPixelHeight(Params->Font, PixelHeight);
+    Params->Scale = GetScaleForPixelHeight(Params->FontSize, PixelHeight);
 }
 
-inline void UIPopScale()
+inline void UIPopPixelHeight()
 {
     ui_params* Params = UIGetParams();
     
-    Assert(Params->ScaleStackIndex > 0);
+    Assert(Params->PixelHeightStackIndex > 0);
     
-    --Params->ScaleStackIndex;
-    Params->ScaleStack[Params->ScaleStackIndex] = 0.0f;
-    if(Params->ScaleStackIndex - 1 >= 0)
+    --Params->PixelHeightStackIndex;
+    Params->PixelHeightStack[Params->PixelHeightStackIndex] = 0.0f;
+    if(Params->PixelHeightStackIndex > 0)
     {
-        Params->Scale = Params->ScaleStack[Params->ScaleStackIndex - 1];
+        Params->TextPixelHeight = Params->PixelHeightStack[Params->PixelHeightStackIndex - 1];
     }
     else
     {
-        Params->Scale = 1.0f;
+        Params->TextPixelHeight = 25.0f;
     }
+    
+    Params->FontSize = FindBestFontSizeForPixelHeight(Params->Font, Params->TextPixelHeight);
+    Params->Scale = GetScaleForPixelHeight(Params->FontSize, Params->TextPixelHeight);
 }
 
 inline void UIPushFont(font* Font)
@@ -551,9 +590,9 @@ INTERNAL_FUNCTION void UIBeginFrame(window_dimensions WindowDimensions)
     UISetParams(ParamsUI);
     
     // NOTE(Dima): Init font scale stack
-    ParamsUI.ScaleStackIndex = 0;
+    ParamsUI.PixelHeightStackIndex = 0;
     ParamsUI.FontStackIndex = 0;
-    UIPushScale(1.0f);
+    UIPushPixelHeight(25.0f);
     UIPushFont(ParamsUI.Font);
     
     // NOTE(Dima): Initializing layouts
@@ -755,8 +794,6 @@ INTERNAL_FUNCTION inline int UIElementTreeDepth(ui_layout* Layout,
         if(At->Type == UIElement_TreeNode)
         {
             Result++;
-            
-            break;
         }
         
         At = At->Parent;
@@ -1012,7 +1049,8 @@ INTERNAL_FUNCTION inline void EndRowOrColumn(b32 IsRow)
     {
         rc2 ResultBounds = Dst->Bounds;
         
-        if(GetArea(Src->Bounds) > 1)
+        b32 AreaIsGood = GetArea(Src->Bounds) > 1;
+        if(AreaIsGood)
         {
             ResultBounds = Src->Bounds;
             
@@ -1026,13 +1064,21 @@ INTERNAL_FUNCTION inline void EndRowOrColumn(b32 IsRow)
         
         if(Dst->IsRow)
         {
-            Layout->At.x = Src->Bounds.Max.x + UIGetLineBase();
+            if(AreaIsGood)
+            {
+                Layout->At.x = Src->Bounds.Max.x + UIGetLineBase();
+            }
+            
             Layout->At.y = Src->StartAt.y;
         }
         else
         {
             Layout->At.x = Src->StartAt.x;
-            Layout->At.y = Src->Bounds.Max.y + UIGetLineBase();
+            
+            if(AreaIsGood)
+            {
+                Layout->At.y = Src->Bounds.Max.y + UIGetLineBase();
+            }
         }
     }
 }
@@ -1099,7 +1145,7 @@ INTERNAL_FUNCTION b32 BeginLayout(const char* Name)
     
     if(FoundJustAllocated)
     {
-        Found->Name = Name;
+        CopyStringsSafe(Found->Name, ArrLen(Found->Name), Name);
         Found->Next = Global_UI->FirstLayout;
         Global_UI->FirstLayout = Found;
         
@@ -1211,7 +1257,7 @@ INTERNAL_FUNCTION inline void DescribeElement(rc2 ElementBounds)
 }
 
 // NOTE(Dima): Elements
-INTERNAL_FUNCTION void ShowTextUnformatted(char* Text)
+INTERNAL_FUNCTION void ShowTextUnformatted(char* Text, b32 DisplayBackground = false)
 {
     ui_params* Params = UIGetParams();
     
@@ -1221,9 +1267,20 @@ INTERNAL_FUNCTION void ShowTextUnformatted(char* Text)
     {
         PreAdvance();
         
-        rc2 Bounds = PrintText(Text, 
-                               Global_UI->CurrentLayout->At, 
-                               UIGetColor(UIColor_Text));
+        rc2 Bounds = {};
+        if(DisplayBackground)
+        {
+            Bounds = GetTextRect(Text, 
+                                 Global_UI->CurrentLayout->At);
+            
+            PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
+                     Bounds, 
+                     UIGetColor(UIColor_ButtonBackgroundInactive));
+        }
+        
+        Bounds = PrintText(Text, 
+                           Global_UI->CurrentLayout->At, 
+                           UIGetColor(UIColor_Text));
         
         DescribeElement(Bounds);
     }
@@ -1253,6 +1310,7 @@ enum ui_button_flags
     TextElement_UseCustomRectangle = (1 << 3),
     TextElement_Highlighted = (1 << 4),
 };
+
 
 INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree, 
                                   rc2 CustomRect = {},
@@ -1299,6 +1357,21 @@ INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree,
                                          BoolFlag(Flags, TextElement_IsClickable));
         
         v4 TextC = UIGetColor(UIColor_Text);
+        
+        // NOTE(Dima): Pushing background
+        if(Flags & TextElement_BackgroundRectangle)
+        {
+            v4 BackgroundColor = UIGetColor(UIColor_ButtonBackgroundInactive);
+            if(Flags & TextElement_Highlighted)
+            {
+                BackgroundColor = UIGetColor(UIColor_ButtonBackgroundActive);
+                TextC = UIGetColor(UIColor_TextActive);
+            }
+            
+            PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
+                     Bounds, BackgroundColor);
+        }
+        
         if(Interaction.WasHotInInteraction)
         {
             TextC = UIGetColor(UIColor_TextHot);
@@ -1307,19 +1380,6 @@ INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree,
             {
                 Pressed = true;
             }
-        }
-        
-        // NOTE(Dima): Pushing background
-        if(Flags & TextElement_BackgroundRectangle)
-        {
-            v4 BackgroundColor = UIGetColor(UIColor_ButtonBackgroundInactive);
-            if(Flags & TextElement_Highlighted)
-            {
-                BackgroundColor = UIGetColor(UIColor_ButtonBackground);
-            }
-            
-            PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
-                     Bounds, BackgroundColor);
         }
         
         // NOTE(Dima): Printing text
@@ -1441,6 +1501,147 @@ INTERNAL_FUNCTION b32 BoolButton(const char* Name, b32* BoolSource,
     return(Pressed);
 }
 
+INTERNAL_FUNCTION
+void SliderFloat(const char* Name, 
+                 f32* ValueFloat,
+                 f32 Min,
+                 f32 Max)
+{
+    ui_params* Params = UIGetParams();
+    ui_layout* Layout = GetCurrentLayout();
+    
+    // NOTE(Dima): Parsing display & guid
+    char IdName[UI_ELEMENT_NAME_SIZE];
+    char DisplayName[UI_ELEMENT_NAME_SIZE];
+    ParseToHashString(IdName, DisplayName, (char*)Name);
+    
+    StepLittleY();
+    
+    BeginRow();
+    
+    // NOTE(Dima): Beginnning element
+    ui_element* Element = UIBeginElement((char*)Name, UIElement_Cached);
+    
+    if(UIElementIsOpenedInTree(Element))
+    {
+        PreAdvance();
+        
+        // NOTE(Dima): Modifying value
+        *ValueFloat = Clamp(*ValueFloat, Min, Max);
+        
+        // NOTE(Dima): Rendering main slider rect
+        v2 SliderRectMin = V2(Layout->At.x, Layout->At.y - UIGetLineBase());
+        v2 SliderRectDim = V2(UIGetLineBase() * 30.0f, UIGetLineAdvance() * 1.6f);
+        rc2 SliderRect = RectMinDim(SliderRectMin, SliderRectDim);
+        
+        PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
+                 SliderRect, 
+                 UIGetColor(UIColor_ButtonBackgroundInactive));
+        
+        PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
+                        SliderRect, 
+                        2.0f,
+                        UIGetColor(UIColor_Borders));
+        
+        // NOTE(Dima): Init anchor values
+        v2 AnchorCenter = V2(Lerp(SliderRect.Min.x, SliderRect.Max.x, (*ValueFloat - Min) / (Max - Min)),
+                             SliderRectMin.y + SliderRectDim.y * 0.5f);
+        v2 AnchorDim = V2(SliderRectDim.y * 0.5f, SliderRectDim.y * 1.1f);
+        rc2 AnchorRect = RectCenterDim(AnchorCenter, AnchorDim);
+        v4 AnchorColor = UIGetColor(UIColor_AnchorInactive);
+        
+        
+        // NOTE(Dima): Processing mouse interaction
+        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_Avg);
+        
+        ProcessMouseKeyInteractionInRect(&Interaction,
+                                         KeyMouse_Left,
+                                         AnchorRect);
+        
+        if (Interaction.WasHotInInteraction)
+        {
+            AnchorColor = UIGetColor(UIColor_AnchorActive);
+        }
+        
+        if (Interaction.WasActiveInInteraction)
+        {
+            Element->Data.SliderFloat.AnchorCenter = AnchorCenter;
+            Element->Data.SliderFloat.OffsetFromAnchorCenter = GetMouseP() - AnchorCenter;
+        }
+        
+        if (InteractionIsActive(&Interaction))
+        {
+            f32 NewCenterX = GetMouseP().x - Element->Data.SliderFloat.OffsetFromAnchorCenter.x;
+            NewCenterX = Clamp(NewCenterX, SliderRect.Min.x, SliderRect.Max.x);
+            v2 NewCenter = V2(NewCenterX, AnchorCenter.y);
+            AnchorRect = RectCenterDim(NewCenter, AnchorDim);
+            
+            *ValueFloat = Lerp(Min, Max, 
+                               (NewCenterX - SliderRect.Min.x) / (SliderRect.Max.x - SliderRect.Min.x));
+        }
+        
+        
+        // NOTE(Dima): Printing slider name
+        UIPushPixelHeight(SliderRectDim.y * 0.45f);
+        PrintTextAligned(DisplayName,
+                         V2(GetCenter(SliderRect).x,
+                            SliderRect.Min.y),
+                         TextAlign_Center,
+                         TextAlign_Top,
+                         UIGetColor(UIColor_TextActive));
+        UIPopPixelHeight();
+        
+        
+        // NOTE(Dima): Rendering anchor
+        PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
+                 AnchorRect,
+                 AnchorColor);
+        PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
+                        AnchorRect,
+                        2.0f,
+                        UIGetColor(UIColor_Borders));
+        
+        // NOTE(Dima): Rendering helper texts
+        char MinValueText[64];
+        char MaxValueText[64];
+        char ValueText[64];
+        
+        stbsp_sprintf(MinValueText, "%.2f", Min);
+        stbsp_sprintf(MaxValueText, "%.2f", Max);
+        stbsp_sprintf(ValueText, "%.2f", *ValueFloat);
+        
+        UIPushPixelHeight(SliderRectDim.y * 0.5f);
+        PrintTextAligned(MinValueText,
+                         V2(SliderRect.Min.x, SliderRect.Max.y),
+                         TextAlign_Left,
+                         TextAlign_Bottom,
+                         UIGetColor(UIColor_Text));
+        
+        PrintTextAligned(MaxValueText,
+                         SliderRect.Max,
+                         TextAlign_Right,
+                         TextAlign_Bottom,
+                         UIGetColor(UIColor_Text));
+        
+        PrintTextAligned(ValueText,
+                         SliderRect.Min,
+                         TextAlign_Left,
+                         TextAlign_Top,
+                         UIGetColor(UIColor_TextHot));
+        
+        UIPopPixelHeight();
+        
+        rc2 Bounds = SliderRect;
+        
+        DescribeElement(Bounds);
+    }
+    
+    UIEndElement(UIElement_Cached);
+    
+    EndRow();
+}
+
+
 INTERNAL_FUNCTION void TreePop()
 {
     EndColumn();
@@ -1470,6 +1671,7 @@ INTERNAL_FUNCTION b32 TreeNode(const char* Name)
     
     // NOTE(Dima): Returning result
     b32 Result = OpenedInTree && Element->IsOpen;
+    
     if(!Result)
     {
         TreePop();

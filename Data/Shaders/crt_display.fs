@@ -8,6 +8,11 @@ uniform vec2 DstTextureSize;
 uniform vec2 ScanLineOpacity;
 uniform float CellSize;
 uniform sampler2D InputTexture;
+uniform bool VignetteEnabled;
+uniform float VignetteRoundness;
+uniform float VignetteOpacity;
+uniform float VignettePower;
+uniform float VignetteBrightnessCompensation;
 
 vec2 CurveRemapUV_CRT(vec2 uv)
 {
@@ -31,6 +36,25 @@ vec3 ScanLineIntensity(float Coord, float Resolution, float Opacity)
 	return vec3(ResultValue);
 }
 
+float CalculateVignette()
+{
+	float Result = 1.0;
+
+	if (VignetteEnabled)
+	{
+		vec2 uv = FragUV;
+		uv = uv * (1.0 - uv.yx) * DstTextureSize / VignetteRoundness;
+
+		float vig = uv.x * uv.y;
+		
+		Result = pow(vig, VignettePower) * VignetteOpacity;
+
+		Result = clamp(Result, 0.0, 1.0) * VignetteBrightnessCompensation; 
+	}
+
+	return Result;
+}
+
 void main()
 {
 	vec2 RemappedUV = CurveRemapUV_CRT(FragUV);
@@ -47,6 +71,9 @@ void main()
 	}
 	else
 	{
-		OutColor = BaseColor.rgb;
+		float Vignette = CalculateVignette();
+		OutColor *= Vignette;
+
+		OutColor = BaseColor.rgb * Vignette;
 	}
 }

@@ -44,6 +44,24 @@ enum ui_element_type
     UIElement_Cached,
 };
 
+struct ui_element_data_slider_float
+{
+    v2 AnchorCenter;
+    v2 OffsetFromAnchorCenter;
+};
+
+struct ui_element_data_slider_int
+{
+    int Min;
+    int Max;
+};
+
+union ui_element_data
+{
+    ui_element_data_slider_float SliderFloat;
+    ui_element_data_slider_int SliderInt;
+};
+
 struct ui_element
 {
 #define UI_ELEMENT_NAME_SIZE 256
@@ -54,6 +72,8 @@ struct ui_element
     
     b32 IsOpen;
     u32 Type;
+    
+    ui_element_data Data;
     
     ui_element* Parent;
     
@@ -90,7 +110,7 @@ struct ui_row_or_column
 // NOTE(Dima): Layouts
 struct ui_layout
 {
-    const char* Name;
+    char Name[64];
     v2 InitAt;
     v2 At;
     
@@ -114,8 +134,8 @@ struct ui_params
     font_size* FontSize;
     f32 TextPixelHeight;
     
-    f32 ScaleStack[64];
-    int ScaleStackIndex;
+    f32 PixelHeightStack[64];
+    int PixelHeightStackIndex;
     
     font* FontStack[64];
     int FontStackIndex;
@@ -181,11 +201,14 @@ struct ui_cell_grid_graph
 enum ui_color_type
 {
     UIColor_Text,
+    UIColor_TextActive,
     UIColor_TextHot,
-    UIColor_ButtonBackground,
+    UIColor_ButtonBackgroundActive,
     UIColor_ButtonBackgroundInactive,
     UIColor_Borders,
     UIColor_GraphBackground,
+    UIColor_AnchorInactive,
+    UIColor_AnchorActive,
     
     UIColor_GraphFrameNew,
     UIColor_GraphFrameOld,
@@ -195,7 +218,7 @@ enum ui_color_type
     UIColor_Count,
 };
 
-struct ui_colors
+struct ui_color_theme
 {
     v4 Colors[UIColor_Count];
 };
@@ -254,7 +277,7 @@ struct ui_state
     ui_params Params;
     
     // NOTE(Dima): Immediate mode stuff
-    ui_colors Colors;
+    ui_color_theme Colors;
     
     ui_interaction_ctx HotInteraction;
     ui_interaction_ctx ActiveInteraction;

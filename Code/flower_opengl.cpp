@@ -818,6 +818,11 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoCrtDisplay(render_commands* Comma
     Shader->SetVec2("Curvature", Params->Curvature);
     Shader->SetVec2("ScanLineOpacity", Params->ScanLineOpacity);
     Shader->SetFloat("CellSize", Params->CellSize);
+    Shader->SetBool("VignetteEnabled", Params->VignetteEnabled);
+    Shader->SetFloat("VignetteRoundness", Params->VignetteRoundness);
+    Shader->SetFloat("VignetteOpacity", Params->VignetteOpacity);
+    Shader->SetFloat("VignetteBrightnessCompensation", Params->VignetteBrightnessCompensation);
+    Shader->SetFloat("VignettePower", Params->VignettePower);
     
     // NOTE(Dima): Render
     glBindVertexArray(OpenGL->ScreenQuad.VAO);

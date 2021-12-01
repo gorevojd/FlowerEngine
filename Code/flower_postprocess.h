@@ -37,8 +37,8 @@ struct posterize_params
 struct box_blur_params
 {
     int RadiusSize;
-    post_proc_resolution Resolution;
     b32 EnableCheapMode;
+    post_proc_resolution Resolution;
 };
 
 struct dilation_params
@@ -56,6 +56,13 @@ struct crt_display_params
     v2 Curvature;
     v2 ScanLineOpacity;
     f32 CellSize;
+    
+    // NOTE(Dima): Vignette related stuff
+    b32 VignetteEnabled;
+    f32 VignetteRoundness;
+    f32 VignetteOpacity;
+    f32 VignetteBrightnessCompensation;
+    f32 VignettePower;
     
     post_proc_resolution Resolution;
 };
@@ -162,9 +169,14 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
         {
             crt_display_params* Params = &ParamsBase->Union.CrtDisplay;
             
-            Params->Curvature = V2(3.0f, 3.0f);
+            Params->Curvature = V2(4.0f, 3.4f);
             Params->ScanLineOpacity = V2(0.1f, 0.16f);
             Params->CellSize = 7.0f;
+            Params->VignetteEnabled = true;
+            Params->VignetteRoundness = 250.0f;
+            Params->VignetteOpacity = 1.0f;
+            Params->VignettePower = 0.5f;
+            Params->VignetteBrightnessCompensation = 1.3f;
             
             Params->Resolution = PostProcResolution_Normal;
         }break;

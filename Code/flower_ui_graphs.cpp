@@ -62,18 +62,18 @@ INTERNAL_FUNCTION rc2 AddPointLabel(char* Text,
                                     f32 Radius,
                                     u32 AlignX = TextAlign_Center,
                                     u32 AlignY = TextAlign_Center,
-                                    f32 TextScale = 1.0f)
+                                    f32 TextPixelHeight = 25.0f)
 {
     v2 Offset = V2(Cos(AngleDegrees * F_DEG2RAD), 
                    Sin(AngleDegrees * F_DEG2RAD)) * Radius;
     
-    UIPushScale(TextScale);
+    UIPushPixelHeight(TextPixelHeight);
     rc2 Result = PrintTextAligned(Text, 
                                   PointCenter + Offset,
                                   AlignX,
                                   AlignY, 
                                   ColorBlack());
-    UIPopScale();
+    UIPopPixelHeight();
     
 #if 0    
     PushRectOutline(Global_UI->Params.Commands,

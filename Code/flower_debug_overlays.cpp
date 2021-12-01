@@ -295,12 +295,12 @@ INTERNAL_FUNCTION void ProfileShowMultiGraphInRect(char* Name, float** Values, i
                                      OldColors[SetIndex]);
     }
     
-    UIPushScale(0.65f);
+    UIPushPixelHeight(16);
     PrintTextAligned(Name, GraphRect.Min, 
                      TextAlign_Left,
                      TextAlign_Top,
                      UIGetColor(UIColor_Text));
-    UIPopScale();
+    UIPopPixelHeight();
     
     PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
                     GraphRect, 2, UIGetColor(UIColor_Borders));
@@ -383,13 +383,13 @@ INTERNAL_FUNCTION void ShowFrameTimeSlider(b32 IsFrameTime = true)
                                      UIGetColor(UIColor_GraphFrameNew),
                                      UIGetColor(UIColor_GraphFrameOld));
         
-        UIPushScale(0.65f);
+        UIPushPixelHeight(16);
         PrintTextAligned("Frame times(ms)", 
                          SliderRect.Min, 
                          TextAlign_Left,
                          TextAlign_Top,
                          UIGetColor(UIColor_Text));
-        UIPopScale();
+        UIPopPixelHeight();
         
         PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
                         SliderRect, 2, UIGetColor(UIColor_Borders));
@@ -436,7 +436,7 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
                 u64 FrameClocksElapsed_ = MainFrame->FrameUpdateNode->TimingSnapshot.ClocksElapsed;
                 f32 FrameClocksElapsed = (f32)FrameClocksElapsed_;
                 
-                UIPushScale(0.65f);
+                UIPushPixelHeight(16);
                 v2 TextAt = At + V2(0.0f, UIGetLineBase());
                 for(int StatIndex = 0; 
                     StatIndex < Frame->ToSortStatsCount; 
@@ -497,7 +497,8 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
                                                   V2(Dim.x, GetDim(ThisTextRect).y));
                         
                         PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
-                                 LineRect, UIGetColor(UIColor_ButtonBackground));
+                                 LineRect, 
+                                 UIGetColor(UIColor_ButtonBackgroundActive));
                     }
                     
                     PrintText(StatBuf, TextAt, TextColor);
@@ -509,7 +510,7 @@ INTERNAL_FUNCTION void ListTopClocks(b32 IncludingChildren)
                     }
                 }
                 
-                UIPopScale();
+                UIPopPixelHeight();
             }
             
             PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
@@ -797,67 +798,75 @@ INTERNAL_FUNCTION void CalculateAveragePerformance(debug_state* State)
     State->Menus.LastAvgTableUpdateTime = Global_Time->Time;
 }
 
+INTERNAL_FUNCTION
+void DEBUG_ShowProfileOverlays(debug_state* Deb)
+{
+    char Buf[256];
+    stbsp_sprintf(Buf, "Last frame: %.2fms, %.0fhz##Profile",
+                  Global_Time->DeltaTime * 1000.0f,
+                  1.0f / Global_Time->DeltaTime);
+    if(TreeNode(Buf))
+    {
+        // NOTE(Dima): Frame slider
+        ShowFramesSlider();
+        ShowFrameTimeSlider();
+        BeginRow();
+        if(Button("TopClocks", Deb->Menus.ProfileMenuType == DebugProfileMenu_TopClocks))
+        {
+            Deb->Menus.ProfileMenuType = DebugProfileMenu_TopClocks;
+        }
+        
+        if(Button("TopClocksEx", Deb->Menus.ProfileMenuType == DebugProfileMenu_TopClocksEx))
+        {
+            Deb->Menus.ProfileMenuType = DebugProfileMenu_TopClocksEx;
+        }
+        
+        if(Button("FrameTime", Deb->Menus.ProfileMenuType == DebugProfileMenu_FrameTimeGraph))
+        {
+            Deb->Menus.ProfileMenuType = DebugProfileMenu_FrameTimeGraph;
+        }
+        
+        EndRow();
+        
+        StepLittleY();
+        
+        switch(Deb->Menus.ProfileMenuType)
+        {
+            case DebugProfileMenu_FrameTimeGraph:
+            {
+                ShowFPSGraph();
+            }break;
+            
+            case DebugProfileMenu_TopClocksEx:
+            {
+                ShowTopClocks(false);
+            }break;
+            
+            case DebugProfileMenu_TopClocks:
+            {
+                ShowTopClocks(true);
+            }break;
+        }
+        
+        TreePop();
+    }
+}
 
-INTERNAL_FUNCTION void DEBUGShowOverlays()
+#include "flower_postprocess_overlays.cpp"
+
+INTERNAL_FUNCTION void DEBUG_ShowOverlays(debug_state* Debug,
+                                          render_commands* RenderCommands)
 {
     FUNCTION_TIMING();
     
-    debug_state* Deb = Global_Debug;
-    
-    CalculateTimesValues(Deb);
-    CalculateAveragePerformance(Deb);
+    CalculateTimesValues(Debug);
+    CalculateAveragePerformance(Debug);
     
     if(BeginLayout("MainLayout"))
     {
-        char Buf[256];
-        stbsp_sprintf(Buf, "Last frame: %.2fms, %.0fhz##Profile",
-                      Global_Time->DeltaTime * 1000.0f,
-                      1.0f / Global_Time->DeltaTime);
-        if(TreeNode(Buf))
-        {
-            // NOTE(Dima): Frame slider
-            ShowFramesSlider();
-            ShowFrameTimeSlider();
-            BeginRow();
-            if(Button("TopClocks", Deb->Menus.ProfileMenuType == DebugProfileMenu_TopClocks))
-            {
-                Deb->Menus.ProfileMenuType = DebugProfileMenu_TopClocks;
-            }
-            
-            if(Button("TopClocksEx", Deb->Menus.ProfileMenuType == DebugProfileMenu_TopClocksEx))
-            {
-                Deb->Menus.ProfileMenuType = DebugProfileMenu_TopClocksEx;
-            }
-            
-            if(Button("FrameTime", Deb->Menus.ProfileMenuType == DebugProfileMenu_FrameTimeGraph))
-            {
-                Deb->Menus.ProfileMenuType = DebugProfileMenu_FrameTimeGraph;
-            }
-            
-            EndRow();
-            
-            StepLittleY();
-            
-            switch(Deb->Menus.ProfileMenuType)
-            {
-                case DebugProfileMenu_FrameTimeGraph:
-                {
-                    ShowFPSGraph();
-                }break;
-                
-                case DebugProfileMenu_TopClocksEx:
-                {
-                    ShowTopClocks(false);
-                }break;
-                
-                case DebugProfileMenu_TopClocks:
-                {
-                    ShowTopClocks(true);
-                }break;
-            }
-            
-            TreePop();
-        }
+        DEBUG_ShowProfileOverlays(Debug);
+        
+        PostProcess_ShowOverlays(&RenderCommands->PostProcessing);
         
         EndLayout();
     }
