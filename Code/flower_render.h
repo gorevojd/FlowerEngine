@@ -1,6 +1,39 @@
 #ifndef FLOWER_RENDER_H
 #define FLOWER_RENDER_H
 
+enum framebuffer_pool_type
+{
+    FramebufPoolType_Color,
+    FramebufPoolType_HDR,
+    FramebufPoolType_SSAO,
+    
+    FramebufPoolType_Count,
+};
+
+enum framebuffer_pool_resolution
+{
+    FramebufPoolRes_Normal,
+    FramebufPoolRes_Half,
+    FramebufPoolRes_Quater,
+    
+    FramebufPoolRes_Count,
+};
+
+struct framebuffer_in_pool_params
+{
+    u32 Type;
+    u32 Resolution;
+};
+
+enum type_color_output
+{
+    ColorOutput_MainColor,
+    ColorOutput_SSAO,
+    ColorOutput_LinearDepth,
+    
+    ColorOutput_Count,
+};
+
 #include "flower_lighting.h"
 #include "flower_postprocess.h"
 
@@ -28,6 +61,31 @@ struct renderer_api
 
 extern renderer_api RenderAPI;
 
+#if 0
+enum texture_components
+{
+    TextureComponents_RGBA,
+    TextureComponents_RGB,
+    TextureComponents_RG,
+    TextureComponents_R,
+};
+
+enum texture_component_format
+{
+    TextureComponentFormat_Float32,
+    TextureComponentFormat_Float16,
+    TextureComponentFormat_UnsignedByte,
+};
+
+struct texture_params
+{
+    int Width;
+    int Height;
+    u32 TextureComponents;
+    u32 ComponentFormat;
+    b32 IsSRGB;
+};
+#endif
 
 enum class culling_mode : u32
 {
@@ -386,6 +444,8 @@ struct render_commands
     ticket_mutex DeallocEntriesMutex;
     render_api_dealloc_entry UseDealloc;
     render_api_dealloc_entry FreeDealloc;
+    
+    int TypeColorOutput;
 };
 
 inline void* GetRenderCommand_(render_commands* Commands, int CommandIndex)

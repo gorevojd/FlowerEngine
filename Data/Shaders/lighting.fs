@@ -23,12 +23,10 @@ uniform float CascadeDistances[8];
 uniform mat4 CascadeLightProjections[8];
 uniform int CascadeCount;
 
-uniform vec2 PoissonSamples[12];
-uniform sampler2D PoissonSamplesRotations;
-uniform bool ShouldRotateSamples;
-
 uniform bool SSAOEnabled;
 uniform float SSAOContribution;
+
+uniform int TypeColorOutput;
 
 vec3 CalcDirLit(vec3 FragSampleC, vec3 FragN)
 {
@@ -219,10 +217,10 @@ void main()
 			TotalShadow += SampleOcclusion;
 		}
 
-		TotalShadow = clamp(1.0 - TotalShadow, 0, 1);
+		float Lightness = clamp(1.0 - TotalShadow * ShadowStrength, 0, 1);
 
 		ResultColor += SampleColorSpec.rgb * AmbientPercentage;
-		ResultColor += CalcDirLit(SampleColorSpec.rgb, WorldN) * TotalShadow;
+		ResultColor += CalcDirLit(SampleColorSpec.rgb, WorldN) * Lightness;
 	}
 	else
 	{
@@ -231,10 +229,19 @@ void main()
 	
 	//ResultColor = SampleColorSpec.rgb;
 
-	Color = vec4(ResultColor, 1.0);
+	if (TypeColorOutput == 0)
+	{
+		Color = vec4(ResultColor, 1.0);
+	}
+	else if (TypeColorOutput == 1)
+	{
+		Color = vec4(vec3(texture2D(SSAOTex, FragUV).r), 1.0f);
+	}
+	else if (TypeColorOutput == 2)
+	{
+		Color = vec4(vec3(GetLinearizedDepth(FragUV) / 1500.0f), 1.0f);
+	}
 
-	//Color = vec4(vec3(texture2D(SSAOTex, FragUV).r), 1.0f);
-	//Color = vec4(vec3(GetLinearizedDepth(FragUV) / 1500.0f), 1.0f);
 	//Color = vec4(SamplePosition, 1.0f);
 	//Color = vec4(SampleColorSpec.rgb, 1.0f);
 }

@@ -294,7 +294,7 @@ SCENE_UPDATE(TestGame)
                       40.0f,
                       ColorGreen());
     
-#if 0    
+#if 1    
     PrintTextWithFont(LiberationMono,
                       "And Making 123 Videos for YouTube",
                       V2(100, 600),

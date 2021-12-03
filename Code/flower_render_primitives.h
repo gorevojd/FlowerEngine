@@ -324,7 +324,7 @@ inline f32 GetScaleForPixelHeight(font_size* FontSize, f32 PixelHeight)
 
 inline font_size* FindBestFontSizeForPixelHeight(font* Font, f32 PixelHeight)
 {
-    font_size* Result = 0;
+    font_size* Result = &Font->Sizes[0];
     
     f32 MinAbsDiff = 999999.0f;
     
@@ -334,6 +334,8 @@ inline font_size* FindBestFontSizeForPixelHeight(font* Font, f32 PixelHeight)
     {
         font_size* Size = &Font->Sizes[SizeIndex];
         
+#if 1
+        //Finding closes by absolute difference
         f32 AbsDiff = FlowerAbs(Global_FontSizes[Size->FontSizeEnumType] - PixelHeight);
         
         if (AbsDiff < MinAbsDiff)
@@ -341,6 +343,16 @@ inline font_size* FindBestFontSizeForPixelHeight(font* Font, f32 PixelHeight)
             MinAbsDiff = AbsDiff;
             Result = Size;
         }
+#else
+        if (PixelHeight < Global_FontSizes[Size->FontSizeEnumType])
+        {
+            break;
+        }
+        else
+        {
+            Result = Size;
+        }
+#endif
     }
     
     return Result;

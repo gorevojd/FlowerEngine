@@ -217,9 +217,9 @@ INTERNAL_FUNCTION void OpenGLCheckFramebuffer(char* File, int Line,
     }
 }
 
-INTERNAL_FUNCTION GLuint OpenGLLoadProgram(char* VertexFilePath, 
-                                           char* FragmentFilePath, 
-                                           char* GeometryFilePath = 0) 
+INTERNAL_FUNCTION GLuint OpenGL_LoadProgram(char* VertexFilePath, 
+                                            char* FragmentFilePath, 
+                                            char* GeometryFilePath = 0) 
 {
     char* VertexSource = PlatformAPI.ReadFileAndNullTerminate(VertexFilePath);
     char* FragmentSource = PlatformAPI.ReadFileAndNullTerminate(FragmentFilePath);
@@ -327,9 +327,9 @@ INTERNAL_FUNCTION opengl_shader* OpenGLLoadShader(opengl_state* OpenGL,
     Result->Name2Attrib = hashmap<uniform_name_entry, 256>(Arena);
     
     
-    Result->ID = OpenGLLoadProgram(VertexFilePath, 
-                                   FragmentFilePath,
-                                   GeometryFilePath);
+    Result->ID = OpenGL_LoadProgram(VertexFilePath, 
+                                    FragmentFilePath,
+                                    GeometryFilePath);
     
     if(Result->ID == -1)
     {
@@ -596,78 +596,181 @@ INTERNAL_FUNCTION void OpenGLCreateAndBindTextureBuffer(renderer_handle* Handle,
                             UniformLoc);
 }
 
-INTERNAL_FUNCTION void OpenGL_InitFB(render_commands* Commands, 
-                                     opengl_framebuffer* FB,
-                                     int ResolutionIndex)
+INTERNAL_FUNCTION inline 
+b32 OpenGL_ColorAttachmentIsEmpty(opengl_framebuffer* FB,
+                                  int ColorAttachmentIndex)
 {
-    opengl_state* OpenGL = GetOpenGL(Commands);
+    b32 Empty = FB->ColorTextures[ColorAttachmentIndex] == 0;
     
-    opengl_framebuffer_pool* Pool = &OpenGL->FramebufferPoolResolutions[ResolutionIndex];
-    
-    FB->Width = Pool->Width;
-    FB->Height = Pool->Height;
-    
-    // NOTE(Dima): Generating framebuffer
-    glGenFramebuffers(1, &FB->Framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, FB->Framebuffer);
-    
-    OpenGLCheckError(__FILE__, __LINE__);
-    
-    GLuint FilterMode = GL_NEAREST;
-    if(ResolutionIndex != PostProcResolution_Normal)
-    {
-        // NOTE(Dima): Allow linear filtering to get cheap blur for downscaled framebuffers
-        FilterMode = GL_LINEAR;
-    }
-    
+    return Empty;
+}
+
+INTERNAL_FUNCTION 
+void OpenGL_AddColorAttachment(opengl_framebuffer* FB,
+                               int ColorAttachmentIndex, 
+                               opengl_framebuffer_texture_params TextureParams)
+{
     // NOTE(Dima): Generating texture attachment
-    glGenTextures(1, &FB->Texture);
-    glBindTexture(GL_TEXTURE_2D, FB->Texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, FilterMode);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, FilterMode);
+    glGenTextures(1, &FB->ColorTextures[ColorAttachmentIndex]);
+    glBindTexture(GL_TEXTURE_2D, FB->ColorTextures[ColorAttachmentIndex]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, 
-                 GL_RGB8, 
+                 TextureParams.InternalFormat, 
                  FB->Width, 
                  FB->Height, 
-                 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+                 0, 
+                 TextureParams.Format, 
+                 TextureParams.Type, 
+                 0);
+    
+    // NOTE(Dima): Setting texture attachment
     glFramebufferTexture2D(GL_FRAMEBUFFER, 
-                           GL_COLOR_ATTACHMENT0, 
+                           GL_COLOR_ATTACHMENT0 + ColorAttachmentIndex, 
                            GL_TEXTURE_2D, 
-                           FB->Texture, 0);
-    
-    OpenGLCheckError(__FILE__, __LINE__);
-    
-    OpenGLCheckFramebuffer(__FILE__, __LINE__);
+                           FB->ColorTextures[ColorAttachmentIndex],
+                           0);
 }
 
-INTERNAL_FUNCTION void OpenGL_BindFB(opengl_framebuffer* FB)
+INTERNAL_FUNCTION
+void OpenGL_AddDepthAttachment(opengl_framebuffer* FB)
+{
+    // NOTE(Dima): Generating depth texture
+    glGenTextures(1, &FB->DepthTexture);
+    glBindTexture(GL_TEXTURE_2D, FB->DepthTexture);
+    glTexImage2D(GL_TEXTURE_2D,
+                 0, 
+                 GL_DEPTH_COMPONENT32F,
+                 FB->Width,
+                 FB->Height,
+                 0,
+                 GL_DEPTH_COMPONENT,
+                 GL_FLOAT, 0);
+    
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float BorderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, BorderColor);
+    
+    glFramebufferTexture2D(GL_FRAMEBUFFER,
+                           GL_DEPTH_ATTACHMENT,
+                           GL_TEXTURE_2D,
+                           FB->DepthTexture, 0);
+}
+
+INTERNAL_FUNCTION
+void OpenGL_FreeFramebuffer(opengl_framebuffer* FB)
+{
+    for (int AttachmentIndex = 0;
+         AttachmentIndex < MAX_COLOR_ATTACHMENTS;
+         AttachmentIndex++)
+    {
+        if (FB->ColorTextures[AttachmentIndex] != 0)
+        {
+            glDeleteTextures(1, &FB->ColorTextures[AttachmentIndex]);
+            FB->ColorTextures[AttachmentIndex] = 0;
+        }
+    }
+    
+    if (FB->DepthTexture != 0)
+    {
+        glDeleteTextures(1, &FB->DepthTexture);
+        FB->DepthTexture = 0;
+    }
+    
+    glDeleteFramebuffers(1, &FB->Framebuffer);
+    FB->Framebuffer = 0;
+}
+
+INTERNAL_FUNCTION 
+void OpenGL_BindFramebuffer(opengl_framebuffer* FB)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, FB->Framebuffer);
     
-    glViewport(0, 0, 
-               FB->Width,
-               FB->Height);
+    glViewport(0, 0, FB->Width, FB->Height);
 }
 
-INTERNAL_FUNCTION opengl_framebuffer* OpenGL_BeginFramebuffer(render_commands* Commands,
-                                                              post_proc_resolution Resolution)
+INTERNAL_FUNCTION inline 
+int OpenGL_GetIndexInPool(framebuffer_in_pool_params Params)
+{
+    int IndexInPool = Params.Type * FramebufPoolType_Count + Params.Resolution;
+    
+    return IndexInPool;
+}
+
+INTERNAL_FUNCTION inline
+framebuffer_in_pool_params OpenGL_GetInPoolParamsFromIndex(int Index)
+{
+    framebuffer_in_pool_params Result = {};
+    
+    Result.Type = Index / FramebufPoolType_Count;
+    Result.Resolution = Index % FramebufPoolType_Count;
+    
+    return Result;
+}
+
+INTERNAL_FUNCTION 
+opengl_framebuffer* OpenGL_GetPoolFramebuffer(render_commands* Commands,
+                                              framebuffer_in_pool_params Params)
 {
     FUNCTION_TIMING();
     
     opengl_state* OpenGL = GetOpenGL(Commands);
     
-    opengl_framebuffer_pool* Pool = &OpenGL->FramebufferPoolResolutions[Resolution];
+    int IndexInPools = OpenGL_GetIndexInPool(Params);
+    opengl_framebuffer_pool* Pool = &OpenGL->FramebufferPools[IndexInPools];
     
     if (Pool->NumFree == 0)
     {
-        Pool->FreeFramebuffers[0] = PushStruct(OpenGL->Arena, opengl_framebuffer);
+        opengl_framebuffer* FB = PushStruct(OpenGL->Arena, opengl_framebuffer);
+        
+        Pool->FreeFramebuffers[0] = FB;
         Pool->NumFree++;
         
-        OpenGL_InitFB(Commands,
-                      Pool->FreeFramebuffers[0],
-                      Resolution);
+        FB->Width = Pool->Width;
+        FB->Height = Pool->Height;
+        FB->IndexInPools = IndexInPools;
+        
+        // NOTE(Dima): Generating framebuffer
+        glGenFramebuffers(1, &FB->Framebuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, FB->Framebuffer);
+        
+        
+        // NOTE(Dima): Adding color attachment
+        opengl_framebuffer_texture_params TextureParams = {};
+        
+        switch(Params.Type)
+        {
+            case FramebufPoolType_Color:
+            {
+                TextureParams.InternalFormat = GL_RGB8;
+                TextureParams.Format = GL_RGB;
+                TextureParams.Type = GL_UNSIGNED_BYTE;
+            }break;
+            
+            case FramebufPoolType_HDR:
+            {
+                TextureParams.InternalFormat = GL_RGB16F;
+                TextureParams.Format = GL_RGB;
+                TextureParams.Type = GL_FLOAT;
+            }break;
+            
+            case FramebufPoolType_SSAO:
+            {
+                TextureParams.InternalFormat = GL_R8;
+                TextureParams.Format = GL_RED;
+                TextureParams.Type = GL_UNSIGNED_BYTE;
+            }break;
+        }
+        
+        OpenGL_AddColorAttachment(FB, 0, TextureParams);
+        
+        OpenGLCheckFramebuffer(__FILE__, __LINE__);
     }
     
     // NOTE(Dima): Popping from free stack
@@ -687,21 +790,23 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_BeginFramebuffer(render_commands* C
     opengl_framebuffer* Result = Pool->UseFramebuffers[IndexInUse];
     Result->IndexInUse = IndexInUse;
     
-    OpenGL_BindFB(Result);
+    OpenGL_BindFramebuffer(Result);
     
     return(Result);
 }
 
-INTERNAL_FUNCTION void OpenGL_EndFramebuffer(render_commands* Commands, 
-                                             opengl_framebuffer* FB)
+INTERNAL_FUNCTION void OpenGL_ReleasePoolFramebuffer(render_commands* Commands, 
+                                                     opengl_framebuffer* FB)
 {
     FUNCTION_TIMING();
     
     opengl_state* OpenGL = GetOpenGL(Commands);
     
-    opengl_framebuffer_pool* Pool = &OpenGL->FramebufferPoolResolutions[FB->ResolutionIndex];
+    opengl_framebuffer_pool* Pool = &OpenGL->FramebufferPools[FB->IndexInPools];
     
     int IndexOfLastInUse = Pool->NumUse - 1;
+    
+    Assert(IndexOfLastInUse >= 0);
     
     // NOTE(Dima): Swapping current with last one in the array
     if (IndexOfLastInUse != FB->IndexInUse)
@@ -748,7 +853,11 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoDilation(render_commands* Command
                                                        PostProcEffectGUID, dilation_params);
     
     // NOTE(Dima): Getting framebuffer for post-process effect
-    opengl_framebuffer* Result = OpenGL_BeginFramebuffer(Commands, Params->Resolution);
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = Params->Resolution;
+    InPoolParams.Type = FramebufPoolType_Color;
+    
+    opengl_framebuffer* Result = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
     
     // NOTE(Dima): Apply shader
     opengl_state* OpenGL = GetOpenGL(Commands);
@@ -778,7 +887,11 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoPosterize(render_commands* Comman
                                                         PostProcEffectGUID, posterize_params);
     
     // NOTE(Dima): Getting framebuffer for post-process effect
-    opengl_framebuffer* Result = OpenGL_BeginFramebuffer(Commands, Params->Resolution);
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = Params->Resolution;
+    InPoolParams.Type = FramebufPoolType_Color;
+    
+    opengl_framebuffer* Result = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
     
     // NOTE(Dima): Apply shader
     opengl_state* OpenGL = GetOpenGL(Commands);
@@ -806,7 +919,11 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoCrtDisplay(render_commands* Comma
                                                           crt_display_params);
     
     // NOTE(Dima): Getting framebuffer for post-process effect
-    opengl_framebuffer* Result = OpenGL_BeginFramebuffer(Commands, Params->Resolution);
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = Params->Resolution;
+    InPoolParams.Type = FramebufPoolType_Color;
+    
+    opengl_framebuffer* Result = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
     
     // NOTE(Dima): Apply shader
     opengl_state* OpenGL = GetOpenGL(Commands);
@@ -840,14 +957,20 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoBoxBlur(render_commands* Commands
     box_blur_params* Params = PostProcEffect_GetParams(&Commands->PostProcessing,
                                                        PostProcEffectGUID, box_blur_params);
     
-    opengl_framebuffer* Result = OpenGL_BeginFramebuffer(Commands, Params->Resolution);
+    // NOTE(Dima): Getting framebuffer for post-process effect
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = Params->Resolution;
+    InPoolParams.Type = FramebufPoolType_Color;
+    
+    opengl_framebuffer* Result = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
     
     int RadiusSize = Params->RadiusSize;
     
     if (Params->EnableCheapMode)
     {
+        // TODO(Dima): 
         // NOTE(Dima): If we use half-res or quater-res textures then we will get blur for free
-        if(Params->Resolution != PostProcResolution_Normal)
+        if(Params->Resolution != FramebufPoolRes_Normal)
         {
             RadiusSize = 0;
         }
@@ -877,7 +1000,12 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoDepthOfField(render_commands* Com
     FUNCTION_TIMING();
     
     // NOTE(Dima): Getting framebuffer for post-process effect
-    opengl_framebuffer* Result = OpenGL_BeginFramebuffer(Commands, PostProcResolution_Normal);
+    
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = FramebufPoolRes_Normal;
+    InPoolParams.Type = FramebufPoolType_Color;
+    
+    opengl_framebuffer* Result = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
     
     dof_params* Params = PostProcEffect_GetParams(&Commands->PostProcessing,
                                                   PostProcEffectGUID,
@@ -913,16 +1041,16 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoDepthOfField(render_commands* Com
     return(Result);
 }
 
-INTERNAL_FUNCTION void OpenGL_SSAO_DoPass(render_commands* Commands, 
-                                          opengl_g_buffer* GBuf,
-                                          render_pass* RenderPass,
-                                          char* PostProcSSAO_GUID)
+INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoPassSSAO(render_commands* Commands, 
+                                                        render_pass* RenderPass,
+                                                        u32 NormalTex,
+                                                        u32 DepthTex,
+                                                        char* PostProcSSAO_GUID)
 {
     FUNCTION_TIMING();
     
+    
     opengl_state* OpenGL = GetOpenGL(Commands);
-    opengl_ssao* SSAO = &OpenGL->SSAO;
-    opengl_shader* Shader = OpenGL->SSAOShader;
     post_processing* PP = &Commands->PostProcessing;
     
     const m44& Projection = RenderPass->Projection;
@@ -930,13 +1058,20 @@ INTERNAL_FUNCTION void OpenGL_SSAO_DoPass(render_commands* Commands,
     ssao_params* Params = PostProcEffect_GetParams(&Commands->PostProcessing,
                                                    PostProcSSAO_GUID, ssao_params);
     
-    // NOTE(Dima): Do pass
-    glBindFramebuffer(GL_FRAMEBUFFER, SSAO->Framebuffer);
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = Params->Resolution;
+    InPoolParams.Type = FramebufPoolType_SSAO;
+    
+    opengl_framebuffer* Framebuffer = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
+    opengl_framebuffer* Result = Framebuffer;
+    
+    // NOTE(Dima): Setting shader params
+    opengl_shader* Shader = OpenGL->SSAOShader;
     
     Shader->Use();
-    Shader->SetTexture2D("DepthTex", GBuf->Depth, 0);
-    Shader->SetTexture2D("NormalTex", GBuf->Normal, 1);
-    Shader->SetTexture2D("SSAONoiseTex", SSAO->NoiseTex, 2);
+    Shader->SetTexture2D("DepthTex", DepthTex, 0);
+    Shader->SetTexture2D("NormalTex", NormalTex, 1);
+    Shader->SetTexture2D("SSAONoiseTex", OpenGL->SSAONoiseTex, 2);
     
     Shader->SetVec3Array("SSAOKernel", 
                          PP->SSAO_Kernel, 
@@ -945,8 +1080,8 @@ INTERNAL_FUNCTION void OpenGL_SSAO_DoPass(render_commands* Commands,
     Shader->SetFloat("SSAOKernelRadius", Params->KernelRadius);
     Shader->SetFloat("SSAORangeCheck", Params->RangeCheck);
     Shader->SetVec2("WH", 
-                    Commands->WindowDimensions.Width,
-                    Commands->WindowDimensions.Height);
+                    Framebuffer->Width,
+                    Framebuffer->Height);
     Shader->SetVec4("PerspProjCoefs",
                     Projection.e[0],
                     Projection.e[5],
@@ -954,90 +1089,58 @@ INTERNAL_FUNCTION void OpenGL_SSAO_DoPass(render_commands* Commands,
                     Projection.e[14]);
     Shader->SetMat4("View", RenderPass->View.e);
     
+    // NOTE(Dima): Rendering
     glBindVertexArray(OpenGL->ScreenQuad.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
+    // NOTE(Dima): SSAO Blur pass if enabled
+    if (Params->BlurEnabled)
+    {
+        InPoolParams.Resolution = Params->BlurResolution;
+        InPoolParams.Type = FramebufPoolType_SSAO;
+        
+        opengl_framebuffer* BlurFramebuffer = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
+        Result = BlurFramebuffer;
+        
+        Shader = OpenGL->SSAOBlurShader;
+        
+        // NOTE(Dima): Setting shader params
+        Shader->Use();
+        Shader->SetTexture2D("OcclusionTex", Framebuffer->ColorTextures[0], 0);
+        Shader->SetInt("BlurRadius", Params->BlurRadius);
+        
+        // NOTE(Dima): Rendering
+        glBindVertexArray(OpenGL->ScreenQuad.VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        
+        // NOTE(Dima): We can release SSAO framebuffer now
+        OpenGL_ReleasePoolFramebuffer(Commands, Framebuffer);
+    }
     
-    // NOTE(Dima): SSAO Blur pass
-    glBindFramebuffer(GL_FRAMEBUFFER, SSAO->BlurFramebuffer);
-    Shader = OpenGL->SSAOBlurShader;
-    Shader->Use();
-    Shader->SetTexture2D("OcclusionTex", SSAO->FramebufferTexture, 0);
-    Shader->SetInt("BlurRadius", Params->BlurRadius);
-    
-    glBindVertexArray(OpenGL->ScreenQuad.VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    return Result;
 }
 
-INTERNAL_FUNCTION void OpenGL_SSAO_Init(render_commands* Commands,
-                                        int Width, int Height)
+INTERNAL_FUNCTION void OpenGL_InitSSAO(render_commands* Commands,
+                                       int Width, int Height)
 {
     opengl_state* OpenGL = GetOpenGL(Commands);
-    opengl_ssao* SSAO = &OpenGL->SSAO;
     post_processing* PP = &Commands->PostProcessing;
     
     // NOTE(Dima): init SSAO noise texture
-    glGenTextures(1, &SSAO->NoiseTex);
-    glBindTexture(GL_TEXTURE_2D, SSAO->NoiseTex);
+    glGenTextures(1, &OpenGL->SSAONoiseTex);
+    glBindTexture(GL_TEXTURE_2D, OpenGL->SSAONoiseTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, &PP->SSAO_Noise);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);  
-    
-    // NOTE(Dima): Init SSAO framebuffer
-    glGenFramebuffers(1, &SSAO->Framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, SSAO->Framebuffer);
-    
-    glGenTextures(1, &SSAO->FramebufferTexture);
-    glBindTexture(GL_TEXTURE_2D, SSAO->FramebufferTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, 
-                 GL_RED, 
-                 Width, Height, 
-                 0, GL_RED, GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, 
-                           GL_COLOR_ATTACHMENT0, 
-                           GL_TEXTURE_2D, 
-                           SSAO->FramebufferTexture, 0);
-    
-    OpenGLCheckFramebuffer(__FILE__, __LINE__);
-    
-    // NOTE(Dima): Init SSAO blur framebuffer
-    glGenFramebuffers(1, &SSAO->BlurFramebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, SSAO->BlurFramebuffer);
-    
-    glGenTextures(1, &SSAO->BlurFramebufferTexture);
-    glBindTexture(GL_TEXTURE_2D, SSAO->BlurFramebufferTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, 
-                 GL_RED, 
-                 Commands->WindowDimensions.Width, 
-                 Commands->WindowDimensions.Height, 
-                 0, GL_RED, GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, 
-                           GL_COLOR_ATTACHMENT0, 
-                           GL_TEXTURE_2D, 
-                           SSAO->BlurFramebufferTexture, 0);
-    
-    OpenGLCheckFramebuffer(__FILE__, __LINE__);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 }
 
-INTERNAL_FUNCTION void OpenGL_SSAO_Free(render_commands* Commands)
+INTERNAL_FUNCTION void OpenGL_FreeSSAO(render_commands* Commands)
 {
     opengl_state* OpenGL = GetOpenGL(Commands);
-    opengl_ssao* SSAO = &OpenGL->SSAO;
     
-    glDeleteFramebuffers(1, &SSAO->Framebuffer);
-    glDeleteFramebuffers(1, &SSAO->BlurFramebuffer);
-    
-    glDeleteTextures(1, &SSAO->FramebufferTexture);
-    glDeleteTextures(1, &SSAO->BlurFramebufferTexture);
-    glDeleteTextures(1, &SSAO->NoiseTex);
+    glDeleteTextures(1, &OpenGL->SSAONoiseTex);
 }
 
 INTERNAL_FUNCTION void OpenGL_GBufferInit(opengl_g_buffer* GBuf, int Width, int Height)
@@ -1216,12 +1319,11 @@ INTERNAL_FUNCTION void OpenGL_InitShadowMaps(render_commands* Commands)
     opengl_state* OpenGL = GetOpenGL(Commands);
     lighting* Lighting = &Commands->Lighting;
     
-    opengl_framebuffer* FB = &OpenGL->ShadowMap;
+    opengl_framebuffer* FB = &OpenGL->ShadowMapsFramebuffer;
     FB->Width = Lighting->ShadowMapRes;
     FB->Height = Lighting->ShadowMapRes;
     
     OpenGL->InitCascadesCount = Lighting->CascadeCount;
-    
     
     // NOTE(Dima): Generating framebuffer
     glGenFramebuffers(1, &FB->Framebuffer);
@@ -1229,8 +1331,8 @@ INTERNAL_FUNCTION void OpenGL_InitShadowMaps(render_commands* Commands)
     
     
     // NOTE(Dima): Generate depth texture array
-    glGenTextures(1, &FB->Texture);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, FB->Texture);
+    glGenTextures(1, &FB->ColorTextures[0]);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, FB->ColorTextures[0]);
     glTexStorage3D(GL_TEXTURE_2D_ARRAY,
                    1, 
                    GL_RG32F,
@@ -1245,7 +1347,6 @@ INTERNAL_FUNCTION void OpenGL_InitShadowMaps(render_commands* Commands)
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     float BorderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
     glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, BorderColor);
-    
     
     // NOTE(Dima): Creating depth texture
     glGenTextures(1, &FB->DepthTexture);
@@ -1272,20 +1373,20 @@ INTERNAL_FUNCTION void OpenGL_InitShadowMaps(render_commands* Commands)
     
     OpenGLCheckError(__FILE__, __LINE__);
     
-    
-    // NOTE(Dima): Init texture of random rotations for PCF poisson samples
-    glGenTextures(1, &OpenGL->PoissonSamplesRotationTex);
-    glBindTexture(GL_TEXTURE_2D, OpenGL->PoissonSamplesRotationTex);
-    glTexImage2D(GL_TEXTURE_2D, 0,
-                 GL_R32F,
-                 4, 4,
-                 0, GL_RED,
-                 GL_FLOAT, 
-                 Lighting->PCF_PoissonSamples.Rotations);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    OpenGLCheckFramebuffer(__FILE__, __LINE__);
     
     // TODO(Dima): Function to free shadow maps
+}
+
+INTERNAL_FUNCTION void OpenGL_FreeShadowMaps(render_commands* Commands)
+{
+    opengl_state* OpenGL = GetOpenGL(Commands);
+    lighting* Lighting = &Commands->Lighting;
+    
+    
+    opengl_framebuffer* ShadowMapFramebuffer = &OpenGL->ShadowMapsFramebuffer;
+    
+    OpenGL_FreeFramebuffer(ShadowMapFramebuffer);
 }
 
 INTERNAL_FUNCTION void OpenGLLoadShaders(render_commands* Commands, memory_arena* Arena)
@@ -1368,13 +1469,14 @@ INTERNAL_FUNCTION void OpenGLLoadShaders(render_commands* Commands, memory_arena
 
 INTERNAL_FUNCTION 
 void OpenGL_InitFramebufferPool(render_commands* Commands,
-                                u32 ResolutionIndex)
+                                framebuffer_in_pool_params Params)
 {
     opengl_state* OpenGL = GetOpenGL(Commands);
     
-    opengl_framebuffer_pool* Result = &OpenGL->FramebufferPoolResolutions[ResolutionIndex];
+    int IndexInPool = OpenGL_GetIndexInPool(Params);
+    opengl_framebuffer_pool* Result = &OpenGL->FramebufferPools[IndexInPool];
     
-    f32 ResolutionDivisor = Global_PostProcResolutionDivisors[ResolutionIndex];
+    f32 ResolutionDivisor = Global_PostProcResolutionDivisors[Params.Resolution];
     
     // NOTE(Dima): Init the result
     Result->Width = (f32)Commands->WindowDimensions.InitWidth / (f32)ResolutionDivisor;
@@ -1383,7 +1485,6 @@ void OpenGL_InitFramebufferPool(render_commands* Commands,
     Result->NumUse = 0;
     Result->NumFree = 0;
 }
-
 
 // NOTE(Dima): Check if framebuffer pool does not contain any framebuffers in Use
 INTERNAL_FUNCTION inline b32 OpenGL_PoolUseIsEmpty(opengl_framebuffer_pool* Pool)
@@ -1405,10 +1506,7 @@ INTERNAL_FUNCTION void OpenGL_DeleteFramebufferPool(opengl_framebuffer_pool* Poo
     {
         opengl_framebuffer* FB = Pool->FreeFramebuffers[Index];
         
-        glDeleteFramebuffers(1, &FB->Framebuffer);
-        glDeleteTextures(1, &FB->Texture);
-        
-        // TODO(Dima): Delete FB->DepthTexture if it was allocated
+        OpenGL_FreeFramebuffer(FB);
     }
 }
 
@@ -1418,11 +1516,11 @@ INTERNAL_FUNCTION b32 OpenGL_PoolsAreEmptyCheck(render_commands* Commands)
     
     b32 Result = true;
     
-    for (int ResolutionIndex = 0;
-         ResolutionIndex < PostProcResolution_Count;
-         ResolutionIndex++)
+    for (int PoolIndex = 0;
+         PoolIndex < NUM_FRAMEBUFFER_POOLS;
+         PoolIndex++)
     {
-        opengl_framebuffer_pool* Pool = &OpenGL->FramebufferPoolResolutions[ResolutionIndex];
+        opengl_framebuffer_pool* Pool = &OpenGL->FramebufferPools[PoolIndex];
         
         Result = Result && OpenGL_PoolUseIsEmpty(Pool);
     }
@@ -1463,16 +1561,18 @@ INTERNAL_FUNCTION void OpenGL_Init(render_commands* Commands, memory_arena* Aren
     OpenGLInitDefaultObjects(Commands);
     
     // NOTE(Dima): Init framebuffer pools
-    for(int ResolutionIndex = 0;
-        ResolutionIndex < PostProcResolution_Count;
-        ResolutionIndex++)
+    for(int PoolIndex = 0;
+        PoolIndex< NUM_FRAMEBUFFER_POOLS;
+        PoolIndex++)
     {
-        OpenGL_InitFramebufferPool(Commands, ResolutionIndex);
+        framebuffer_in_pool_params InPoolParams = OpenGL_GetInPoolParamsFromIndex(PoolIndex);
+        
+        OpenGL_InitFramebufferPool(Commands, InPoolParams);
     }
     
     // NOTE(Dima): Init GBuffer
     OpenGL_GBufferInit(&OpenGL->GBuffer, Width, Height);
-    OpenGL_SSAO_Init(Commands, Width, Height);
+    OpenGL_InitSSAO(Commands, Width, Height);
     OpenGL_InitShadowMaps(Commands);
     
     OpenGLLoadShaders(Commands, Arena);
@@ -1484,21 +1584,21 @@ INTERNAL_FUNCTION void OpenGL_Free(render_commands* Commands)
 {
     opengl_state* OpenGL = GetOpenGL(Commands);
     
-    // NOTE(Dima): Deleting all framebuffer pools
-    for (int ResolutionIndex = 0;
-         ResolutionIndex < PostProcResolution_Count;
-         ResolutionIndex++)
-    {
-        OpenGL_DeleteFramebufferPool(&OpenGL->FramebufferPoolResolutions[ResolutionIndex]);
-    }
-    
     // NOTE(Dima): Free objects
     OpenGL_DeleteArrayObject(&OpenGL->ScreenQuad);
     OpenGL_DeleteArrayObject(&OpenGL->SkyboxCube);
     
     // NOTE(Dima): Delete GBuffer
     OpenGL_GBufferFree(&OpenGL->GBuffer);
-    OpenGL_SSAO_Free(Commands);
+    OpenGL_FreeSSAO(Commands);
+    
+    // NOTE(Dima): Deleting all framebuffer pools
+    for (int PoolIndex = 0;
+         PoolIndex < NUM_FRAMEBUFFER_POOLS;
+         PoolIndex++)
+    {
+        OpenGL_DeleteFramebufferPool(&OpenGL->FramebufferPools[PoolIndex]);
+    }
     
     // NOTE(Dima): Delete shaders
     opengl_loaded_shader* ShaderAt = OpenGL->LoadedShadersList;
@@ -2165,7 +2265,7 @@ INTERNAL_FUNCTION void OpenGL_RenderRectBuffer(render_commands* Commands,
     }
 }
 
-INTERNAL_FUNCTION void OpenGLRenderCommands(render_commands* Commands, render_pass* RenderPass)
+INTERNAL_FUNCTION void OpenGL_RenderCommands(render_commands* Commands, render_pass* RenderPass)
 {
     FUNCTION_TIMING();
     
@@ -2300,15 +2400,16 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
     
     opengl_state* OpenGL = GetOpenGL(Commands);
     lighting* Lighting = &Commands->Lighting;
+    opengl_framebuffer* ShadowMapsFB = &OpenGL->ShadowMapsFramebuffer;
     
     if(Lighting->DirLit.CalculateShadows)
     {
         glEnable(GL_DEPTH_TEST);
         
-        glBindFramebuffer(GL_FRAMEBUFFER, OpenGL->ShadowMap.Framebuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, ShadowMapsFB->Framebuffer);
         glViewport(0, 0,
-                   OpenGL->ShadowMap.Width,
-                   OpenGL->ShadowMap.Height);
+                   ShadowMapsFB->Width,
+                   ShadowMapsFB->Height);
         
         for(int CascadeIndex = 0;
             CascadeIndex < OpenGL->InitCascadesCount;
@@ -2326,7 +2427,7 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
             // NOTE(Dima): Now bind layer to copy and create depth squared buffer
             glFramebufferTextureLayer(GL_FRAMEBUFFER,
                                       GL_COLOR_ATTACHMENT0,
-                                      OpenGL->ShadowMap.Texture,
+                                      ShadowMapsFB->ColorTextures[0],
                                       0, TargetCascadeIndex);
             
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
@@ -2335,7 +2436,7 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
-            OpenGLRenderCommands(Commands, ShadowPass);
+            OpenGL_RenderCommands(Commands, ShadowPass);
             
             if(Lighting->BlurVarianceShadowMaps)
             {
@@ -2344,7 +2445,7 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
                 // NOTE(Dima): Apply blur
                 glFramebufferTextureLayer(GL_FRAMEBUFFER,
                                           GL_COLOR_ATTACHMENT0,
-                                          OpenGL->ShadowMap.Texture,
+                                          ShadowMapsFB->ColorTextures[0],
                                           0, CascadeIndex);
                 
                 glDrawBuffer(GL_COLOR_ATTACHMENT0);
@@ -2355,7 +2456,8 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
                 
                 opengl_shader* BlurShader = OpenGL->VarianceShadowBlurShader;
                 BlurShader->Use();
-                BlurShader->SetTexture2DArray("TextureArray", OpenGL->ShadowMap.Texture, 0);
+                BlurShader->SetTexture2DArray("TextureArray", 
+                                              ShadowMapsFB->ColorTextures[0], 0);
                 BlurShader->SetInt("TextureIndex", OpenGL->InitCascadesCount);
                 BlurShader->SetInt("BlurRadius", Lighting->VarianceShadowMapBlurRadius);
                 
@@ -2370,21 +2472,20 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
 
 INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoLightingPass(render_commands* Commands,
                                                             render_pass* RenderPass,
-                                                            post_proc_resolution Resolution,
+                                                            framebuffer_in_pool_params InPoolParams,
+                                                            u32 SSAOTexture,
                                                             char* PostProcSSAO_GUID)
 {
     FUNCTION_TIMING();
     
     opengl_state* OpenGL = GetOpenGL(Commands);
-    opengl_ssao* SSAO = &OpenGL->SSAO;
-    opengl_shader* LitShader = OpenGL->LightingShader;
     lighting* Lighting = &Commands->Lighting;
     post_processing* PP = &Commands->PostProcessing;
     
-    opengl_framebuffer* Result = OpenGL_BeginFramebuffer(Commands, Resolution);
-    
+    opengl_framebuffer* Result = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
     
     // NOTE(Dima): LIGHTING PASS. Preparing GBuffer
+    opengl_shader* LitShader = OpenGL->LightingShader;
     LitShader->Use();
     
     const m44& Projection = RenderPass->Projection;
@@ -2416,21 +2517,21 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoLightingPass(render_commands* Com
     {
         ssao_params* SSAOParams = PostProcEffect_GetParams(PP, PostProcSSAO_GUID, ssao_params);
         
+        LitShader->Use();
         LitShader->SetFloat("SSAOContribution", SSAOParams->Contribution);
-        LitShader->SetTexture2D("SSAOTex", SSAO->BlurFramebufferTexture, 4);
+        LitShader->SetTexture2D("SSAOTex", SSAOTexture, 4);
     }
-    
     
     // NOTE(Dima): Uniform lighting variables
     LitShader->SetVec3("CameraP", RenderPass->CameraP);
     LitShader->SetFloat("AmbientPercentage", Lighting->AmbientPercentage);
     LitShader->SetFloat("ShadowStrength", Lighting->ShadowStrength);
     
-    
     LitShader->SetVec3("DirectionalLightDirection", Lighting->DirLit.Dir);
     LitShader->SetVec3("DirectionalLightColor", Lighting->DirLit.C);
     LitShader->SetBool("CalculateDirLightShadow", Lighting->DirLit.CalculateShadows);
-    LitShader->SetTexture2DArray("LightDepthTex", OpenGL->ShadowMap.Texture, 5);
+    LitShader->SetTexture2DArray("LightDepthTex", 
+                                 OpenGL->ShadowMapsFramebuffer.ColorTextures[0], 5);
     
     f32 Distances[8];
     m44 LitProjections[8];
@@ -2448,14 +2549,7 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DoLightingPass(render_commands* Com
     LitShader->SetMat4Array("CascadeLightProjections", LitProjections, Lighting->CascadeCount);
     LitShader->SetInt("CascadeCount", Lighting->CascadeCount);
     
-    LitShader->SetVec2Array("PoissonSamples", 
-                            Lighting->PCF_PoissonSamples.Samples,
-                            Lighting->PCF_PoissonSamples.Count);
-    LitShader->SetTexture2D("PoissonSamplesRotations",
-                            OpenGL->PoissonSamplesRotationTex,
-                            6);
-    LitShader->SetBool("ShouldRotateSamples", 
-                       Lighting->PCF_PoissonSamples.ShouldRotateSamples);
+    LitShader->SetInt("TypeColorOutput", Commands->TypeColorOutput);
     
     glBindVertexArray(OpenGL->ScreenQuad.VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -2476,12 +2570,12 @@ INTERNAL_FUNCTION void OpenGL_RenderPassToGBuffer(render_commands* Commands,
     
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    OpenGLRenderCommands(Commands, Pass);
+    OpenGL_RenderCommands(Commands, Pass);
 }
 
 INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DeferredRender(render_commands* Commands,
                                                             render_pass* Pass,
-                                                            post_proc_resolution Resolution,
+                                                            framebuffer_pool_resolution Resolution,
                                                             char* PostProcSSAO_GUID)
 {
     opengl_state* OpenGL = GetOpenGL(Commands);
@@ -2490,18 +2584,35 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_DeferredRender(render_commands* Com
     // NOTE(Dima): Rendering to GBuffer
     OpenGL_RenderPassToGBuffer(Commands, Pass);
     
-    if(PostProcEffect_IsEnabled(PP, PostProcSSAO_GUID))
+    // NOTE(Dima): Making SSAO Here not to mess with shader rebinding
+    opengl_framebuffer* SSAOFramebuf = 0;
+    u32 SSAOTexture = 0;
+    if (PostProcEffect_IsEnabled(PP, PostProcSSAO_GUID))
     {
-        OpenGL_SSAO_DoPass(Commands, 
-                           &OpenGL->GBuffer,
-                           Pass,
-                           PostProcSSAO_GUID);
+        SSAOFramebuf = SSAOFramebuf = OpenGL_DoPassSSAO(Commands, 
+                                                        Pass,
+                                                        OpenGL->GBuffer.Normal,
+                                                        OpenGL->GBuffer.Depth,
+                                                        PostProcSSAO_GUID);
+        
+        SSAOTexture = SSAOFramebuf->ColorTextures[0];
     }
     
+    
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = Resolution;
+    InPoolParams.Type = FramebufPoolType_Color;
     opengl_framebuffer* LightingPass = OpenGL_DoLightingPass(Commands, 
                                                              Pass, 
-                                                             Resolution,
+                                                             InPoolParams,
+                                                             SSAOTexture,
                                                              PostProcSSAO_GUID);
+    
+    // NOTE(Dima): Freeing SSAO Framebuffer
+    if (SSAOFramebuf)
+    {
+        OpenGL_ReleasePoolFramebuffer(Commands, SSAOFramebuf);
+    }
     
     return(LightingPass);
 }
@@ -2513,7 +2624,11 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_RenderWater(render_commands* Comman
                                                          u32 DepthTex,
                                                          render_pass* MainRenderPass)
 {
-    opengl_framebuffer* Result = OpenGL_BeginFramebuffer(Commands, PostProcResolution_Normal);
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = FramebufPoolRes_Normal;
+    InPoolParams.Type = FramebufPoolType_Color;
+    opengl_framebuffer* Result = OpenGL_GetPoolFramebuffer(Commands, 
+                                                           InPoolParams);
     
     render_water* Water = &Commands->Water;
     
@@ -2523,9 +2638,9 @@ INTERNAL_FUNCTION opengl_framebuffer* OpenGL_RenderWater(render_commands* Comman
     // NOTE(Dima): Setting shader uniforms
     Shader->Use();
     
-    Shader->SetTexture2D("SceneRender", Scene->Texture, 0);
+    Shader->SetTexture2D("SceneRender", Scene->ColorTextures[0], 0);
     Shader->SetTexture2D("ScenePositionsTex", PositionsTex, 1);
-    Shader->SetTexture2D("ReflectionRender", WaterReflection->Texture, 2);
+    Shader->SetTexture2D("ReflectionRender", WaterReflection->ColorTextures[0], 2);
     Shader->SetTexture2D("SceneDepthTex", DepthTex, 3);
     
     Shader->SetVec4("ClipPlane", Water->PlaneEquation);
@@ -2588,7 +2703,7 @@ INTERNAL_FUNCTION void OpenGL_RenderDepthRects(render_commands* Commands)
         TextureIndex++)
     {
         OpenGL_RenderDepthRect(Commands, 
-                               OpenGL->ShadowMap.Texture,
+                               OpenGL->ShadowMapsFramebuffer.ColorTextures[0],
                                TextureIndex);
     }
     
@@ -2633,13 +2748,13 @@ INTERNAL_FUNCTION void OpenGL_RenderPathDeferred(render_commands* Commands)
     if(Commands->WaterIsSet)
     {
         WaterRenderResult = OpenGL_DeferredRender(Commands, WaterPass, 
-                                                  PostProcResolution_Normal,
+                                                  FramebufPoolRes_Normal,
                                                   "InWaterSSAO");
         
         // NOTE(Dima): Doing scene pass after water pass so that we have fresh positions texture
         // NOTE(Dima): that we need in water rendering next
         opengl_framebuffer* SceneRenderResult = OpenGL_DeferredRender(Commands, Pass,
-                                                                      PostProcResolution_Normal,
+                                                                      FramebufPoolRes_Normal,
                                                                       "MainSSAO");
         
         CombineRenderResult = OpenGL_RenderWater(Commands,
@@ -2649,59 +2764,56 @@ INTERNAL_FUNCTION void OpenGL_RenderPathDeferred(render_commands* Commands)
                                                  OpenGL->GBuffer.Depth,
                                                  Pass);
         
-        OpenGL_EndFramebuffer(Commands, SceneRenderResult);
-        OpenGL_EndFramebuffer(Commands, WaterRenderResult);
+        OpenGL_ReleasePoolFramebuffer(Commands, SceneRenderResult);
+        OpenGL_ReleasePoolFramebuffer(Commands, WaterRenderResult);
     }
     else
     {
         CombineRenderResult = OpenGL_DeferredRender(Commands, Pass,
-                                                    PostProcResolution_Normal,
+                                                    FramebufPoolRes_Normal,
                                                     "MainSSAO");
     }
     
-    opengl_framebuffer* DepthOfField = 0;
     if (PostProcEffect_IsEnabled(PP, "MainDOF") && PostProcEffect_IsEnabled(PP, "MainDOF_Blur"))
     {
         // NOTE(Dima): Some post processing
         opengl_framebuffer* LittleBlur = OpenGL_DoBoxBlur(Commands, 
-                                                          CombineRenderResult->Texture, 
+                                                          CombineRenderResult->ColorTextures[0], 
                                                           "MainDOF_Blur");
         
-        DepthOfField = OpenGL_DoDepthOfField(Commands,
-                                             CombineRenderResult->Texture,
-                                             LittleBlur->Texture,
-                                             OpenGL->GBuffer.Depth,
-                                             "MainDOF");
+        opengl_framebuffer* DepthOfField = OpenGL_DoDepthOfField(Commands,
+                                                                 CombineRenderResult->ColorTextures[0],
+                                                                 LittleBlur->ColorTextures[0],
+                                                                 OpenGL->GBuffer.Depth,
+                                                                 "MainDOF");
         
-        OpenGL_EndFramebuffer(Commands, LittleBlur);
-    }
-    
-    
-    // NOTE(Dima): Writing DOF result to main framebuffer.
-    
-    opengl_framebuffer* SrcMain = 0;
-    if(DepthOfField)
-    {
-        SrcMain = DepthOfField;
+        OpenGL_ReleasePoolFramebuffer(Commands, LittleBlur);
+        OpenGL_ReleasePoolFramebuffer(Commands, CombineRenderResult);
+        
+        
+        // NOTE(Dima): Copying to main framebuffer
+        int Width = Commands->WindowDimensions.Width;
+        int Height = Commands->WindowDimensions.Height;
+        
+        OpenGL_CopyColorFromToFramebuffer(DepthOfField->Framebuffer, 
+                                          DepthOfField->Width, 
+                                          DepthOfField->Height,
+                                          0, Width, Height);
+        
+        OpenGL_ReleasePoolFramebuffer(Commands, DepthOfField);
     }
     else
     {
-        SrcMain = CombineRenderResult;
-    }
-    
-    // NOTE(Dima): Copying to main framebuffer
-    int Width = Commands->WindowDimensions.Width;
-    int Height = Commands->WindowDimensions.Height;
-    
-    OpenGL_CopyColorFromToFramebuffer(SrcMain->Framebuffer, 
-                                      SrcMain->Width, 
-                                      SrcMain->Height,
-                                      0, Width, Height);
-    
-    OpenGL_EndFramebuffer(Commands, CombineRenderResult);
-    if (DepthOfField)
-    {
-        OpenGL_EndFramebuffer(Commands, DepthOfField);
+        // NOTE(Dima): Copying to main framebuffer
+        int Width = Commands->WindowDimensions.Width;
+        int Height = Commands->WindowDimensions.Height;
+        
+        OpenGL_CopyColorFromToFramebuffer(CombineRenderResult->Framebuffer, 
+                                          CombineRenderResult->Width, 
+                                          CombineRenderResult->Height,
+                                          0, Width, Height);
+        
+        OpenGL_ReleasePoolFramebuffer(Commands, CombineRenderResult);
     }
 }
 
@@ -2718,27 +2830,30 @@ INTERNAL_FUNCTION void OpenGL_RenderPathForward(render_commands* Commands)
     glViewport(0, 0, Width, Height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    OpenGLRenderCommands(Commands, Pass);
+    OpenGL_RenderCommands(Commands, Pass);
     
     // NOTE(Dima): Getting framebuffer
-    opengl_framebuffer* MainRender = OpenGL_BeginFramebuffer(Commands, PostProcResolution_Normal);
+    framebuffer_in_pool_params InPoolParams = {};
+    InPoolParams.Resolution = FramebufPoolRes_Normal;
+    InPoolParams.Type = FramebufPoolType_Color;
+    opengl_framebuffer* MainRender = OpenGL_GetPoolFramebuffer(Commands, InPoolParams);
     
     OpenGL_CopyColorFromToFramebuffer(0, Width, Height,
                                       MainRender->Framebuffer, 
                                       MainRender->Width, 
                                       MainRender->Height);
     
-#if 1    
+#if 0
     opengl_framebuffer* Final = OpenGL_DoCrtDisplay(Commands,
-                                                    MainRender->Texture,
+                                                    MainRender->ColorTextures[0],
                                                     "CrtDisplay");
 #else
     opengl_framebuffer* Final = OpenGL_DoPosterize(Commands,
-                                                   MainRender->Texture,
+                                                   MainRender->ColorTextures[0],
                                                    "Posterize");
 #endif
     
-    OpenGL_EndFramebuffer(Commands, MainRender);
+    OpenGL_ReleasePoolFramebuffer(Commands, MainRender);
     
     
     // NOTE(Dima): Copying to main framebuffer
@@ -2747,7 +2862,7 @@ INTERNAL_FUNCTION void OpenGL_RenderPathForward(render_commands* Commands)
                                       Final->Height,
                                       0, Width, Height);
     
-    OpenGL_EndFramebuffer(Commands, Final);
+    OpenGL_ReleasePoolFramebuffer(Commands, Final);
 }
 
 INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGL_Render)
@@ -2758,9 +2873,18 @@ INTERNAL_FUNCTION PLATFORM_RENDERER_RENDER(OpenGL_Render)
     
     opengl_state* OpenGL = GetOpenGL(Commands);
     
+    if (Commands->Lighting.NeedResettingShadowMaps)
+    {
+        OpenGL_FreeShadowMaps(Commands);
+        OpenGL_InitShadowMaps(Commands);
+        
+        Commands->Lighting.NeedResettingShadowMaps = false;
+    }
+    
     glEnable(GL_DEPTH_TEST);
     
-    if (Commands->IsDeferredRenderer)
+    //if (Commands->IsDeferredRenderer)
+    if (true)
     {
         OpenGL_RenderPathDeferred(Commands);
     }

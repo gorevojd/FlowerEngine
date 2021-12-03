@@ -27,7 +27,6 @@ INTERNAL_FUNCTION void PrintWebForBaredGraph(int BarsCount,
         
         PushLine2D(RectBuffer, V2(Target, TotalRect.Min.y), V2(Target, TotalRect.Max.y), 1, Color);
     }
-    
 }
 
 INTERNAL_FUNCTION void ShowFramesSlider()
@@ -853,6 +852,7 @@ void DEBUG_ShowProfileOverlays(debug_state* Deb)
 }
 
 #include "flower_postprocess_overlays.cpp"
+#include "flower_lighting_overlays.cpp"
 
 INTERNAL_FUNCTION void DEBUG_ShowOverlays(debug_state* Debug,
                                           render_commands* RenderCommands)
@@ -867,6 +867,7 @@ INTERNAL_FUNCTION void DEBUG_ShowOverlays(debug_state* Debug,
         DEBUG_ShowProfileOverlays(Debug);
         
         PostProcess_ShowOverlays(&RenderCommands->PostProcessing);
+        Lighting_ShowOverlays(&RenderCommands->Lighting);
         
         EndLayout();
     }

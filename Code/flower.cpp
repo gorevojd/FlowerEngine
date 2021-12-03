@@ -224,6 +224,8 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     // NOTE(Dima): This should happen after we processed reloading game code!!!
     FUNCTION_TIMING();
     
+    render_commands* Commands = Global_RenderCommands;
+    
     // NOTE(Dima): Processing Input
     PlatformAPI.ProcessInput();
     
@@ -254,13 +256,13 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         // NOTE(Dima): Shadows enable/disable
         if(GetKeyDown(Key_O))
         {
-            Global_RenderCommands->Lighting.DirLit.CalculateShadows = !Global_RenderCommands->Lighting.DirLit.CalculateShadows;
+            Commands->Lighting.DirLit.CalculateShadows = !Commands->Lighting.DirLit.CalculateShadows;
         }
         
         // NOTE(Dima): SSAO enable/disable
         if(GetKeyDown(Key_I))
         {
-            post_processing* PP = &Global_RenderCommands->PostProcessing;
+            post_processing* PP = &Commands->PostProcessing;
             
             b32 NewSSAOEnabled = !PostProcEffect_IsEnabled(PP, "MainSSAO");
             PostProcEffect_SetEnabled(PP, "MainSSAO", NewSSAOEnabled);
@@ -279,6 +281,11 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
                 NewSceneIndex = Game->NumScenes - 1;
             }
             ChangeScene(Game, NewSceneIndex);
+        }
+        
+        if (GetKeyDown(Key_U))
+        {
+            Commands->TypeColorOutput = (Commands->TypeColorOutput + 1) % ColorOutput_Count;
         }
         
         if(GetMod(KeyMod_LeftAlt))
@@ -311,7 +318,6 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     DEBUGUpdate();
     
     // NOTE(Dima): Render everything
-    render_commands* Commands = Global_RenderCommands;
     //Commands->Rects2D_Window->TextureAtlas = 0;
     //Commands->Rects2D_Unit->TextureAtlas = 0;
     Commands->VoxelAtlas = Global_Assets->VoxelAtlas;

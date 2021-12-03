@@ -44,22 +44,15 @@ enum ui_element_type
     UIElement_Cached,
 };
 
-struct ui_element_data_slider_float
+struct ui_element_data_slider
 {
     v2 AnchorCenter;
     v2 OffsetFromAnchorCenter;
 };
 
-struct ui_element_data_slider_int
-{
-    int Min;
-    int Max;
-};
-
 union ui_element_data
 {
-    ui_element_data_slider_float SliderFloat;
-    ui_element_data_slider_int SliderInt;
+    ui_element_data_slider Slider;
 };
 
 struct ui_element

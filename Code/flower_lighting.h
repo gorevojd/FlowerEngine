@@ -26,9 +26,9 @@ struct shadow_cascade_info
 GLOBAL_VARIABLE int DefaultCascadeDistances[]
 {
     10, 
-    30,
-    100,
-    300,
+    25,
+    70,
+    200,
 };
 
 struct pcf_poisson_samples
@@ -64,6 +64,7 @@ struct lighting
     int CascadeCount;
     int ShadowMapRes;
     f32 CascadeSafeDistance;
+    b32 NeedResettingShadowMaps;
     
     int VarianceShadowMapBlurRadius;
     b32 BlurVarianceShadowMaps;

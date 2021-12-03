@@ -1517,8 +1517,6 @@ void SliderFloat(const char* Name,
     
     StepLittleY();
     
-    BeginRow();
-    
     // NOTE(Dima): Beginnning element
     ui_element* Element = UIBeginElement((char*)Name, UIElement_Cached);
     
@@ -1531,7 +1529,7 @@ void SliderFloat(const char* Name,
         
         // NOTE(Dima): Rendering main slider rect
         v2 SliderRectMin = V2(Layout->At.x, Layout->At.y - UIGetLineBase());
-        v2 SliderRectDim = V2(UIGetLineBase() * 30.0f, UIGetLineAdvance() * 1.6f);
+        v2 SliderRectDim = V2(UIGetLineBase() * 30.0f, UIGetLineAdvance() * 1.3f);
         rc2 SliderRect = RectMinDim(SliderRectMin, SliderRectDim);
         
         PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
@@ -1565,13 +1563,13 @@ void SliderFloat(const char* Name,
         
         if (Interaction.WasActiveInInteraction)
         {
-            Element->Data.SliderFloat.AnchorCenter = AnchorCenter;
-            Element->Data.SliderFloat.OffsetFromAnchorCenter = GetMouseP() - AnchorCenter;
+            Element->Data.Slider.AnchorCenter = AnchorCenter;
+            Element->Data.Slider.OffsetFromAnchorCenter = GetMouseP() - AnchorCenter;
         }
         
         if (InteractionIsActive(&Interaction))
         {
-            f32 NewCenterX = GetMouseP().x - Element->Data.SliderFloat.OffsetFromAnchorCenter.x;
+            f32 NewCenterX = GetMouseP().x - Element->Data.Slider.OffsetFromAnchorCenter.x;
             NewCenterX = Clamp(NewCenterX, SliderRect.Min.x, SliderRect.Max.x);
             v2 NewCenter = V2(NewCenterX, AnchorCenter.y);
             AnchorRect = RectCenterDim(NewCenter, AnchorDim);
@@ -1582,7 +1580,7 @@ void SliderFloat(const char* Name,
         
         
         // NOTE(Dima): Printing slider name
-        UIPushPixelHeight(SliderRectDim.y * 0.45f);
+        UIPushPixelHeight(SliderRectDim.y * 0.55f);
         PrintTextAligned(DisplayName,
                          V2(GetCenter(SliderRect).x,
                             SliderRect.Min.y),
@@ -1610,7 +1608,7 @@ void SliderFloat(const char* Name,
         stbsp_sprintf(MaxValueText, "%.2f", Max);
         stbsp_sprintf(ValueText, "%.2f", *ValueFloat);
         
-        UIPushPixelHeight(SliderRectDim.y * 0.5f);
+        UIPushPixelHeight(SliderRectDim.y * 0.55f);
         PrintTextAligned(MinValueText,
                          V2(SliderRect.Min.x, SliderRect.Max.y),
                          TextAlign_Left,
@@ -1632,13 +1630,158 @@ void SliderFloat(const char* Name,
         UIPopPixelHeight();
         
         rc2 Bounds = SliderRect;
-        
         DescribeElement(Bounds);
     }
     
     UIEndElement(UIElement_Cached);
+}
+
+INTERNAL_FUNCTION
+void SliderInt(const char* Name,
+               int* ValueInt,
+               int Min,
+               int Max)
+{
+    ui_params* Params = UIGetParams();
+    ui_layout* Layout = GetCurrentLayout();
     
-    EndRow();
+    // NOTE(Dima): Parsing display & guid
+    char IdName[UI_ELEMENT_NAME_SIZE];
+    char DisplayName[UI_ELEMENT_NAME_SIZE];
+    ParseToHashString(IdName, DisplayName, (char*)Name);
+    
+    StepLittleY();
+    
+    // NOTE(Dima): Beginnning element
+    ui_element* Element = UIBeginElement((char*)Name, UIElement_Cached);
+    
+    if(UIElementIsOpenedInTree(Element))
+    {
+        PreAdvance();
+        
+        // NOTE(Dima): Modifying value
+        *ValueInt = Clamp(*ValueInt, Min, Max);
+        
+        // NOTE(Dima): Rendering main slider rect
+        v2 SliderRectMin = V2(Layout->At.x, Layout->At.y - UIGetLineBase());
+        v2 SliderRectDim = V2(UIGetLineBase() * 30.0f, UIGetLineAdvance() * 1.3f);
+        rc2 SliderRect = RectMinDim(SliderRectMin, SliderRectDim);
+        
+        PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
+                 SliderRect, 
+                 UIGetColor(UIColor_ButtonBackgroundInactive));
+        
+        PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
+                        SliderRect, 
+                        2.0f,
+                        UIGetColor(UIColor_Borders));
+        
+        // NOTE(Dima): Init anchor values
+        f32 AnchorCenterX = Lerp(SliderRect.Min.x, 
+                                 SliderRect.Max.x, 
+                                 (f32)(*ValueInt - Min) / (f32)(Max - Min));
+        f32 AnchorCenterY = SliderRectMin.y + SliderRectDim.y * 0.5f;
+        v2 AnchorCenter = V2(AnchorCenterX, AnchorCenterY);
+        v2 AnchorDim = V2(SliderRectDim.y * 0.5f, SliderRectDim.y * 1.1f);
+        rc2 AnchorRect = RectCenterDim(AnchorCenter, AnchorDim);
+        v4 AnchorColor = UIGetColor(UIColor_AnchorInactive);
+        
+        // NOTE(Dima): Processing mouse interaction
+        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_Avg);
+        
+        ProcessMouseKeyInteractionInRect(&Interaction,
+                                         KeyMouse_Left,
+                                         AnchorRect);
+        
+        if (Interaction.WasHotInInteraction)
+        {
+            AnchorColor = UIGetColor(UIColor_AnchorActive);
+        }
+        
+        if (Interaction.WasActiveInInteraction)
+        {
+            Element->Data.Slider.AnchorCenter = AnchorCenter;
+            Element->Data.Slider.OffsetFromAnchorCenter = GetMouseP() - AnchorCenter;
+        }
+        
+        if (InteractionIsActive(&Interaction))
+        {
+            f32 NewSuggestedCenterX = GetMouseP().x - Element->Data.Slider.OffsetFromAnchorCenter.x;
+            NewSuggestedCenterX = Clamp(NewSuggestedCenterX, 
+                                        SliderRect.Min.x, 
+                                        SliderRect.Max.x);
+            
+            f32 t = (NewSuggestedCenterX - SliderRect.Min.x) / (SliderRect.Max.x - SliderRect.Min.x);
+            f32 ValueF32 = Lerp((f32)Min, (f32)Max, t);
+            
+            *ValueInt = roundf(ValueF32);
+            
+            f32 NewAnchorCenter = Lerp(SliderRect.Min.x, 
+                                       SliderRect.Max.x, 
+                                       (f32)(*ValueInt - Min) / (f32)(Max - Min));
+            
+            v2 NewCenter = V2(NewAnchorCenter, AnchorCenter.y);
+            AnchorRect = RectCenterDim(NewCenter, AnchorDim);
+        }
+        
+        
+        // NOTE(Dima): Printing slider name
+        UIPushPixelHeight(SliderRectDim.y * 0.55f);
+        PrintTextAligned(DisplayName,
+                         V2(GetCenter(SliderRect).x,
+                            SliderRect.Min.y),
+                         TextAlign_Center,
+                         TextAlign_Top,
+                         UIGetColor(UIColor_TextActive));
+        UIPopPixelHeight();
+        
+        
+        // NOTE(Dima): Rendering anchor
+        PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
+                 AnchorRect,
+                 AnchorColor);
+        PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
+                        AnchorRect,
+                        2.0f,
+                        UIGetColor(UIColor_Borders));
+        
+        
+        // NOTE(Dima): Rendering helper texts
+        char MinValueText[64];
+        char MaxValueText[64];
+        char ValueText[64];
+        
+        stbsp_sprintf(MinValueText, "%d", Min);
+        stbsp_sprintf(MaxValueText, "%d", Max);
+        stbsp_sprintf(ValueText, "%d", *ValueInt);
+        
+        UIPushPixelHeight(SliderRectDim.y * 0.55f);
+        PrintTextAligned(MinValueText,
+                         V2(SliderRect.Min.x, SliderRect.Max.y),
+                         TextAlign_Left,
+                         TextAlign_Bottom,
+                         UIGetColor(UIColor_Text));
+        
+        PrintTextAligned(MaxValueText,
+                         SliderRect.Max,
+                         TextAlign_Right,
+                         TextAlign_Bottom,
+                         UIGetColor(UIColor_Text));
+        
+        PrintTextAligned(ValueText,
+                         SliderRect.Min,
+                         TextAlign_Left,
+                         TextAlign_Top,
+                         UIGetColor(UIColor_TextHot));
+        UIPopPixelHeight();
+        
+        // TODO(Dima): 
+        
+        rc2 Bounds = SliderRect;
+        DescribeElement(Bounds);
+    }
+    
+    UIEndElement(UIElement_Cached);
 }
 
 

@@ -1,16 +1,7 @@
 #ifndef FLOWER_POSTPROCESS_H
 #define FLOWER_POSTPROCESS_H
 
-enum post_proc_resolution
-{
-    PostProcResolution_Normal,
-    PostProcResolution_Half,
-    PostProcResolution_Quater,
-    
-    PostProcResolution_Count,
-};
-
-GLOBAL_VARIABLE int Global_PostProcResolutionDivisors[PostProcResolution_Count] =
+GLOBAL_VARIABLE int Global_PostProcResolutionDivisors[FramebufPoolType_Count] =
 {
     1,
     2,
@@ -31,14 +22,14 @@ struct posterize_params
 {
     int Levels;
     
-    post_proc_resolution Resolution;
+    framebuffer_pool_resolution Resolution;
 };
 
 struct box_blur_params
 {
     int RadiusSize;
     b32 EnableCheapMode;
-    post_proc_resolution Resolution;
+    framebuffer_pool_resolution Resolution;
 };
 
 struct dilation_params
@@ -48,7 +39,7 @@ struct dilation_params
     f32 MinThreshold;
     f32 MaxThreshold;
     
-    post_proc_resolution Resolution;
+    framebuffer_pool_resolution Resolution;
 };
 
 struct crt_display_params
@@ -64,7 +55,7 @@ struct crt_display_params
     f32 VignetteBrightnessCompensation;
     f32 VignettePower;
     
-    post_proc_resolution Resolution;
+    framebuffer_pool_resolution Resolution;
 };
 
 struct dof_params
@@ -85,7 +76,8 @@ struct ssao_params
     b32 BlurEnabled;
     int BlurRadius;
     
-    post_proc_resolution Resolution;
+    framebuffer_pool_resolution Resolution;
+    framebuffer_pool_resolution BlurResolution;
 };
 
 struct post_proc_params
@@ -121,7 +113,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             posterize_params* Posterize = &ParamsBase->Union.Posterize;
             
             Posterize->Levels = 7;
-            Posterize->Resolution = PostProcResolution_Normal;
+            Posterize->Resolution = FramebufPoolRes_Normal;
         }break;
         
         case PostProcEffect_BoxBlur:
@@ -130,7 +122,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             
             BoxBlur->RadiusSize = 2;
             BoxBlur->EnableCheapMode = false;
-            BoxBlur->Resolution = PostProcResolution_Normal;
+            BoxBlur->Resolution = FramebufPoolRes_Normal;
         }break;
         
         case PostProcEffect_Dilation:
@@ -140,7 +132,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             Dilation->Size = 2;
             Dilation->MinThreshold = 0.1f;
             Dilation->MaxThreshold = 0.3f;
-            Dilation->Resolution = PostProcResolution_Normal;
+            Dilation->Resolution = FramebufPoolRes_Normal;
         }break;
         
         case PostProcEffect_DOF:
@@ -162,7 +154,11 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             SSAO->Contribution = 1.0f;
             SSAO->RangeCheck = 0.25f;
             SSAO->BlurRadius = 2;
-            SSAO->Resolution = PostProcResolution_Normal;
+            SSAO->BlurEnabled = true;
+            
+            framebuffer_pool_resolution Res = FramebufPoolRes_Normal;
+            SSAO->Resolution = Res;
+            SSAO->BlurResolution = Res;
         }break;
         
         case PostProcEffect_CrtDisplay:
@@ -178,7 +174,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             Params->VignettePower = 0.5f;
             Params->VignetteBrightnessCompensation = 1.3f;
             
-            Params->Resolution = PostProcResolution_Normal;
+            Params->Resolution = FramebufPoolRes_Normal;
         }break;
     }
 }

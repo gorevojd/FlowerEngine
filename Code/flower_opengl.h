@@ -1,5 +1,5 @@
-#ifndef TUTY_OPENGL_H
-#define TUTY_OPENGL_H
+#ifndef FLOWER_OPENGL_H
+#define FLOWER_OPENGL_H
 
 #include "GL/glew.h"
 #include "flower_render.h"
@@ -7,16 +7,31 @@
 
 #include "flower_opengl_shader.h"
 
+struct opengl_framebuffer_texture_params
+{
+    // NOTE(Dima): GL_R8, GL_RGBA8, GL_RGB32F, ...
+    GLuint InternalFormat;
+    
+    // NOTE(Dima): Actual format GL_RGBA, GL_RGB, GL_BGRA....
+    GLuint Format;
+    
+    // NOTE(Dima): Component type GL_UNSIGNED_BYTE, GL_FLOAT, GL_HALF_FLOAT, GL_UNSIGNED_SHORT_5_6_5
+    GLuint Type;
+};
+
 struct opengl_framebuffer
 {
     u32 Framebuffer;
-    u32 Texture;
+    
+#define MAX_COLOR_ATTACHMENTS 8
+    u32 ColorTextures[MAX_COLOR_ATTACHMENTS];
     u32 DepthTexture;
     
     int Width;
     int Height;
     
-    int ResolutionIndex;
+    // NOTE(Dima): These ones are used only if allocated through Pool
+    int IndexInPools;
     int IndexInUse;
 };
 
@@ -53,18 +68,6 @@ struct opengl_g_buffer
     u32 Positions;
 };
 
-struct opengl_ssao
-{
-    // NOTE(Dima): SSAO
-    u32 Framebuffer;
-    u32 FramebufferTexture;
-    
-    u32 BlurFramebuffer;
-    u32 BlurFramebufferTexture;
-    
-    u32 NoiseTex;
-};
-
 struct opengl_loaded_shader
 {
     opengl_shader* Shader;
@@ -96,8 +99,8 @@ struct opengl_state
     opengl_shader* CrtDisplayShader;
     
     opengl_g_buffer GBuffer;
-    opengl_ssao SSAO;
-    u32 PoissonSamplesRotationTex;
+    
+    u32 SSAONoiseTex;
     
     // NOTE(Dima): Screen quad
     opengl_array_object ScreenQuad;
@@ -105,11 +108,12 @@ struct opengl_state
     // NOTE(Dima): Skybox cube
     opengl_array_object SkyboxCube;
     
-    opengl_framebuffer ShadowMap;
+    opengl_framebuffer ShadowMapsFramebuffer;
     int InitCascadesCount;
     
     // NOTE(Dima): Framebuffer pools
-    opengl_framebuffer_pool FramebufferPoolResolutions[PostProcResolution_Count];
+#define NUM_FRAMEBUFFER_POOLS (FramebufPoolType_Count * FramebufPoolRes_Count)
+    opengl_framebuffer_pool FramebufferPools[NUM_FRAMEBUFFER_POOLS];
     
     int MaxCombinedTextureUnits;
 };
