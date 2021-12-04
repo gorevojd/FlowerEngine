@@ -94,31 +94,12 @@ struct asset_storage
     b32 Initialized;
 };
 
-struct asset_pack
-{
-    asset_storage AssetStorage;
-    
-    b32 InUse;
-    int IndexInPacks;
-    
-    char PackFileName[256];
-    char PackBlobName[256];
-};
-
-struct asset_loading_context
-{
-#define MAX_ASSET_PACKS 64
-    asset_pack Packs[MAX_ASSET_PACKS];
-};
-
 struct asset_system
 {
     memory_arena* Arena;
     
     asset_storage AssetStorage;
-    asset_loading_context LoadingCtx;
     
-    image* VoxelAtlas;
 };
 
 #endif //FLOWER_ASSET_H

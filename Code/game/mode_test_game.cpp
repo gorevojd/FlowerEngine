@@ -283,6 +283,7 @@ SCENE_UPDATE(TestGame)
     font* LiberationMono = G_GetAssetDataByID(LiberationMonoID, font);
     
     //PushImage(BerlinSans->Atlas, V2(100), 1024);
+#if 0    
     PrintTextWithFont(BerlinSans,
                       "Hello world. My Name is Dima",
                       V2(1000, 100),
@@ -294,7 +295,6 @@ SCENE_UPDATE(TestGame)
                       40.0f,
                       ColorGreen());
     
-#if 1    
     PrintTextWithFont(LiberationMono,
                       "And Making 123 Videos for YouTube",
                       V2(100, 600),

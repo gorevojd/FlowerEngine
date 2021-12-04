@@ -407,7 +407,8 @@ INTERNAL_FUNCTION void OpenGLDeleteHandle(renderer_handle* Handle)
     }
 }
 
-INTERNAL_FUNCTION b32 OpenGLProcessHandleInvalidation(renderer_handle* Handle)
+INTERNAL_FUNCTION 
+b32 OpenGL_ProcessHandleInvalidation(renderer_handle* Handle)
 {
     b32 WasDeleted = ShouldDeleteHandleStorage(Handle);
     
@@ -421,48 +422,52 @@ INTERNAL_FUNCTION b32 OpenGLProcessHandleInvalidation(renderer_handle* Handle)
     return(WasDeleted);
 }
 
-INTERNAL_FUNCTION GLuint OpenGLInitImage(image* Image)
+INTERNAL_FUNCTION 
+GLuint OpenGL_InitImage(image* Image)
 {
     GLuint TexOpenGL = 0;
     
-    b32 ImageWasDeleted = OpenGLProcessHandleInvalidation(&Image->Handle);
-    
-    if(!Image->Handle.Initialized || ImageWasDeleted)
+    if (Image)
     {
-        glGenTextures(1, &TexOpenGL);
-        glBindTexture(GL_TEXTURE_2D, TexOpenGL);
+        b32 ImageWasDeleted = OpenGL_ProcessHandleInvalidation(&Image->Handle);
         
-        glTexImage2D(GL_TEXTURE_2D,
-                     0,
-                     GL_RGBA,
-                     Image->Width,
-                     Image->Height,
-                     0,
-                     GL_RGBA,
-                     GL_UNSIGNED_BYTE,
-                     Image->Pixels);
-        
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        
-        GLuint FilteringMode = GL_LINEAR;
-        if(Image->FilteringIsClosest)
+        if(!Image->Handle.Initialized || ImageWasDeleted)
         {
-            FilteringMode = GL_NEAREST;
+            glGenTextures(1, &TexOpenGL);
+            glBindTexture(GL_TEXTURE_2D, TexOpenGL);
+            
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,
+                         GL_RGBA,
+                         Image->Width,
+                         Image->Height,
+                         0,
+                         GL_RGBA,
+                         GL_UNSIGNED_BYTE,
+                         Image->Pixels);
+            
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            
+            GLuint FilteringMode = GL_LINEAR;
+            if(Image->FilteringIsClosest)
+            {
+                FilteringMode = GL_NEAREST;
+            }
+            
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, FilteringMode);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, FilteringMode);
+            
+            glBindTexture(GL_TEXTURE_2D, 0);
+            
+            Image->Handle = CreateRendererHandle(RendererHandle_Image);
+            Image->Handle.Image.TextureObject = TexOpenGL;
+            Image->Handle.Initialized = true;
         }
-        
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, FilteringMode);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, FilteringMode);
-        
-        glBindTexture(GL_TEXTURE_2D, 0);
-        
-        Image->Handle = CreateRendererHandle(RendererHandle_Image);
-        Image->Handle.Image.TextureObject = TexOpenGL;
-        Image->Handle.Initialized = true;
-    }
-    else
-    {
-        TexOpenGL = Image->Handle.Image.TextureObject;
+        else
+        {
+            TexOpenGL = Image->Handle.Image.TextureObject;
+        }
     }
     
     return(TexOpenGL);
@@ -483,7 +488,7 @@ INTERNAL_FUNCTION void OpenGLInitCubemap(cubemap* Cubemap)
 {
     renderer_handle* CubemapHandle = &Cubemap->Handle;
     
-    b32 WasDeleted = OpenGLProcessHandleInvalidation(CubemapHandle);
+    b32 WasDeleted = OpenGL_ProcessHandleInvalidation(CubemapHandle);
     
     if(!CubemapHandle->Initialized || WasDeleted)
     {
@@ -1666,7 +1671,7 @@ OpenGL_AllocateMesh(opengl_state* OpenGL,
 {
     renderer_handle* Result = &Mesh->Handle;
     
-    b32 MeshWasDeleted = OpenGLProcessHandleInvalidation(Result);
+    b32 MeshWasDeleted = OpenGL_ProcessHandleInvalidation(Result);
     
     if(!Result->Initialized || MeshWasDeleted)
     {
@@ -1847,7 +1852,7 @@ INTERNAL_FUNCTION void OpenGL_RenderMesh(render_commands* Commands,
                     
                     if(DiffuseTex != 0)
                     {
-                        OpenGLInitImage(DiffuseTex);
+                        OpenGL_InitImage(DiffuseTex);
                         
                         Shader->SetTexture2D("TexDiffuse", 
                                              DiffuseTex->Handle.Image.TextureObject,
@@ -1921,7 +1926,7 @@ INTERNAL_FUNCTION void OpenGL_RenderVoxelMesh(render_commands* Commands,
 #define VOXEL_MESH_ATLAS_TEXTURE_UNIT 0
 #define VOXEL_MESH_PER_FACE_TEXTURE_UNIT 1
     
-    b32 MeshWasDeleted = OpenGLProcessHandleInvalidation(&Mesh->Handle);
+    b32 MeshWasDeleted = OpenGL_ProcessHandleInvalidation(&Mesh->Handle);
     if(!Mesh->Handle.Initialized || MeshWasDeleted)
     {
         if(Mesh->VerticesCount > 0)
@@ -1961,7 +1966,7 @@ INTERNAL_FUNCTION void OpenGL_RenderVoxelMesh(render_commands* Commands,
     }
     
     glUseProgram(Shader->ID);
-    b32 PerFaceBufWasDeleted = OpenGLProcessHandleInvalidation(&Mesh->PerFaceBufHandle);
+    b32 PerFaceBufWasDeleted = OpenGL_ProcessHandleInvalidation(&Mesh->PerFaceBufHandle);
     if(!Mesh->PerFaceBufHandle.Initialized || PerFaceBufWasDeleted)
     {
         if(Mesh->FaceCount > 0)
@@ -1982,7 +1987,7 @@ INTERNAL_FUNCTION void OpenGL_RenderVoxelMesh(render_commands* Commands,
     glBindBuffer(GL_ARRAY_BUFFER, Mesh->Handle.Mesh.BufferObject);
     
     // NOTE(Dima): Uniform voxel atlas
-    GLuint AtlasTexture = OpenGLInitImage(VoxelAtlas);
+    GLuint AtlasTexture = OpenGL_InitImage(VoxelAtlas);
     Shader->SetTexture2D("TextureAtlas", AtlasTexture, VOXEL_MESH_ATLAS_TEXTURE_UNIT);
     Shader->SetMat4("ViewProjection", RenderPass->ViewProjection.e);
     Shader->SetMat4("Projection", RenderPass->Projection.e);
@@ -2075,9 +2080,9 @@ INTERNAL_FUNCTION void OpenGL_RenderImage(render_commands* Commands,
     Shader->SetVec4("MultColor", C.r, C.g, C.b, C.a);
     Shader->SetBool("IsBatch", false);
     
+    OpenGL_InitImage(Image);
     if(Image)
     {
-        OpenGLInitImage(Image);
         
         Shader->SetTexture2D("Samplers[0]", Image->Handle.Image.TextureObject, 0);
     }
@@ -2219,10 +2224,9 @@ INTERNAL_FUNCTION void OpenGL_RenderRectBuffer(render_commands* Commands,
         
         image* Img = RectBuffer->TextureAtlases[i];
         
+        OpenGL_InitImage(Img);
         if (Img)
         {
-            OpenGLInitImage(Img);
-            
             Shader->SetTexture2D(Buf, Img->Handle.Image.TextureObject, 2 + i);
         }
     }

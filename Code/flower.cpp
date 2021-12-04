@@ -320,7 +320,9 @@ extern "C" __declspec(dllexport) GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     // NOTE(Dima): Render everything
     //Commands->Rects2D_Window->TextureAtlas = 0;
     //Commands->Rects2D_Unit->TextureAtlas = 0;
-    Commands->VoxelAtlas = Global_Assets->VoxelAtlas;
+    
+    asset_id VoxelImageID = GetAssetID("Image_VoxelAtlasCool");
+    Commands->VoxelAtlas = G_GetAssetDataByID(VoxelImageID, image);
     
     RenderAll();
     
