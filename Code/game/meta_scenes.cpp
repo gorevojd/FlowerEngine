@@ -11,6 +11,7 @@
 #ifndef META_SCENES_H
 #define META_SCENES_H
 
+#include "game/mode_asset_tool.cpp"
 #include "game/mode_graph_show.cpp"
 #include "game/mode_minecraft.cpp"
 #include "game/mode_rubiks.cpp"
@@ -20,6 +21,7 @@
 GLOBAL_VARIABLE const char* MetaScene_Names[] = 
 {
 	"TestGame",
+	"AssetTool",
 	"GraphShow",
 	"RubiksCube",
 	"Minecraft",
@@ -29,6 +31,7 @@ GLOBAL_VARIABLE const char* MetaScene_Names[] =
 GLOBAL_VARIABLE scene_init* MetaScene_InitFunctions[] = 
 {
 	TestGame_Init,
+	AssetTool_Init,
 	GraphShow_Init,
 	RubiksCube_Init,
 	Minecraft_Init,
@@ -38,6 +41,7 @@ GLOBAL_VARIABLE scene_init* MetaScene_InitFunctions[] =
 GLOBAL_VARIABLE scene_update* MetaScene_UpdateFunctions[] = 
 {
 	TestGame_Update,
+	AssetTool_Update,
 	GraphShow_Update,
 	RubiksCube_Update,
 	Minecraft_Update,
@@ -47,6 +51,7 @@ GLOBAL_VARIABLE scene_update* MetaScene_UpdateFunctions[] =
 GLOBAL_VARIABLE scene_ongui* MetaScene_OnGUIFunctions[] = 
 {
 	TestGame_OnGUI,
+	0,
 	0,
 	0,
 	0,

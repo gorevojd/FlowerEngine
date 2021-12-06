@@ -7,8 +7,8 @@ struct asset_pack
     
     int IndexInPacks;
     
-    char PackFileName[256];
-    char PackBlobName[256];
+    char Name[256];
+    char FileName[256];
 };
 
 struct asset_tool

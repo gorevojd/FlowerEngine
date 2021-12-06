@@ -1,6 +1,15 @@
 #include "flower_lighting.cpp"
 #include "flower_postprocess.cpp"
 
+inline v2 G_GetWindowDimensions()
+{
+    window_dimensions* Dims = &Global_RenderCommands->WindowDimensions;
+    
+    v2 Result = V2(Dims->Width, Dims->Height);
+    
+    return Result;
+}
+
 inline void* PushRenderCommand_(u32 CommandType, u32 SizeOfCommandStruct)
 {
     render_commands* Commands = Global_RenderCommands;
@@ -37,7 +46,7 @@ inline void PushImage(image* Img,
     render_command_image* Entry = PushRenderCommand(RenderCommand_Image, render_command_image);
     
     v2 Dim = V2(Height * Img->WidthOverHeight, Height);
-    v2 OffsetToNeededPos = Hadamard(Dim, Img->Align);
+    v2 OffsetToNeededPos = Hadamard(Dim, Align);
     v2 ResultP = P - OffsetToNeededPos;
     
     Entry->Image = Img;

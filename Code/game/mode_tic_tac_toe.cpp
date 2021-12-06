@@ -50,6 +50,9 @@ struct tic_tac_state
     f32 FadeToGameStartTime;
     f32 FadeoutStartTime;
     
+    int ScoreCrosses;
+    int ScoreZeroes;
+    
     u32 State;
 };
 
@@ -90,9 +93,17 @@ void ResetAllCellValues(tic_tac_state* State)
     
     State->State = TicTacState_FadeToGame;
     State->FadeToGameStartTime = Global_Time->Time;
-    State->CurPlayerCellValue = TicTacCell_Cross;
     State->BitmapsAndLineTransparency = 0.0f;
     State->BothLose = false;
+    
+    if ((State->ScoreZeroes + State->ScoreCrosses) % 2 == 0)
+    {
+        State->CurPlayerCellValue = TicTacCell_Cross;
+    }
+    else
+    {
+        State->CurPlayerCellValue = TicTacCell_Zero;
+    }
 }
 
 SCENE_INIT(TicTacToe)
@@ -138,6 +149,9 @@ SCENE_INIT(TicTacToe)
     }
     
     ResetAllCellValues(State);
+    
+    State->ScoreZeroes = 0;
+    State->ScoreCrosses = 0;
     
     loading_params Params = LoadingParams_Image();
     Params.Image.Align = V2(0.5f);
@@ -351,13 +365,55 @@ void TicTac2D(tic_tac_state* State)
 {
     ResetRectBuffer(&State->RectBuffer);
     
-    //PushClear(V3(0.23, 0.44f, 0.01f));
-    PushClear(V3(0.7f, 0.75f, 0.95f));
+    
+    asset_id DimboFontID = GetAssetID("Font_Dimbo");
+    font* Dimbo = G_GetAssetDataByID(DimboFontID, font);
+    v4 StatColor = ColorWhite();
+    
+    PushClear(V3(0.23, 0.44f, 0.01f));
+    //PushClear(V3(0.7f, 0.75f, 0.95f));
     
     if(GetKeyDown(Key_R))
     {
         ResetAllCellValues(State);
+        
+        State->ScoreZeroes = 0;
+        State->ScoreCrosses = 0;
     }
+    
+#if 0    
+    // NOTE(Dima): Printing current player image
+    if(State->State == TicTacState_Game)
+    {
+        // NOTE(Dima): Printing 
+        v2 CurPlayerImageP = UVToScreenPoint(0.95f, 0.05f);
+        image* CurrentPlayerImage = 0;
+        switch(State->CurPlayerCellValue)
+        {
+            case TicTacCell_Zero:
+            {
+                CurrentPlayerImage = State->Zero;
+            }break;
+            
+            case TicTacCell_Cross:
+            {
+                CurrentPlayerImage = State->Cross;
+            }break;
+        }
+        
+        PushImage(CurrentPlayerImage, 
+                  CurPlayerImageP,
+                  70,
+                  V2(0.0f, CurrentPlayerImage->Align.y));
+        PrintTextWithFontAligned(Dimbo,
+                                 "Current player: ",
+                                 CurPlayerImageP,
+                                 80,
+                                 TextAlign_Right,
+                                 TextAlign_Center,
+                                 StatColor);
+    }
+#endif
     
     // NOTE(Dima): Updating and Rendering cells
     for (int CellIndex = 0;
@@ -372,6 +428,7 @@ void TicTac2D(tic_tac_state* State)
         v4 QuadColor = ColorWhite();
         if(State->State == TicTacState_Game)
         {
+            
             if (MouseInRect(Quad->Rect))
             {
                 if (GetKeyDown(KeyMouse_Left))
@@ -413,6 +470,15 @@ void TicTac2D(tic_tac_state* State)
                         else
                         {
                             State->State = TicTacState_WinAnim;
+                            
+                            if (State->CurPlayerCellValue == TicTacCell_Cross)
+                            {
+                                State->ScoreCrosses++;
+                            }
+                            else
+                            {
+                                State->ScoreZeroes++;
+                            }
                             
                             tic_tac_quad* FirstQuad = &State->Quads[FirstCellIndex];
                             tic_tac_quad* LastQuad = &State->Quads[LastCellIndex];
@@ -560,7 +626,76 @@ void TicTac2D(tic_tac_state* State)
                       CellImage->Align,
                       V4(ColorBlack().rgb, 1.0f - State->BitmapsAndLineTransparency));
         }
+        else
+        {
+            if (State->State == TicTacState_Game)
+            {
+                if (MouseInRect(Quad->Rect))
+                {
+                    if (Quad->CellValue == TicTacCell_None)
+                    {
+                        // NOTE(Dima): Showing current player hint
+                        image* CurrentPlayerImage = 0;
+                        switch(State->CurPlayerCellValue)
+                        {
+                            case TicTacCell_Zero:
+                            {
+                                CurrentPlayerImage = State->Zero;
+                            }break;
+                            
+                            case TicTacCell_Cross:
+                            {
+                                CurrentPlayerImage = State->Cross;
+                            }break;
+                        }
+                        
+                        PushImage(CurrentPlayerImage, 
+                                  Quad->CenterP,
+                                  GetDim(Quad->Rect).y * 0.8f,
+                                  CurrentPlayerImage->Align,
+                                  V4(ColorBlack().rgb, 0.4f));
+                    }
+                }
+            }
+            
+        }
     }
+    
+    
+    
+    // NOTE(Dima): Rendering scores
+    v2 CrossScoreImageP = V2(40, 40);
+    v2 ZeroScoreImageP = V2(40, 120);
+    
+    PushCenteredImage(State->Cross, 
+                      CrossScoreImageP,
+                      70, StatColor);
+    
+    PushCenteredImage(State->Zero,
+                      ZeroScoreImageP,
+                      70, StatColor);
+    
+    char StatBufCross[32];
+    char StatBufZero[32];
+    
+    stbsp_sprintf(StatBufCross, "Score: %d", State->ScoreCrosses);
+    stbsp_sprintf(StatBufZero, "Score: %d", State->ScoreZeroes);
+    
+    PrintTextWithFontAligned(Dimbo,
+                             StatBufCross,
+                             CrossScoreImageP + V2(50, 0.0f),
+                             80,
+                             TextAlign_Left,
+                             TextAlign_Center,
+                             StatColor);
+    
+    PrintTextWithFontAligned(Dimbo,
+                             StatBufZero,
+                             ZeroScoreImageP + V2(50, 0.0f),
+                             80,
+                             TextAlign_Left,
+                             TextAlign_Center,
+                             StatColor);
 }
 
 SCENE_UPDATE(TicTacToe)

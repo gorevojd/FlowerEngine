@@ -62,7 +62,7 @@ INTERNAL_FUNCTION inline f32 GetKerning(font* Font, u32 CodepointFirst, u32 Code
 }
 
 INTERNAL_FUNCTION rc2 PrintText_(font* Font, 
-                                 char* Text, 
+                                 const char* Text, 
                                  v3 Left, v3 Up, v3 Forward,
                                  v3 P, 
                                  v2 Offset, 
@@ -71,7 +71,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
                                  f32 Scale,
                                  v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    char* At = Text;
+    const char* At = Text;
     
     v2 AtP = V2(P.x, P.y);
     
@@ -137,7 +137,7 @@ INTERNAL_FUNCTION rc2 PrintText_(font* Font,
     return(Bounds);
 }
 
-INTERNAL_FUNCTION inline rc2 GetTextRect(char* Text, v2 P)
+INTERNAL_FUNCTION inline rc2 GetTextRect(const char* Text, v2 P)
 {
     ui_params* Params = UIGetParams();
     font* Font = Params->Font;
@@ -167,7 +167,7 @@ INTERNAL_FUNCTION inline v2 GetTextSize(char* Text)
 
 
 INTERNAL_FUNCTION inline rc2 GetTextRectWithFont(font* Font,
-                                                 char* Text, 
+                                                 const char* Text, 
                                                  f32 PixelHeight,
                                                  v2 P)
 {
@@ -189,7 +189,7 @@ INTERNAL_FUNCTION inline rc2 GetTextRectWithFont(font* Font,
 }
 
 INTERNAL_FUNCTION inline v2 GetTextSizeWithFont(font* Font, 
-                                                char* Text,
+                                                const char* Text,
                                                 f32 PixelHeight)
 {
     rc2 TextRect = GetTextRectWithFont(Font, Text, PixelHeight, V2(0.0f, 0.0f));
@@ -267,13 +267,14 @@ INTERNAL_FUNCTION inline f32 GetPrintVerticalPosition(font* Font, font_size* Fon
     return(Result);
 }
 
-INTERNAL_FUNCTION inline v2 GetPrintPositionInRect(font* Font,
-                                                   font_size* FontSize,
-                                                   f32 TextPixelHeight,
-                                                   rc2 Rect,
-                                                   v2 TextDim,
-                                                   u32 AlignX,
-                                                   u32 AlignY)
+INTERNAL_FUNCTION inline 
+v2 GetPrintPositionInRect(font* Font,
+                          font_size* FontSize,
+                          f32 TextPixelHeight,
+                          rc2 Rect,
+                          v2 TextDim,
+                          u32 AlignX,
+                          u32 AlignY)
 {
     f32 Scale = GetScaleForPixelHeight(FontSize, TextPixelHeight);
     
@@ -288,11 +289,12 @@ INTERNAL_FUNCTION inline v2 GetPrintPositionInRect(font* Font,
     return(Result);
 }
 
-INTERNAL_FUNCTION rc2 PrintTextWithFont(font* Font,
-                                        char* Text,
-                                        v2 P,
-                                        f32 PixelHeight = 25.0f,
-                                        v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+INTERNAL_FUNCTION 
+rc2 PrintTextWithFont(font* Font,
+                      const char* Text,
+                      v2 P,
+                      f32 PixelHeight = 25.0f,
+                      v4 C = ColorWhite())
 {
     font_size* FontSize = FindBestFontSizeForPixelHeight(Font, PixelHeight);
     f32 Scale = GetScaleForPixelHeight(FontSize, PixelHeight);
@@ -308,13 +310,14 @@ INTERNAL_FUNCTION rc2 PrintTextWithFont(font* Font,
     return(Result);
 }
 
-INTERNAL_FUNCTION rc2 PrintTextWithFontAligned(font* Font,
-                                               char* Text,
-                                               rc2 Rect,
-                                               f32 PixelHeight = 25.0f,
-                                               u32 AlignX = TextAlign_Center,
-                                               u32 AlignY = TextAlign_Center,
-                                               v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+INTERNAL_FUNCTION 
+rc2 PrintTextWithFontAligned(font* Font,
+                             const char* Text,
+                             rc2 Rect,
+                             f32 PixelHeight = 25.0f,
+                             u32 AlignX = TextAlign_Center,
+                             u32 AlignY = TextAlign_Center,
+                             v4 C = ColorWhite())
 {
     font_size* FontSize = FindBestFontSizeForPixelHeight(Font, PixelHeight);
     
@@ -331,12 +334,12 @@ INTERNAL_FUNCTION rc2 PrintTextWithFontAligned(font* Font,
 }
 
 INTERNAL_FUNCTION rc2 PrintTextWithFontAligned(font* Font,
-                                               char* Text,
+                                               const char* Text,
                                                v2 P,
                                                f32 PixelHeight = 25.0f,
                                                u32 AlignX = TextAlign_Center,
                                                u32 AlignY = TextAlign_Center,
-                                               v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+                                               v4 C = ColorWhite())
 {
     rc2 Result = PrintTextWithFontAligned(Font, Text,
                                           RectMinMax(P, P),
@@ -347,9 +350,46 @@ INTERNAL_FUNCTION rc2 PrintTextWithFontAligned(font* Font,
     return Result;
 }
 
+
+INTERNAL_FUNCTION
+rc2 PrintTextWithFontCenteredInRect(font* Font,
+                                    const char* Text,
+                                    rc2 Rect,
+                                    v4 C = ColorWhite())
+{
+    v2 TextSize100 = GetTextSizeWithFont(Font, Text, 100.0f);
+    v2 RectDim = GetDim(Rect);
+    
+    f32 NormValueX = TextSize100.x / RectDim.x;
+    f32 NormValueY = TextSize100.y / RectDim.y;
+    
+    f32 NormValue = 1.0f;
+    if (NormValueX > NormValueY)
+    {
+        NormValue = NormValueX;
+    }
+    else
+    {
+        NormValue = NormValueY;
+    }
+    
+    f32 NewPixelHeight = 100.0f / NormValue;
+    
+    rc2 Result = PrintTextWithFontAligned(Font,
+                                          Text,
+                                          GetCenter(Rect),
+                                          NewPixelHeight,
+                                          TextAlign_Center,
+                                          TextAlign_Center,
+                                          C);
+    
+    return Result;
+}
+
+
 INTERNAL_FUNCTION rc2 PrintText(char* Text,
                                 v2 P,
-                                v4 C = V4(1.0f, 1.0f, 1.0f, 1.0f))
+                                v4 C = ColorWhite())
 {
     ui_params* Params = UIGetParams();
     font* Font = Params->Font;
@@ -1348,7 +1388,7 @@ INTERNAL_FUNCTION b32 TextElement(u32 Flags, b32* OpenedInTree,
         }
         
         // NOTE(Dima): Interaction
-        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_Avg);
+        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_High);
         
         ProcessMouseKeyInteractionInRect(&Interaction, 
                                          KeyMouse_Left, 
@@ -1550,7 +1590,7 @@ void SliderFloat(const char* Name,
         
         
         // NOTE(Dima): Processing mouse interaction
-        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_Avg);
+        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_High);
         
         ProcessMouseKeyInteractionInRect(&Interaction,
                                          KeyMouse_Left,
@@ -1687,7 +1727,7 @@ void SliderInt(const char* Name,
         v4 AnchorColor = UIGetColor(UIColor_AnchorInactive);
         
         // NOTE(Dima): Processing mouse interaction
-        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_Avg);
+        ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_High);
         
         ProcessMouseKeyInteractionInRect(&Interaction,
                                          KeyMouse_Left,

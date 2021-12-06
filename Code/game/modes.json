@@ -4,6 +4,10 @@
 		"Method_OnGUI": true
 	},
 
+	"AssetTool": {
+		"FileName": "game/mode_asset_tool.cpp"
+	},
+
 	"GraphShow": {
 		"FileName": "game/mode_graph_show.cpp"
 	},

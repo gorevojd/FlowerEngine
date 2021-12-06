@@ -1,36 +1,8 @@
-#include "flower_asset_shared.cpp"
+#include "asset_tool.h"
+#include "asset_tool.cpp"
 
-// TODO(Dima): This should be included in asset tool at some point in time
-#include "asset_tool_adding.cpp"
 
-#define GetAssetDataByID(storage, id, type) (type*)GetAssetDataByID_(storage, id)
-#define G_GetAssetDataByID(id, type) (type*)GetAssetDataByID_(GetGlobalAssetStorage(), id)
-
-INTERNAL_FUNCTION inline 
-asset_storage* GetGlobalAssetStorage()
-{
-    asset_storage* Result = &Global_Assets->AssetStorage;
-    
-    return Result;
-}
-
-INTERNAL_FUNCTION inline 
-asset_id GetAssetID(const char* GUID)
-{
-    asset_id Result = GetAssetID(GetGlobalAssetStorage(), GUID);
-    
-    return Result;
-}
-
-INTERNAL_FUNCTION 
-void StartAssetLoading(asset_storage* Storage, 
-                       asset_id AssetID,
-                       b32 Immediate)
-{
-    
-}
-
-#if 1
+#if 0
 INTERNAL_FUNCTION 
 void AddBear(asset_storage* Storage)
 {
@@ -305,7 +277,9 @@ void AddFonts(asset_storage* Storage)
 INTERNAL_FUNCTION 
 void AddCommonAssets(asset_storage* Storage)
 {
+    AddCars(Storage);
     AddFonts(Storage);
+    AddAnimals(Storage);
     
     // NOTE(Dima): Loading default images
     asset_id BoxDiffuseID = AddAssetImage(Storage, 
@@ -393,28 +367,119 @@ void AddCommonAssets(asset_storage* Storage)
 }
 #endif
 
-INTERNAL_FUNCTION void InitAssetSystem(memory_arena* Arena)
+INTERNAL_FUNCTION 
+b32 ButtonAt(font* Font,
+             char* ButtonText,
+             rc2 PackRect)
 {
-    Global_Assets = PushStruct(Arena, asset_system);
-    Global_Assets->Arena = Arena;
+    b32 Result = false;
     
-    asset_system* A = Global_Assets;
+    v4 ColorBack = ColorGray(0.05f);
+    v4 ColorText = ColorGray(0.95f);
     
-    InitAssetStorage(&A->AssetStorage);
+    ui_element* Element = UIBeginElement(ButtonText, UIElement_Static);
     
+    // NOTE(Dima): Processing global interaction
+    ui_interaction Interaction = CreateInteraction(Element, InteractionPriority_Avg);
+    
+    ProcessMouseKeyInteractionInRect(&Interaction, 
+                                     KeyMouse_Left, 
+                                     PackRect);
+    
+    
+    if (Interaction.WasHotInInteraction)
     {
-        //asset_pack* Pack = UseAssetPack(&Global_Assets->LoadingCtx, "common");
-        //asset_storage* Storage = &Pack->AssetStorage;
+        ColorBack = ColorGray(0.95f);
+        ColorText = ColorGray(0.05f);
         
-        AddCommonAssets(&Global_Assets->AssetStorage);
-        AddCars(&Global_Assets->AssetStorage);
-        AddAnimals(&Global_Assets->AssetStorage);
-        
-#if 0
-        
-        WriteAssetPackToFile(Pack);
-#endif
-        
+        if (Interaction.WasActiveInInteraction)
+        {
+            Result = true;
+        }
     }
+    
+    // NOTE(Dima): Pusing rect and it's outline 
+    PushRect(Global_RenderCommands->DEBUG_Rects2D_Window,
+             PackRect,
+             ColorBack);
+    PushRectOutline(Global_RenderCommands->DEBUG_Rects2D_Window,
+                    PackRect,
+                    3.0f,
+                    ColorBlack());
+    
+    // NOTE(Dima): Printing text
+    PrintTextWithFontCenteredInRect(Font,
+                                    Element->DisplayName,
+                                    PackRect,
+                                    ColorText);
+    
+    UIEndElement(UIElement_Static);
+    
+    return Result;
 }
 
+INTERNAL_FUNCTION void DisplayAssetPacksScreen(asset_tool* Tool)
+{
+    asset_id DimboID = GetAssetID("Font_Dimbo");
+    font* Font = G_GetAssetDataByID(DimboID, font);
+    
+    v2 WndDims = G_GetWindowDimensions();
+    
+    if (BeginLayout("AssetPacks"))
+    {
+        
+        v2 StartAt = V2(50.0f, 200.0f);
+        v2 PrintAt = StartAt;
+        v2 ButtonDim = V2(400.0f, 100.0f);
+        v2 Spacing = V2(50);
+        
+        for (int PackIndex = 0;
+             PackIndex < Tool->NumPacksInUse;
+             PackIndex++)
+        {
+            asset_pack* Pack = &Tool->Packs[PackIndex];
+            
+            rc2 PackRect = RectMinDim(PrintAt, ButtonDim);
+            
+            if (PackRect.Max.x > WndDims.x)
+            {
+                PrintAt.x = StartAt.x;
+                PrintAt.y = PackRect.Max.y + Spacing.y;
+                
+                PackRect = RectMinDim(PrintAt, ButtonDim);
+            }
+            
+            b32 Clicked = ButtonAt(Font, 
+                                   Pack->Name, 
+                                   PackRect);
+            
+            PrintAt.x = PackRect.Max.x + Spacing.x;
+        }
+        
+        EndLayout();
+    }
+    
+}
+
+
+SCENE_INIT(AssetTool)
+{
+    asset_tool* Tool = GetSceneState(asset_tool);
+    
+    UseAssetPack(Tool, "Cars");
+    UseAssetPack(Tool, "Fonts");
+    UseAssetPack(Tool, "Animals");
+    UseAssetPack(Tool, "Minecraft");
+    
+    
+    //AddCommonAssets(&Global_Assets->AssetStorage);
+}
+
+SCENE_UPDATE(AssetTool)
+{
+    asset_tool* Tool = GetSceneState(asset_tool);
+    
+    PushClear(ColorRed().rgb);
+    
+    DisplayAssetPacksScreen(Tool);
+}
