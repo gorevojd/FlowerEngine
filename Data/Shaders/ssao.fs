@@ -63,6 +63,7 @@ void main()
 		vec3 T = normalize(Rvec - ViewN * dot(ViewN, Rvec));
 		vec3 B = cross(T, ViewN);
 
+		//mat3 TBN = mat3(T, B, ViewN);
 		mat3 TBN = transpose(mat3(T, B, ViewN));
 
 		float Occlusion = 0.0f;

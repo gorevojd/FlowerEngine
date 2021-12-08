@@ -22,14 +22,14 @@ struct posterize_params
 {
     int Levels;
     
-    framebuffer_pool_resolution Resolution;
+    rt_downscale_res Resolution;
 };
 
 struct box_blur_params
 {
     int RadiusSize;
     b32 EnableCheapMode;
-    framebuffer_pool_resolution Resolution;
+    rt_downscale_res Resolution;
 };
 
 struct dilation_params
@@ -39,7 +39,7 @@ struct dilation_params
     f32 MinThreshold;
     f32 MaxThreshold;
     
-    framebuffer_pool_resolution Resolution;
+    rt_downscale_res Resolution;
 };
 
 struct crt_display_params
@@ -55,7 +55,7 @@ struct crt_display_params
     f32 VignetteBrightnessCompensation;
     f32 VignettePower;
     
-    framebuffer_pool_resolution Resolution;
+    rt_downscale_res Resolution;
 };
 
 struct dof_params
@@ -76,8 +76,8 @@ struct ssao_params
     b32 BlurEnabled;
     int BlurRadius;
     
-    framebuffer_pool_resolution Resolution;
-    framebuffer_pool_resolution BlurResolution;
+    rt_downscale_res Resolution;
+    rt_downscale_res BlurResolution;
 };
 
 struct post_proc_params
@@ -113,7 +113,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             posterize_params* Posterize = &ParamsBase->Union.Posterize;
             
             Posterize->Levels = 7;
-            Posterize->Resolution = FramebufPoolRes_Normal;
+            Posterize->Resolution = DownscaleRes_1;
         }break;
         
         case PostProcEffect_BoxBlur:
@@ -122,7 +122,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             
             BoxBlur->RadiusSize = 2;
             BoxBlur->EnableCheapMode = false;
-            BoxBlur->Resolution = FramebufPoolRes_Normal;
+            BoxBlur->Resolution = DownscaleRes_1;
         }break;
         
         case PostProcEffect_Dilation:
@@ -132,7 +132,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             Dilation->Size = 2;
             Dilation->MinThreshold = 0.1f;
             Dilation->MaxThreshold = 0.3f;
-            Dilation->Resolution = FramebufPoolRes_Normal;
+            Dilation->Resolution = DownscaleRes_1;
         }break;
         
         case PostProcEffect_DOF:
@@ -156,7 +156,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             SSAO->BlurRadius = 2;
             SSAO->BlurEnabled = true;
             
-            framebuffer_pool_resolution Res = FramebufPoolRes_Normal;
+            rt_downscale_res Res = DownscaleRes_1;
             SSAO->Resolution = Res;
             SSAO->BlurResolution = Res;
         }break;
@@ -174,7 +174,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             Params->VignettePower = 0.5f;
             Params->VignetteBrightnessCompensation = 1.3f;
             
-            Params->Resolution = FramebufPoolRes_Normal;
+            Params->Resolution = DownscaleRes_1;
         }break;
     }
 }

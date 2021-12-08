@@ -7,6 +7,13 @@
 
 #include "flower_opengl_shader.h"
 
+enum gbuffer_color_texture_types
+{
+    GBufferTex_Colors,
+    GBufferTex_Normals,
+    GBufferTex_Positions,
+};
+
 struct opengl_framebuffer_texture_params
 {
     // NOTE(Dima): GL_R8, GL_RGBA8, GL_RGB32F, ...
@@ -17,6 +24,8 @@ struct opengl_framebuffer_texture_params
     
     // NOTE(Dima): Component type GL_UNSIGNED_BYTE, GL_FLOAT, GL_HALF_FLOAT, GL_UNSIGNED_SHORT_5_6_5
     GLuint Type;
+    
+    GLuint Filtering;
 };
 
 struct opengl_framebuffer
@@ -27,8 +36,7 @@ struct opengl_framebuffer
     u32 ColorTextures[MAX_COLOR_ATTACHMENTS];
     u32 DepthTexture;
     
-    int Width;
-    int Height;
+    iv2 Resolution;
     
     // NOTE(Dima): These ones are used only if allocated through Pool
     int IndexInPools;
@@ -41,6 +49,27 @@ struct opengl_array_object
     u32 VBO;
     u32 EBO;
 };
+
+#if 0
+enum render_target_type
+{
+    RenderTarget_GBuffer,
+    
+    RenderTarget_Composition,
+    RenderTarget_Composition_Blur,
+    
+    RenderTarget_SSAO,
+    RenderTarget_SSAO_Blur,
+    
+    RenderTarget_PostProc0,
+    RenderTarget_PostProc1,
+    
+    RenderTarget_Bloom,
+    RenderTarget_Bloom_1div2,
+    RenderTarget_Bloom_1div4,
+    RenderTarget_Bloom_1div8,
+};
+#endif
 
 struct opengl_framebuffer_pool
 {
@@ -98,8 +127,10 @@ struct opengl_state
     opengl_shader* RenderWaterShader;
     opengl_shader* CrtDisplayShader;
     
-    opengl_g_buffer GBuffer;
+    opengl_framebuffer GBuffer;
     
+    opengl_framebuffer SSAOBuffer;
+    opengl_framebuffer SSAOBlurBuffer;
     u32 SSAONoiseTex;
     
     // NOTE(Dima): Screen quad
@@ -112,7 +143,7 @@ struct opengl_state
     int InitCascadesCount;
     
     // NOTE(Dima): Framebuffer pools
-#define NUM_FRAMEBUFFER_POOLS (FramebufPoolType_Count * FramebufPoolRes_Count)
+#define NUM_FRAMEBUFFER_POOLS (FramebufPoolType_Count * DownscaleRes_Count)
     opengl_framebuffer_pool FramebufferPools[NUM_FRAMEBUFFER_POOLS];
     
     int MaxCombinedTextureUnits;

@@ -128,7 +128,7 @@ m44 GetViewMatrix(game_camera* Camera)
 INTERNAL_FUNCTION void SetRenderPassDataFromCamera(render_pass* RenderPass,
                                                    game_camera* Camera)
 {
-    window_dimensions* WndDims = &Global_RenderCommands->WindowDimensions;
+    iv2 CurDim = G_GetCurrentWindowDim();
     
     m44 View = GetViewMatrix(Camera);
     
@@ -136,7 +136,7 @@ INTERNAL_FUNCTION void SetRenderPassDataFromCamera(render_pass* RenderPass,
     
     if (IsMode2D)
     {
-        f32 WidthOverHeight = (f32)WndDims->Width / (f32)WndDims->Height;
+        f32 WidthOverHeight = (f32)CurDim.Width / (f32)CurDim.Height;
         
         SetOrthographicPassData(RenderPass,
                                 Camera->P,
@@ -151,8 +151,8 @@ INTERNAL_FUNCTION void SetRenderPassDataFromCamera(render_pass* RenderPass,
         SetPerspectivePassData(RenderPass,
                                Camera->P,
                                View, 
-                               WndDims->Width,
-                               WndDims->Height,
+                               CurDim.Width,
+                               CurDim.Height,
                                Camera->FarClipPlane,
                                Camera->NearClipPlane);
     }

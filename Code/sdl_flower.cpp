@@ -971,8 +971,8 @@ INTERNAL_FUNCTION void ProcessInput()
     
     // NOTE(Dima): Getting window dimensions
     SDL_GetWindowSize(App->Window, 
-                      &App->WndDims.Width, 
-                      &App->WndDims.Height);
+                      &App->WndDims.Current.Width, 
+                      &App->WndDims.Current.Height);
     
     // NOTE(Dima): Processing input
     PreProcessInput();
@@ -1132,15 +1132,14 @@ int main(int ArgsCount, char** Args)
     Game->JobSystem = InitJobSystem(&GameArena, QueuesThreadCounts, QueuesJobCounts);
     
 #if 1
-    App->WndDims.InitWidth = 1920;
-    App->WndDims.InitHeight = 1080;
+    App->WndDims.Init.Width = 1920;
+    App->WndDims.Init.Height = 1080;
 #else
-    App->WndDims.InitWidth = 1600;
-    App->WndDims.InitHeight = 900;
+    App->WndDims.Init.Width = 1600;
+    App->WndDims.Init.Height = 900;
 #endif
     
-    App->WndDims.Width = App->WndDims.InitWidth;
-    App->WndDims.Height = App->WndDims.InitHeight;
+    App->WndDims.Current = App->WndDims.Init;
     
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -1159,8 +1158,8 @@ int main(int ArgsCount, char** Args)
     App->Window = SDL_CreateWindow("Flower",
                                    SDL_WINDOWPOS_UNDEFINED,
                                    SDL_WINDOWPOS_UNDEFINED,
-                                   App->WndDims.InitWidth,
-                                   App->WndDims.InitHeight,
+                                   App->WndDims.Init.Width,
+                                   App->WndDims.Init.Height,
                                    SDL_WINDOW_OPENGL);
     
     // NOTE(Dima): Init game

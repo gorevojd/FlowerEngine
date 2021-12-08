@@ -252,18 +252,20 @@ SCENE_UPDATE(TestGame)
 #endif
     
 #if 1    
+    iv2 CurDim = G_GetCurrentWindowDim();
+    
     render_pass* OrthoPass = AddRenderPass();
     SetOrthographicPassData(OrthoPass,
                             V3(0.0f),
                             IdentityMatrix4(),
-                            Global_RenderCommands->WindowDimensions.Width,
-                            Global_RenderCommands->WindowDimensions.Height,
+                            CurDim.Width,
+                            CurDim.Height,
                             500, 0.1f);
     
     RectBufferSetMatrices(Global_RenderCommands->DEBUG_Rects2D_Unit,
                           IdentityMatrix4(),
-                          OrthographicProjectionUnit(Global_RenderCommands->WindowDimensions.Width,
-                                                     Global_RenderCommands->WindowDimensions.Height));
+                          OrthographicProjectionUnit(CurDim.Width,
+                                                     CurDim.Height));
     
     f32 RectAtX = -1.0f;
     for (int i = 0; i < 10; i++)

@@ -447,8 +447,9 @@ INTERNAL_FUNCTION inline v2 UVToScreenPoint(float x, float y)
 {
     v2 Result;
     
-    Result.x = x * Global_UI->Params.WindowDimensions.Width;
-    Result.y = y * Global_UI->Params.WindowDimensions.Height;
+    iv2 Dim = G_GetCurrentWindowDim();
+    Result.x = x * (f32)Dim.Width;
+    Result.y = y * (f32)Dim.Height;
     
     return(Result);
 }

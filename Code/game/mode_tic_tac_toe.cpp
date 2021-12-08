@@ -126,9 +126,10 @@ SCENE_INIT(TicTacToe)
         Quad->Width = State->QuadWidth;
         Quad->VisibleWidth = State->QuadWidth * 0.95f;
         
+        iv2 CurDim = G_GetCurrentWindowDim();
         // NOTE(Dima): Reprojecting rect to window coords
-        m44 Projection = OrthographicProjectionUnit(Global_RenderCommands->WindowDimensions.Width,
-                                                    Global_RenderCommands->WindowDimensions.Height);
+        m44 Projection = OrthographicProjectionUnit(CurDim.Width,
+                                                    CurDim.Height);
         
         rc2 RectUnit = RectCenterDim(V2(Quad->CenterPUnit.x, 
                                         Quad->CenterPUnit.z), 
@@ -136,13 +137,13 @@ SCENE_INIT(TicTacToe)
         v2 NewMin = ReprojectToWindowCoords(V2(RectUnit.Min.x,
                                                RectUnit.Max.y),
                                             Projection, 
-                                            Global_RenderCommands->WindowDimensions.Width,
-                                            Global_RenderCommands->WindowDimensions.Height);
+                                            CurDim.Width,
+                                            CurDim.Height);
         v2 NewMax = ReprojectToWindowCoords(V2(RectUnit.Max.x,
                                                RectUnit.Min.y),
                                             Projection, 
-                                            Global_RenderCommands->WindowDimensions.Width,
-                                            Global_RenderCommands->WindowDimensions.Height);
+                                            CurDim.Width,
+                                            CurDim.Height);
         
         Quad->Rect = RectMinMax(NewMin, NewMax);
         Quad->CenterP = GetCenter(Quad->Rect);
@@ -589,10 +590,11 @@ void TicTac2D(tic_tac_state* State)
         }
     }
     
+    iv2 CurDim = G_GetCurrentWindowDim();
     RectBufferSetMatrices(&State->RectBuffer,
                           IdentityMatrix4(),
-                          OrthographicProjectionWindow(Global_RenderCommands->WindowDimensions.Width,
-                                                       Global_RenderCommands->WindowDimensions.Height));
+                          OrthographicProjectionWindow(CurDim.Width,
+                                                       CurDim.Height));
     
     PushRectBuffer(&State->RectBuffer);
     

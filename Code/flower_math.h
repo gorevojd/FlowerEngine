@@ -14,7 +14,8 @@
 
 // NOTE(Dima): Structures
 union v2 {
-	struct {
+	struct
+    {
 		f32 x;
 		f32 y;
 	};
@@ -27,6 +28,29 @@ union v2 {
     
     f32 e[2];
 };
+
+union iv2 {
+	struct
+    {
+        int x;
+        int y;
+	};
+    
+    struct
+    {
+        int w;
+        int h;
+    };
+    
+    struct 
+    {
+        int Width;
+        int Height;
+    };
+    
+    f32 e[2];
+};
+
 
 union v3
 {
@@ -254,6 +278,26 @@ inline v2 V2(f32 x, f32 y)
     Res.y = y;
     
     return(Res);
+}
+
+inline v2 V2(iv2 Value)
+{
+    v2 Result;
+    
+    Result.x = Value.x;
+    Result.y = Value.y;
+    
+    return Result;
+}
+
+inline iv2 IV2(int x, int y)
+{
+    iv2 Result;
+    
+    Result.x = x;
+    Result.y = y;
+    
+    return Result;
 }
 
 inline v3 V3(v2 xy, f32 z) 
@@ -535,6 +579,14 @@ inline v2 Add(v2 A, v2 B)
     return(A);
 }
 
+inline iv2 Add(iv2 A, iv2 B)
+{
+    A.x += B.x;
+    A.y += B.y;
+    
+    return(A);
+}
+
 inline v3 Add(v3 A, v3 B) 
 {
     A.x += B.x;
@@ -566,6 +618,14 @@ inline quat Add(quat A, quat B)
 
 /*Subtract operations*/
 inline v2 Sub(v2 A, v2 B) 
+{
+    A.x -= B.x;
+    A.y -= B.y;
+    
+    return(A);
+}
+
+inline iv2 Sub(iv2 A, iv2 B)
 {
     A.x -= B.x;
     A.y -= B.y;
@@ -607,6 +667,14 @@ inline v2 Mul(v2 A, f32 S)
 {
     A.x *= S;
     A.y *= S;
+    
+    return(A);
+}
+
+inline iv2 Mul(iv2 A, int B)
+{
+    A.x *= B;
+    A.y *= B;
     
     return(A);
 }
@@ -773,6 +841,14 @@ inline v2 Div(v2 A, f32 S)
     return(A);
 }
 
+inline iv2 Div(iv2 A, int S)
+{
+    A.x /= S;
+    A.y /= S;
+    
+    return(A);
+}
+
 inline v3 Div(v3 A, f32 S) 
 {
     f32 OneOverS = 1.0f / S;
@@ -853,6 +929,28 @@ inline v2 &operator+=(v2& A, v2 b) { return(A = A + b); }
 inline v2 &operator-=(v2& A, v2 b) { return(A = A - b); }
 inline v2 &operator*=(v2& A, f32 S) { return(A = A * S); }
 inline v2 &operator/=(v2& A, f32 S) { return(A = A / S); }
+
+/*iv2 operator overloading*/
+inline iv2 operator+(iv2 A) { return(A); }
+inline iv2 operator-(iv2 A) { iv2 R = { -A.x, -A.y }; return(R); }
+
+inline iv2 operator+(iv2 A, iv2 b) { return Add(A, b); }
+inline iv2 operator-(iv2 A, iv2 b) { return Sub(A, b); }
+
+inline iv2 operator*(iv2 A, int S) { return Mul(A, S); }
+inline iv2 operator*(f32 S, iv2 A) { return Mul(A, S); }
+inline iv2 operator/(iv2 A, int S) { return Div(A, S); }
+
+inline iv2 operator*(iv2 A, iv2 b) { iv2 R = { A.x * b.x, A.y * b.y }; return(R); }
+inline iv2 operator/(iv2 A, iv2 b) { iv2 R = { A.x / b.x, A.y / b.y }; return(R); }
+
+inline iv2 &operator+=(iv2& A, iv2 b) { return(A = A + b); }
+inline iv2 &operator-=(iv2& A, iv2 b) { return(A = A - b); }
+inline iv2 &operator*=(iv2& A, int S) { return(A = A * S); }
+inline iv2 &operator/=(iv2& A, int S) { return(A = A / S); }
+
+inline b32 operator==(const iv2& A, const iv2& B) { return (A.x == B.x && A.y == B.y); }
+inline b32 operator!=(const iv2& A, const iv2& B) { return !(A == B); }
 
 /*v3 operator overloading*/
 inline v3 operator+(v3 A) { return(A); }

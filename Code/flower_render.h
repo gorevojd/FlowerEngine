@@ -10,13 +10,14 @@ enum framebuffer_pool_type
     FramebufPoolType_Count,
 };
 
-enum framebuffer_pool_resolution
+enum rt_downscale_res
 {
-    FramebufPoolRes_Normal,
-    FramebufPoolRes_Half,
-    FramebufPoolRes_Quater,
+    DownscaleRes_1,
+    DownscaleRes_1div2,
+    DownscaleRes_1div4,
+    //DownscaleRes_1div8,
     
-    FramebufPoolRes_Count,
+    DownscaleRes_Count,
 };
 
 struct framebuffer_in_pool_params
@@ -30,6 +31,7 @@ enum type_color_output
     ColorOutput_MainColor,
     ColorOutput_SSAO,
     ColorOutput_LinearDepth,
+    ColorOutput_Normals,
     
     ColorOutput_Count,
 };
@@ -270,11 +272,16 @@ struct batch_rect_buffer
 
 struct window_dimensions
 {
+    iv2 Init;
+    iv2 Current;
+    
+#if 0    
     int InitWidth;
     int InitHeight;
     
     int Width;
     int Height;
+#endif
 };
 
 struct render_api_dealloc_entry

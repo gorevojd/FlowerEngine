@@ -1,11 +1,9 @@
 #include "flower_lighting.cpp"
 #include "flower_postprocess.cpp"
 
-inline v2 G_GetWindowDimensions()
+inline iv2 G_GetCurrentWindowDim()
 {
-    window_dimensions* Dims = &Global_RenderCommands->WindowDimensions;
-    
-    v2 Result = V2(Dims->Width, Dims->Height);
+    iv2 Result = Global_RenderCommands->WindowDimensions.Current;
     
     return Result;
 }
@@ -451,8 +449,7 @@ INTERNAL_FUNCTION inline void PushCenteredQuad(batch_rect_buffer* RectBuffer,
 INTERNAL_FUNCTION inline void PushFullscreenRect(v4 C = ColorWhite())
 {
     rc2 Rect = RectMinDim(V2(0.0f, 0.0f), 
-                          V2(Global_RenderCommands->WindowDimensions.Width,
-                             Global_RenderCommands->WindowDimensions.Height));
+                          V2(Global_RenderCommands->WindowDimensions.Current));
     
     PushRect(Global_RenderCommands->DEBUG_Rects2D_Window, Rect, C);
 }
@@ -998,17 +995,18 @@ INTERNAL_FUNCTION void BeginRender(window_dimensions WindowDimensions,
     // NOTE(Dima): Resetting mesh instance table
     ResetMeshInstanceTable();
     
+    iv2 CurDim = Commands->WindowDimensions.Current;
     
     // NOTE(Dima): Setting default rect buffers matrices
     RectBufferSetMatrices(Commands->DEBUG_Rects2D_Window,
                           IdentityMatrix4(),
-                          OrthographicProjectionWindow(Commands->WindowDimensions.Width,
-                                                       Commands->WindowDimensions.Height));
+                          OrthographicProjectionWindow(CurDim.Width,
+                                                       CurDim.Height));
     
     RectBufferSetMatrices(Commands->DEBUG_Rects2D_Unit,
                           IdentityMatrix4(),
-                          OrthographicProjectionUnit(Commands->WindowDimensions.Width,
-                                                     Commands->WindowDimensions.Height));
+                          OrthographicProjectionUnit(CurDim.Width,
+                                                     CurDim.Height));
     
     // NOTE(Dima): Resetting current frame active fonts
     for (int i = 0; i < ArrLen(Commands->ActiveFrameUniqueFonts); i++)

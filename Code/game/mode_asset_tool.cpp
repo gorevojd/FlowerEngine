@@ -423,7 +423,7 @@ INTERNAL_FUNCTION void DisplayAssetPacksScreen(asset_tool* Tool)
     asset_id DimboID = GetAssetID("Font_Dimbo");
     font* Font = G_GetAssetDataByID(DimboID, font);
     
-    v2 WndDims = G_GetWindowDimensions();
+    iv2 WndDims = G_GetCurrentWindowDim();
     
     if (BeginLayout("AssetPacks"))
     {

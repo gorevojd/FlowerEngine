@@ -1,5 +1,5 @@
 INTERNAL_FUNCTION
-void DisplayResolutionRadioButton(framebuffer_pool_resolution* Resolution,
+void DisplayResolutionRadioButton(rt_downscale_res* Resolution,
                                   char* Name)
 {
     ui_params* Params = UIGetParams();
@@ -8,19 +8,19 @@ void DisplayResolutionRadioButton(framebuffer_pool_resolution* Resolution,
     
     ShowTextUnformatted(Name);
     
-    if(Button("1x", *Resolution == FramebufPoolRes_Normal))
+    if(Button("1x", *Resolution == DownscaleRes_1))
     {
-        *Resolution = FramebufPoolRes_Normal;
+        *Resolution = DownscaleRes_1;
     }
     
-    if(Button("0.5x", *Resolution == FramebufPoolRes_Half))
+    if(Button("0.5x", *Resolution == DownscaleRes_1div2))
     {
-        *Resolution = FramebufPoolRes_Half;
+        *Resolution = DownscaleRes_1div2;
     }
     
-    if(Button("0.25x", *Resolution == FramebufPoolRes_Quater))
+    if(Button("0.25x", *Resolution == DownscaleRes_1div4))
     {
-        *Resolution = FramebufPoolRes_Quater;
+        *Resolution = DownscaleRes_1div4;
     }
     
     EndRow();

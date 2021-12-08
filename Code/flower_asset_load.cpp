@@ -650,6 +650,8 @@ INTERNAL_FUNCTION void AddGlyphToFont(load_font_context* Ctx, u32 Codepoint)
                                ImageOutlineH,
                                GlyphStyle_Outline);
                 
+                // TODO(Dima): Implement other outline algo
+                
 #if 0       
                 RenderOneBitmapIntoAnother(&OutlineSrc,
                                            &StbImage,

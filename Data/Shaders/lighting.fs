@@ -195,12 +195,12 @@ void main()
 
 	vec4 SampleColorSpec = texture2D(ColorSpecTex, FragUV);
 	float SampleDepth = texture2D(DepthTex, FragUV).r;
-
+	vec3 WorldN = texture2D(NormalTex, FragUV).xyz;
+	vec3 WorldP = texture2D(PositionsTex, FragUV).xyz;
+		
 	vec3 ResultColor;
 	if(SampleDepth < 0.9999999)
 	{
-		vec3 WorldN = texture2D(NormalTex, FragUV).xyz;
-		vec3 WorldP = texture2D(PositionsTex, FragUV).xyz;
 		
 		float TotalShadow = 0.0f;
 		if(CalculateDirLightShadow)
@@ -240,6 +240,10 @@ void main()
 	else if (TypeColorOutput == 2)
 	{
 		Color = vec4(vec3(GetLinearizedDepth(FragUV) / 1500.0f), 1.0f);
+	}
+	else if (TypeColorOutput == 3)
+	{
+		Color = vec4(WorldN * 0.5 + vec3(0.5), 1.0);
 	}
 
 	//Color = vec4(SamplePosition, 1.0f);
