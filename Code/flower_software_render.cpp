@@ -87,7 +87,32 @@ void Normalize2DGaussianBox(float* Box, int Radius)
 	}
 }
 
-void Calculate2DGaussianBox(float* Box, int Radius) 
+void GaussianKernelGenerate1D(f32* Arr, int Radius)
+{
+	f32 Sigma = (f32)Radius * 0.45f;
+	f32 SigmaSq = Sigma * Sigma;
+	f32 Multiplyer = 1.0f / sqrtf(6.28318530718 * SigmaSq);
+	f32 InExpMultiplyer = -1.0f / (2.0f * SigmaSq);
+    
+	f32 TempSum = 0.0f;
+	for (int Index = 0; Index <= Radius; Index++)
+	{
+		f32 UsePower = (f32)(Index * Index) * InExpMultiplyer;
+        
+		f32 Value = Multiplyer * expf(UsePower);
+		Arr[Index] = Value;
+        
+		TempSum += Value * (Index != 0 ? 2.0f : 1.0f);
+	}
+    
+	f32 Norm = 1.0f / TempSum;
+	for (int Index = 0; Index <= Radius; Index++)
+	{
+		Arr[Index] = Arr[Index] * Norm;
+	}
+}
+
+void GaussianBoxGenerate2D(float* Box, int Radius) 
 {
 	int Diameter = Radius + Radius + 1;
     

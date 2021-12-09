@@ -153,7 +153,7 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
             SSAO->KernelRadius = 0.6f;
             SSAO->Contribution = 1.0f;
             SSAO->RangeCheck = 0.25f;
-            SSAO->BlurRadius = 2;
+            SSAO->BlurRadius = 4;
             SSAO->BlurEnabled = true;
             
             rt_downscale_res Res = DownscaleRes_1;
@@ -182,9 +182,12 @@ inline void PostProcEffect_DefaultParams(post_proc_params* ParamsBase, u32 Effec
 struct post_processing
 {
     random_generation Random;
+    memory_arena* Arena;
     
     v3 SSAO_Kernel[128];
     v3 SSAO_Noise[16];
+    
+    f32* Gaussian1DKernelForRadius[16];
     
 #define POST_PROC_MAX_EFFECTS 32
     post_proc_effect Effects[POST_PROC_MAX_EFFECTS];

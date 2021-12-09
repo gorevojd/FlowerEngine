@@ -74,7 +74,7 @@ void DisplayParams_SSAO(ssao_params* Params)
     SliderFloat("RangeCheck", &Params->RangeCheck, 0.0f, 1.0f);
     
     BoolButton("BlurEnabled", &Params->BlurEnabled);
-    SliderInt("BlurRadius", &Params->BlurRadius, 1, 5);
+    SliderInt("BlurRadius", &Params->BlurRadius, 1, 8);
 }
 
 INTERNAL_FUNCTION

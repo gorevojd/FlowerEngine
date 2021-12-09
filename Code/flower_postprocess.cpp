@@ -41,9 +41,10 @@ INTERNAL_FUNCTION void InitSSAO(post_processing* PP)
     }
 }
 
-INTERNAL_FUNCTION void InitPostprocessing(post_processing* PP)
+INTERNAL_FUNCTION void InitPostprocessing(post_processing* PP, memory_arena* Arena)
 {
     PP->Random = SeedRandom(62313);
+    PP->Arena = Arena;
     
     InitSSAO(PP);
     
@@ -66,4 +67,16 @@ INTERNAL_FUNCTION void InitPostprocessing(post_processing* PP)
     
     post_proc_effect* Posterize = PostProcEffect_Add(PP, "Posterize",
                                                      PostProcEffect_Posterize);
+    
+    // NOTE(Dima): Init precomputed 1d gaussian kernels
+    for (int Radius = 0; 
+         Radius < ArrLen(PP->Gaussian1DKernelForRadius); 
+         Radius++)
+    {
+        f32* Kernel = PushArray(Arena, f32, Radius + 1);
+        
+        GaussianKernelGenerate1D(Kernel, Radius);
+        
+        PP->Gaussian1DKernelForRadius[Radius] = Kernel;
+    }
 }

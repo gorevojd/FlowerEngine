@@ -130,7 +130,8 @@ struct opengl_state
     opengl_framebuffer GBuffer;
     
     opengl_framebuffer SSAOBuffer;
-    opengl_framebuffer SSAOBlurBuffer;
+    opengl_framebuffer SSAOBlurBuffer1;
+    opengl_framebuffer SSAOBlurBuffer2;
     u32 SSAONoiseTex;
     
     // NOTE(Dima): Screen quad

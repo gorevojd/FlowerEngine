@@ -42,7 +42,7 @@ void Lighting_ShowShadowsOverlay(lighting* Lighting)
     BoolButton("BlurShadowMaps", &Lighting->BlurVarianceShadowMaps);
     SliderInt("BlurRadius", 
               &Lighting->VarianceShadowMapBlurRadius,
-              1, 4);
+              1, 8);
     SliderFloat("ShadowStrength", &Lighting->ShadowStrength, 0.0f, 1.0f);
     
 }

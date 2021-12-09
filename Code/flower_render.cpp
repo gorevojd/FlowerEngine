@@ -1063,7 +1063,7 @@ INTERNAL_FUNCTION void InitRender(memory_arena* Arena, window_dimensions Dimensi
     
     // NOTE(Dima): Init other stuff
     InitLighting(&Comms->Lighting, Arena);
-    InitPostprocessing(&Comms->PostProcessing);
+    InitPostprocessing(&Comms->PostProcessing, Arena);
     
     Comms->DefaultSkyColor = V3(0.1f, 0.7f, 0.8f);
     Comms->DefaultSkyType = RenderSky_SolidColor;

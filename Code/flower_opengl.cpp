@@ -1164,12 +1164,6 @@ INTERNAL_FUNCTION void OpenGL_InitSSAO(render_commands* Commands,
     opengl_state* OpenGL = GetOpenGL(Commands);
     post_processing* PP = &Commands->PostProcessing;
     
-    // NOTE(Dima): Initializing SSAO framebuffer
-    OpenGL_InitFlowBufferSSAO(&OpenGL->SSAOBuffer, Width, Height);
-    
-    // NOTE(Dima): Initializing SSAO Blur framebuffer
-    OpenGL_InitFlowBufferSSAO(&OpenGL->SSAOBlurBuffer, Width, Height);
-    
     // NOTE(Dima): init SSAO noise texture
     glGenTextures(1, &OpenGL->SSAONoiseTex);
     glBindTexture(GL_TEXTURE_2D, OpenGL->SSAONoiseTex);
@@ -1187,10 +1181,50 @@ INTERNAL_FUNCTION void OpenGL_FreeSSAO(render_commands* Commands)
     glDeleteTextures(1, &OpenGL->SSAONoiseTex);
     
     // NOTE(Dima): Freing SSAO Blur Framebuffer
-    OpenGL_FreeFramebuffer(&OpenGL->SSAOBlurBuffer);
+    OpenGL_FreeFramebuffer(&OpenGL->SSAOBlurBuffer1);
+    OpenGL_FreeFramebuffer(&OpenGL->SSAOBlurBuffer2);
     
     // NOTE(Dima): Freing SSAO Framebuffer
     OpenGL_FreeFramebuffer(&OpenGL->SSAOBuffer);
+}
+
+INTERNAL_FUNCTION
+u32 OpenGL_DoBlurSSAO(render_commands* Commands, 
+                      opengl_framebuffer* BlurBuffer, 
+                      ssao_params* Params,
+                      render_pass* RenderPass,
+                      b32 IsHorizontal,
+                      u32 InTexture)
+{
+    opengl_state* OpenGL = GetOpenGL(Commands);
+    post_processing* PP = &Commands->PostProcessing;
+    opengl_shader* Shader = OpenGL->SSAOBlurShader;
+    
+    OpenGL_PreProcessFramebuffer(BlurBuffer,
+                                 Params->BlurResolution,
+                                 IV2(RenderPass->Width, RenderPass->Height),
+                                 OpenGL_InitFlowBufferSSAO);
+    
+    OpenGL_BindFramebuffer(BlurBuffer);
+    
+    // NOTE(Dima): Setting shader params
+    Shader->Use();
+    Shader->SetTexture2D("OcclusionTex", InTexture, 0);
+    Shader->SetInt("BlurRadius", Params->BlurRadius);
+    Shader->SetBool("IsHorizontalPass", IsHorizontal);
+    
+    Assert(Params->BlurRadius < ArrLen(PP->Gaussian1DKernelForRadius));
+    Shader->SetFloatArray("GaussianKernel", 
+                          PP->Gaussian1DKernelForRadius[Params->BlurRadius], 
+                          Params->BlurRadius + 1);
+    
+    // NOTE(Dima): Rendering
+    glBindVertexArray(OpenGL->ScreenQuad.VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    
+    u32 Result = BlurBuffer->ColorTextures[0];
+    
+    return Result;
 }
 
 INTERNAL_FUNCTION 
@@ -1250,26 +1284,20 @@ u32 OpenGL_DoSSAO(render_commands* Commands,
     // NOTE(Dima): SSAO Blur pass if enabled
     if (Params->BlurEnabled)
     {
+        ResultTextureSSAO = OpenGL_DoBlurSSAO(Commands, 
+                                              &OpenGL->SSAOBlurBuffer1, 
+                                              Params, 
+                                              RenderPass,
+                                              true,
+                                              OpenGL->SSAOBuffer.ColorTextures[0]);
         
-        OpenGL_PreProcessFramebuffer(&OpenGL->SSAOBlurBuffer,
-                                     Params->BlurResolution,
-                                     IV2(RenderPass->Width, RenderPass->Height),
-                                     OpenGL_InitFlowBufferSSAO);
+        ResultTextureSSAO = OpenGL_DoBlurSSAO(Commands,
+                                              &OpenGL->SSAOBlurBuffer2, 
+                                              Params, 
+                                              RenderPass,
+                                              false,
+                                              ResultTextureSSAO);
         
-        OpenGL_BindFramebuffer(&OpenGL->SSAOBlurBuffer);
-        
-        Shader = OpenGL->SSAOBlurShader;
-        
-        // NOTE(Dima): Setting shader params
-        Shader->Use();
-        Shader->SetTexture2D("OcclusionTex", OpenGL->SSAOBuffer.ColorTextures[0], 0);
-        Shader->SetInt("BlurRadius", Params->BlurRadius);
-        
-        // NOTE(Dima): Rendering
-        glBindVertexArray(OpenGL->ScreenQuad.VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        
-        ResultTextureSSAO = OpenGL->SSAOBlurBuffer.ColorTextures[0];
     }
     
     return ResultTextureSSAO;
@@ -2492,7 +2520,39 @@ INTERNAL_FUNCTION void OpenGL_RenderCommands(render_commands* Commands, render_p
     }
 }
 
-INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
+INTERNAL_FUNCTION
+void OpenGL_DoShadowMapBlurPass(render_commands* Commands,
+                                int InTextureIndex,
+                                b32 IsHorizontalPass)
+{
+    opengl_state* OpenGL = GetOpenGL(Commands);
+    lighting* Lighting = &Commands->Lighting;
+    opengl_framebuffer* ShadowMapsFB = &OpenGL->ShadowMapsFramebuffer;
+    post_processing* PP = &Commands->PostProcessing;
+    
+    int BlurRadius = Lighting->VarianceShadowMapBlurRadius;
+    
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    
+    opengl_shader* BlurShader = OpenGL->VarianceShadowBlurShader;
+    BlurShader->Use();
+    BlurShader->SetTexture2DArray("TextureArray", 
+                                  ShadowMapsFB->ColorTextures[0], 0);
+    BlurShader->SetInt("TextureIndex", InTextureIndex);
+    BlurShader->SetBool("IsHorizontalPass", IsHorizontalPass);
+    BlurShader->SetInt("BlurRadius", BlurRadius);
+    
+    Assert(BlurRadius < ArrLen(PP->Gaussian1DKernelForRadius));
+    BlurShader->SetFloatArray("GaussianKernel", 
+                              PP->Gaussian1DKernelForRadius[BlurRadius], 
+                              BlurRadius + 1);
+    
+    glBindVertexArray(OpenGL->ScreenQuad.VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+INTERNAL_FUNCTION 
+void OpenGL_RenderShadowMaps(render_commands* Commands)
 {
     FUNCTION_TIMING();
     
@@ -2518,17 +2578,11 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
             shadow_cascade_info* Cascade = &Commands->Lighting.Cascades[CascadeIndex];
             render_pass* ShadowPass = Cascade->RenderPass;
             
-            int TargetCascadeIndex = CascadeIndex;
-            if(Lighting->BlurVarianceShadowMaps)
-            {
-                TargetCascadeIndex = OpenGL->InitCascadesCount;
-            }
-            
             // NOTE(Dima): Now bind layer to copy and create depth squared buffer
             glFramebufferTextureLayer(GL_FRAMEBUFFER,
                                       GL_COLOR_ATTACHMENT0,
                                       ShadowMapsFB->ColorTextures[0],
-                                      0, TargetCascadeIndex);
+                                      0, CascadeIndex);
             
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
             
@@ -2542,27 +2596,23 @@ INTERNAL_FUNCTION void OpenGL_RenderShadowMaps(render_commands* Commands)
             {
                 glDisable(GL_DEPTH_TEST);
                 
-                // NOTE(Dima): Apply blur
+                // NOTE(Dima): Apply blur horizontal
+                glFramebufferTextureLayer(GL_FRAMEBUFFER,
+                                          GL_COLOR_ATTACHMENT0,
+                                          ShadowMapsFB->ColorTextures[0],
+                                          0, OpenGL->InitCascadesCount);
+                OpenGL_DoShadowMapBlurPass(Commands, 
+                                           CascadeIndex, 
+                                           true);
+                
+                // NOTE(Dima): Apply blur vertical
                 glFramebufferTextureLayer(GL_FRAMEBUFFER,
                                           GL_COLOR_ATTACHMENT0,
                                           ShadowMapsFB->ColorTextures[0],
                                           0, CascadeIndex);
-                
-                glDrawBuffer(GL_COLOR_ATTACHMENT0);
-                
-                // NOTE(Dima): Rendering
-                //glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-                //glClear(GL_COLOR_BUFFER_BIT);
-                
-                opengl_shader* BlurShader = OpenGL->VarianceShadowBlurShader;
-                BlurShader->Use();
-                BlurShader->SetTexture2DArray("TextureArray", 
-                                              ShadowMapsFB->ColorTextures[0], 0);
-                BlurShader->SetInt("TextureIndex", OpenGL->InitCascadesCount);
-                BlurShader->SetInt("BlurRadius", Lighting->VarianceShadowMapBlurRadius);
-                
-                glBindVertexArray(OpenGL->ScreenQuad.VAO);
-                glDrawArrays(GL_TRIANGLES, 0, 6);
+                OpenGL_DoShadowMapBlurPass(Commands, 
+                                           OpenGL->InitCascadesCount,
+                                           false);
                 
                 glEnable(GL_DEPTH_TEST);
             }
